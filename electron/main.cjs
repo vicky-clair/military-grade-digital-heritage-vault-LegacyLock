@@ -65,13 +65,15 @@ function createWindow() {
     titleBarStyle: 'hiddenInset',
   });
 
-  const devUrl = 'http://localhost:5173';
-  if (process.env.NODE_ENV === 'development' || !app.isPackaged) {
-    mainWindow.loadURL(devUrl).catch(() => {
-      mainWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
-    });
+  if (process.env.START_URL) {
+    mainWindow.loadURL(process.env.START_URL);
   } else {
-    mainWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
+    const distPath = path.join(__dirname, '..', 'dist', 'index.html');
+    if (fs.existsSync(distPath)) {
+      mainWindow.loadFile(distPath);
+    } else {
+      mainWindow.loadURL('http://localhost:5173');
+    }
   }
 }
 
