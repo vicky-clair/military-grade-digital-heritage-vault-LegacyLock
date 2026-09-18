@@ -49,32 +49,43 @@ function runVaultCli(args) {
 }
 
 function createWindow() {
+  console.log('[Electron Main] Creating main browser window...');
   mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 820,
+    width: 1240,
+    height: 840,
     minWidth: 1024,
     minHeight: 700,
     title: 'LegacyLock 遗产保险锁 (军规级数字遗产双保险箱)',
     backgroundColor: '#061524',
+    show: false, // 先隐藏，等 ready-to-show 再显示
+    autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: false,
     },
-    titleBarStyle: 'hiddenInset',
   });
 
-  if (process.env.START_URL) {
-    mainWindow.loadURL(process.env.START_URL);
-  } else {
-    const distPath = path.join(__dirname, '..', 'dist', 'index.html');
-    if (fs.existsSync(distPath)) {
-      mainWindow.loadFile(distPath);
-    } else {
-      mainWindow.loadURL('http://localhost:5173');
-    }
-  }
+  mainWindow.once('ready-to-show', () => {
+    console.log('[Electron Main] Window ready-to-show event fired! Showing and focusing window.');
+    mainWindow.show();
+    mainWindow.setAlwaysOnTop(true);
+    mainWindow.focus();
+    mainWindow.setAlwaysOnTop(false);
+  });
+
+  mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
+    console.error('[Electron Main] Failed to load URL:', validatedURL, 'Error:', errorCode, errorDescription);
+  });
+
+  mainWindow.webContents.on('did-finish-load', () => {
+    console.log('[Electron Main] WebContents did-finish-load successfully!');
+  });
+
+  const distPath = path.join(__dirname, '..', 'dist', 'index.html');
+  console.log('[Electron Main] Loading file from:', distPath);
+  mainWindow.loadFile(distPath);
 }
 
 // 注册 IPC 通信
@@ -279,6 +290,7 @@ function registerIpcHandlers() {
 }
 
 app.whenReady().then(() => {
+  console.log('[Electron Main] app.whenReady fired!');
   registerIpcHandlers();
   createWindow();
 
