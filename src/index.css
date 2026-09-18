@@ -2581,3 +2581,108 @@ input, select, textarea {
   gap: 14px;
 }
 
+/* ==========================================================================
+   USB PASSWORD MODAL - CONSOLIDATED DUAL-KEY CONSOLE (双钥匙控制台)
+   ========================================================================== */
+.modal-window-dialog.usb-modal-dialog {
+  max-width: 860px;
+}
+
+.usb-dual-panel-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 768px) {
+  .usb-dual-panel-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.usb-key-card {
+  border-radius: 14px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  position: relative;
+  transition: all 0.2s ease;
+}
+
+.usb-key-card.master-card {
+  background: linear-gradient(180deg, rgba(5, 114, 236, 0.12) 0%, rgba(18, 26, 68, 0.75) 100%);
+  border: 1.5px solid rgba(0, 212, 255, 0.3);
+  box-shadow: inset 0 1px 0 rgba(0, 212, 255, 0.15), 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.usb-key-card.master-card:hover {
+  border-color: rgba(0, 212, 255, 0.5);
+}
+
+.usb-key-card.heir-card {
+  background: linear-gradient(180deg, rgba(168, 85, 247, 0.12) 0%, rgba(26, 18, 58, 0.75) 100%);
+  border: 1.5px solid rgba(168, 85, 247, 0.3);
+  box-shadow: inset 0 1px 0 rgba(168, 85, 247, 0.15), 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.usb-key-card.heir-card:hover {
+  border-color: rgba(168, 85, 247, 0.5);
+}
+
+.usb-key-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.usb-key-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 6px;
+  letter-spacing: 0.05em;
+}
+
+.usb-key-badge.master {
+  background: rgba(0, 212, 255, 0.15);
+  border: 1px solid rgba(0, 212, 255, 0.4);
+  color: #00D4FF;
+}
+
+.usb-key-badge.heir {
+  background: rgba(168, 85, 247, 0.15);
+  border: 1px solid rgba(168, 85, 247, 0.4);
+  color: #C084FC;
+}
+
+.usb-security-spec-bar {
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(52, 211, 153, 0.3);
+  border-radius: 12px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.usb-security-badge-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.usb-security-badge-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 12px;
+}
+
+
