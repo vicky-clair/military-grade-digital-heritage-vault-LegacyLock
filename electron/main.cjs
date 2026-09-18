@@ -66,24 +66,43 @@ function startEmbeddedServer(port = 5173) {
       '.ico': 'image/x-icon',
     };
 
+    const absDistDir = path.resolve(distDir);
+
     const server = http.createServer((req, res) => {
-      let reqPath = req.url.split('?')[0];
-      if (reqPath === '/' || !reqPath) reqPath = '/index.html';
-      let filePath = path.join(distDir, reqPath);
-      if (!fs.existsSync(filePath)) {
-        filePath = path.join(distDir, 'index.html');
-      }
-      const ext = path.extname(filePath);
-      const contentType = mimes[ext] || 'application/octet-stream';
       try {
+        let rawPath = req.url.split('?')[0];
+        let reqPath = decodeURIComponent(rawPath);
+        if (reqPath === '/' || !reqPath) reqPath = '/index.html';
+        
+        // 安全路径规范化，杜绝目录穿越攻击 (Path Traversal Protection)
+        const normalizedRel = path.normalize(reqPath).replace(/^(\.\.[\/\\])+/, '');
+        let filePath = path.resolve(absDistDir, '.' + normalizedRel);
+        
+        // 强制校验绝对路径必须处于 distDir 根目录下
+        if (!filePath.startsWith(absDistDir)) {
+          res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' });
+          res.end('403 Forbidden: Path Traversal Intercepted by LegacyLock Security');
+          return;
+        }
+
+        if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
+          filePath = path.join(absDistDir, 'index.html');
+        }
+
+        const ext = path.extname(filePath);
+        const contentType = mimes[ext] || 'application/octet-stream';
         const content = fs.readFileSync(filePath);
+        
+        // 限制 CORS 仅允许本机应用环境，防御外部网页跨域探测
         res.writeHead(200, {
           'Content-Type': contentType,
-          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Origin': `http://127.0.0.1:${port}`,
+          'X-Content-Type-Options': 'nosniff',
+          'X-Frame-Options': 'DENY',
         });
         res.end(content);
       } catch (e) {
-        res.writeHead(500);
+        res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
         res.end(e.message);
       }
     });
@@ -589,7 +608,14 @@ function registerIpcHandlers() {
         '--output', out,
       ]);
 
-      try { fs.unlinkSync(tempInput); } catch (_) {}
+      // 军规级零填充覆写并安全销毁明文临时文件
+      try {
+        if (fs.existsSync(tempInput)) {
+          const sz = fs.statSync(tempInput).size;
+          fs.writeFileSync(tempInput, Buffer.alloc(sz, 0));
+          fs.unlinkSync(tempInput);
+        }
+      } catch (_) {}
       return { success: true, data: res };
     } catch (err) {
       return { success: false, error: err.message };
@@ -600,7 +626,7 @@ function registerIpcHandlers() {
   ipcMain.handle('vault:unlock', async (_, options) => {
     try {
       const { userKey, heirKey, config, vaultPath } = options;
-      const vault = vaultPath || path.join(__dirname, '..', 'vault.locked');
+      const vault = vaultPath || getVaultContainerPath();
       const res = await runVaultCli([
         'unlock',
         '--user-key', userKey,
@@ -630,9 +656,21 @@ function registerIpcHandlers() {
     }
   });
 
+  function getVaultContainerPath() {
+    try {
+      const userPath = path.join(app.getPath('userData'), 'vault.locked');
+      if (fs.existsSync(userPath)) return userPath;
+      const projectPath = path.join(__dirname, '..', 'vault.locked');
+      if (fs.existsSync(projectPath)) return projectPath;
+      return userPath;
+    } catch (_) {
+      return path.join(__dirname, '..', 'vault.locked');
+    }
+  }
+
   // 9. 读取本地容器
   ipcMain.handle('vault:read-container', async () => {
-    const vaultPath = path.join(__dirname, '..', 'vault.locked');
+    const vaultPath = getVaultContainerPath();
     if (fs.existsSync(vaultPath)) {
       try {
         const content = fs.readFileSync(vaultPath, 'utf8');
@@ -646,9 +684,16 @@ function registerIpcHandlers() {
 
   // 10. 保存容器
   ipcMain.handle('vault:save-container', async (_, data) => {
-    const vaultPath = path.join(__dirname, '..', 'vault.locked');
-    fs.writeFileSync(vaultPath, JSON.stringify(data, null, 2), 'utf8');
-    return { success: true, path: vaultPath };
+    const vaultPath = getVaultContainerPath();
+    try {
+      fs.writeFileSync(vaultPath, JSON.stringify(data, null, 2), 'utf8');
+      return { success: true, path: vaultPath };
+    } catch (e) {
+      // 降级保存到项目根目录
+      const fallbackPath = path.join(__dirname, '..', 'vault.locked');
+      fs.writeFileSync(fallbackPath, JSON.stringify(data, null, 2), 'utf8');
+      return { success: true, path: fallbackPath };
+    }
   });
 }
 

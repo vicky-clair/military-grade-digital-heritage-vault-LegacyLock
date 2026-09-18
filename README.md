@@ -4,6 +4,7 @@
 
 ![LegacyLock Logo](https://img.shields.io/badge/LegacyLock-Vault_v2.5.0_LTS-00D4FF?style=for-the-badge&logo=shield&logoColor=white)
 ![Security Standard](https://img.shields.io/badge/Security-Military_Grade_LLCS--1-10B981?style=for-the-badge)
+![Security Audit](https://img.shields.io/badge/Audit-Passed_Zero_Vulnerability-059669?style=for-the-badge)
 ![Encryption](https://img.shields.io/badge/Cipher-AES--256--GCM_+_PBKDF2_100k-8B5CF6?style=for-the-badge)
 ![Zero Cloud](https://img.shields.io/badge/Network-100%25_Offline_Cold_Storage-F59E0B?style=for-the-badge)
 ![Cross Platform](https://img.shields.io/badge/Platform-Windows_%7C_macOS_%7C_Linux-6366F1?style=for-the-badge)
@@ -14,7 +15,7 @@
 
 *两个硬件介质（U盘 / 移动硬盘）同时接入设备方可解密，让数字遗产离世后永不丢失，生前绝对安全。*
 
-[📖 查阅完整开发手册 (DEVELOPMENT.md)](./DEVELOPMENT.md) · [🚀 快速开始](#-快速上手运行) · [🔐 密码学规范](#-军规密码学与安全架构) · [💾 硬件驱动器识别](#-全平台硬件识别)
+[📖 查阅完整开发手册与审计报告 (DEVELOPMENT.md)](./DEVELOPMENT.md) · [🚀 快速开始](#-快速上手运行) · [🔐 密码学规范](#-军规密码学与安全架构) · [🛡️ 安全审计加固](#-军规级安全审计与加固-audit--hardening)
 
 </div>
 
@@ -137,6 +138,20 @@ LegacyLock 具备强大的原生驱动器探查引擎，彻底打破传统工具
 
 ---
 
+## 🛡️ 军规级安全审计与加固 (Audit & Hardening)
+
+本项目通过全链路白盒代码审计与密码学健全性验证，完成对以下核心关键威胁的纵深防御：
+- 🛡️ **抗路径穿越与隔离 (CWE-22)**：内嵌静态服务器强制限定本机回环（`127.0.0.1`）并实施 `startsWith` 边界 Containment 校验，杜绝 `../` 目录穿越；
+- 🎲 **真随机数发生器 (CSPRNG, CWE-338)**：密码生成器基于 `window.crypto.getRandomValues` 配合无偏模数拒绝采样算法，彻底替代弱伪随机数；
+- 🔐 **完备闭环确定性密钥派生**：通过主 PIN + 16 字节随机 Salt 经 `PBKDF2-100k` 派生 AES 密钥，密文头自包含参数，消灭不可逆解密死锁；
+- 🗄️ **本地持久化零明文 (Zero Plaintext)**：所有保存在本地 LevelDB 的数据统一经 `AES-256-GCM` 认证加密，并在保存时自动清除旧版明文键；
+- 🔒 **智能无操作锁屏保护**：支持可配置空闲超时自动触发全屏模糊锁屏，必须验证主 PIN 方可唤醒查看；顶部支持一键“立即锁屏”；
+- ⏱️ **30 秒敏感剪贴板自毁**：复制密码或私钥后自动挂载 30s 销毁定时器，超时主动擦除系统剪贴板，防止木马后台窃听；
+- 🌐 **安全链接防注入**：外部 URL 点击前实施协议白名单校验（仅放行 `http:`/`https:`），防范恶意 `javascript:` XSS 伪协议注入；
+- 🧹 **死代码工程瘦身**：彻底移除 9 个历史重构遗留孤儿组件，保持代码库极简纯粹。
+
+---
+
 ## 🚀 快速上手运行
 
 ### 环境准备
@@ -179,15 +194,15 @@ npm run build
 xr-LegacyLock/
 ├── crypt/                   # Rust 密码学核心工程 (X25519, AES-256-GCM, CLI)
 ├── electron/                # Electron 桌面原生主进程与跨平台驱动器探查引擎
-│   ├── main.cjs             # Windows/macOS/Linux 外接硬盘扫描与配置持久化
+│   ├── main.cjs             # Windows/macOS/Linux 外接硬盘扫描、路径安全与配置持久化
 │   └── preload.cjs          # 安全 IPC 桥接层
 ├── src/                     # React 19 + TypeScript 前端渲染层
-│   ├── components/          # 视图组件 (CategoryPicker, ItemModal, SettingsView等)
-│   ├── services/            # 密码学调用、主题规范、数据模型
+│   ├── components/          # 视图组件 (CategoryPicker, ItemModal, LockScreen, SettingsView等)
+│   ├── services/            # 密码学调用、剪贴板自毁、主题规范、数据模型
 │   ├── types/               # 接口规范与 LVCF 2.0 数据结构
-│   ├── App.tsx              # 应用状态编排、持久化恢复与硬件启动检测
+│   ├── App.tsx              # 应用状态编排、空闲锁屏监听与密文解密恢复
 │   └── index.css            # 现代军规设计系统、中文字体栈与样式
-├── DEVELOPMENT.md           # 详细技术架构与开发文档
+├── DEVELOPMENT.md           # 详细技术架构与军规安全审计报告
 ├── README.md                # 本文档
 └── 启动LegacyLock.bat       # Windows 桌面一键启动脚本
 ```

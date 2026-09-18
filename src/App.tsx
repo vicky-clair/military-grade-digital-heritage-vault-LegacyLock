@@ -7,6 +7,7 @@ import { UsbPasswordModal } from './components/UsbPasswordModal';
 import { HealthCheckModal } from './components/HealthCheckModal';
 import { MediaMigrationModal } from './components/MediaMigrationModal';
 import { HeirRecoveryView } from './components/HeirRecoveryView';
+import { LockScreen } from './components/LockScreen';
 import { INITIAL_VAULT_ITEMS } from './services/mockData';
 import {
   EncryptedContainer,
@@ -23,18 +24,24 @@ import {
   encryptVaultWeb,
   isElectronApp,
   performVaultHealthCheck,
+  saveSecureLocalItems,
+  loadSecureLocalItems,
 } from './services/cryptoService';
 import { getTheme, DEFAULT_THEME_ID } from './services/themes';
 
 export const App: React.FC = () => {
-  const [items, setItems] = useState<VaultItem[]>(() => {
-    const saved = localStorage.getItem('legacylock_items');
-    if (saved) {
+  const [items, setItems] = useState<VaultItem[]>(INITIAL_VAULT_ITEMS);
+
+  // 军规级防暂离锁屏状态
+  const [isLocked, setIsLocked] = useState<boolean>(() => {
+    const savedPlan = localStorage.getItem('legacylock_plan');
+    if (savedPlan) {
       try {
-        return JSON.parse(saved);
+        const p = JSON.parse(savedPlan);
+        return Boolean(p.usbPasswordConfig?.hasMasterPassword && p.usbPasswordConfig?.masterPasswordHash);
       } catch (_) {}
     }
-    return INITIAL_VAULT_ITEMS;
+    return false;
   });
 
   const [plan, setPlan] = useState<HeritagePlanConfig>(() => {
@@ -183,8 +190,15 @@ export const App: React.FC = () => {
     setTimeout(() => setIsScanningDrives(false), 500);
   };
 
-  // 启动即刻自动执行：恢复最后保存的主题配色 + 自动识别外部移动硬盘/U盘
+  // 启动即刻自动执行：恢复最后保存的主题配色 + 加密加载资产 + 自动识别外部存储介质
   useEffect(() => {
+    // 异步加载 AES-256 加密的本地资产
+    loadSecureLocalItems().then((loaded) => {
+      if (loaded && loaded.length > 0) {
+        setItems(loaded);
+      }
+    });
+
     if (isElectronApp() && window.legacyLockAPI?.getAppSettings) {
       window.legacyLockAPI.getAppSettings().then((res) => {
         if (res.success && res.settings && res.settings.theme) {
@@ -196,8 +210,32 @@ export const App: React.FC = () => {
     handleRefreshDrives();
   }, []);
 
+  // 军规级防暂离空闲自动锁屏监听
   useEffect(() => {
-    localStorage.setItem('legacylock_items', JSON.stringify(items));
+    let timeoutId: any = null;
+
+    const resetIdleTimer = () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      const autoLockMin = Number(localStorage.getItem('legacylock_autolock') || '15');
+      if (autoLockMin > 0 && !isLocked) {
+        timeoutId = setTimeout(() => {
+          setIsLocked(true);
+        }, autoLockMin * 60 * 1000);
+      }
+    };
+
+    const events = ['mousemove', 'keydown', 'touchstart', 'scroll', 'click'];
+    events.forEach((ev) => window.addEventListener(ev, resetIdleTimer, { passive: true }));
+    resetIdleTimer();
+
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      events.forEach((ev) => window.removeEventListener(ev, resetIdleTimer));
+    };
+  }, [isLocked]);
+
+  useEffect(() => {
+    saveSecureLocalItems(items);
     encryptVaultWeb(items, plan).then((c) => {
       setContainer(c);
       if (isElectronApp() && window.legacyLockAPI) {
@@ -381,9 +419,18 @@ export const App: React.FC = () => {
             currentTheme={currentTheme}
             onSelectTheme={handleSelectTheme}
             onEmergencyWipe={handleEmergencyWipe}
+            onLock={() => setIsLocked(true)}
           />
         </>
       )}
+
+      {/* 军规级防暂离锁屏全屏遮罩 */}
+      <LockScreen
+        isOpen={isLocked}
+        config={plan.usbPasswordConfig}
+        onUnlock={() => setIsLocked(false)}
+        onEmergencyWipe={handleEmergencyWipe}
+      />
 
       {/* 分类选择弹窗（严格对齐用户参考图 1: 你想要添加什么？） */}
       <CategoryPickerModal

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   KeyRound,
   Copy,
@@ -15,10 +15,12 @@ import {
   Palette,
   ChevronDown,
   Search,
+  Lock,
 } from 'lucide-react';
 import { HeritagePlanConfig, NavCategoryType, UsbDrive, VaultCategory, VaultItem } from '../types';
 import { getCategoryDef } from '../services/categories';
 import { THEMES, ThemeDefinition } from '../services/themes';
+import { copyToClipboard } from '../services/clipboardService';
 import { ImportExportView } from './ImportExportView';
 import { SettingsView } from './SettingsView';
 
@@ -42,6 +44,7 @@ interface RightContentAreaProps {
   currentTheme: ThemeDefinition;
   onSelectTheme: (themeId: string) => void;
   onEmergencyWipe?: () => void;
+  onLock?: () => void;
 }
 
 export const RightContentArea: React.FC<RightContentAreaProps> = ({
@@ -61,6 +64,7 @@ export const RightContentArea: React.FC<RightContentAreaProps> = ({
   currentTheme,
   onSelectTheme,
   onEmergencyWipe,
+  onLock,
 }) => {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [revealedIds, setRevealedIds] = useState<Record<string, boolean>>({});
@@ -95,7 +99,7 @@ export const RightContentArea: React.FC<RightContentAreaProps> = ({
   });
 
   const handleCopy = (text: string, id: string) => {
-    navigator.clipboard.writeText(text);
+    copyToClipboard(text, { isSensitive: true });
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
   };
@@ -103,6 +107,11 @@ export const RightContentArea: React.FC<RightContentAreaProps> = ({
   const toggleReveal = (id: string) => {
     setRevealedIds((prev) => ({ ...prev, [id]: !prev[id] }));
   };
+
+  // 切换分类或搜索时，自动重置明文暴露状态，防范驻留泄露
+  useEffect(() => {
+    setRevealedIds({});
+  }, [selectedNav, searchQuery]);
 
   const getNavInfo = () => {
     switch (selectedNav) {
@@ -276,6 +285,22 @@ export const RightContentArea: React.FC<RightContentAreaProps> = ({
             <ShieldCheck style={{ width: 15, height: 15, color: '#34D399' }} />
             <span className="tool-pill-label green-text">密库自检</span>
           </button>
+
+          {/* 一键立即安全锁屏 */}
+          {onLock && (
+            <button
+              onClick={onLock}
+              className="topbar-tool-pill"
+              style={{
+                borderColor: 'rgba(168, 85, 247, 0.4)',
+                background: 'rgba(168, 85, 247, 0.12)',
+              }}
+              title="立即锁定密库并阻断内存敏感凭据暴露"
+            >
+              <Lock style={{ width: 14, height: 14, color: '#C084FC' }} />
+              <span className="tool-pill-label" style={{ color: '#D8B4FE' }}>立即锁屏</span>
+            </button>
+          )}
         </div>
 
         {/* 右侧窗口控制 */}

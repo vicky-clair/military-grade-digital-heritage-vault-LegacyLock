@@ -123,8 +123,12 @@ export interface HeirRecord {
 
 export interface UsbPasswordConfig {
   hasMasterPassword: boolean;
+  masterPasswordHash?: string;
+  masterPasswordSalt?: string;
   masterPasswordHint?: string;
   hasHeirPassword: boolean;
+  heirPasswordHash?: string;
+  heirPasswordSalt?: string;
   heirPasswordHint?: string;
   autoLockMinutes: number;
   lastChangedAt?: number;

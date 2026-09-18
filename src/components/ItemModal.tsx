@@ -90,10 +90,22 @@ export const ItemModal: React.FC<ItemModalProps> = ({
     let pool = letters + numbers;
     if (symbols) pool += syms;
 
+    // 采用密码学安全伪随机数发生器 (WebCrypto CSPRNG) 并进行无偏模映射 (Rejection Sampling)
+    const poolLen = pool.length;
+    const maxValid = Math.floor(0xffffffff / poolLen) * poolLen;
+    const randomBuffer = new Uint32Array(length * 2);
     let result = '';
-    for (let i = 0; i < length; i++) {
-      result += pool.charAt(Math.floor(Math.random() * pool.length));
+
+    while (result.length < length) {
+      window.crypto.getRandomValues(randomBuffer);
+      for (let i = 0; i < randomBuffer.length && result.length < length; i++) {
+        const val = randomBuffer[i];
+        if (val < maxValid) {
+          result += pool.charAt(val % poolLen);
+        }
+      }
     }
+
     setPassword(result);
   };
 

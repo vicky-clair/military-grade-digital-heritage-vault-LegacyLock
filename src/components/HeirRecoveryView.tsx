@@ -14,8 +14,17 @@ import {
   BookOpen,
   Info,
 } from 'lucide-react';
-import { VaultCategory, VaultItem } from '../types';
+import { VaultItem } from '../types';
 import { CATEGORIES, getCategoryDef } from '../services/categories';
+import { copyToClipboard } from '../services/clipboardService';
+
+function getSafeUrl(rawUrl?: string): string | null {
+  if (!rawUrl) return null;
+  const trimmed = rawUrl.trim();
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  if (/^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/i.test(trimmed)) return `https://${trimmed}`;
+  return null;
+}
 
 interface HeirRecoveryViewProps {
   items: VaultItem[];
@@ -31,13 +40,13 @@ export const HeirRecoveryView: React.FC<HeirRecoveryViewProps> = ({
   onExitRecovery,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<'all' | VaultCategory>('all');
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [revealedIds, setRevealedIds] = useState<Record<string, boolean>>({});
   const [activeInstructionItem, setActiveInstructionItem] = useState<VaultItem | null>(null);
 
   const handleCopy = (text: string, key: string) => {
-    navigator.clipboard.writeText(text);
+    copyToClipboard(text, { isSensitive: true });
     setCopiedKey(key);
     setTimeout(() => setCopiedKey(null), 2000);
   };
@@ -301,15 +310,19 @@ export const HeirRecoveryView: React.FC<HeirRecoveryViewProps> = ({
                       {item.url && (
                         <div className="flex items-center justify-between">
                           <span className="text-slate-500 text-[10px]">端点:</span>
-                          <a
-                            href={item.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-[#00D4FF] hover:underline truncate max-w-[200px] flex items-center gap-1"
-                          >
-                            <span className="truncate">{item.url}</span>
-                            <ExternalLink className="w-2.5 h-2.5 flex-shrink-0" />
-                          </a>
+                          {getSafeUrl(item.url) ? (
+                            <a
+                              href={getSafeUrl(item.url)!}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-[#00D4FF] hover:underline truncate max-w-[200px] flex items-center gap-1"
+                            >
+                              <span className="truncate">{item.url}</span>
+                              <ExternalLink className="w-2.5 h-2.5 flex-shrink-0" />
+                            </a>
+                          ) : (
+                            <span className="text-slate-400 font-mono text-[11px] truncate max-w-[200px]">{item.url}</span>
+                          )}
                         </div>
                       )}
 

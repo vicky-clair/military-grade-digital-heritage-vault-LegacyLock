@@ -36,3 +36,6 @@ Thumbs.db
 # Key files / USB testing dummies
 *.bin
 !test/*.bin
+
+# Temporary scratch
+scratch/

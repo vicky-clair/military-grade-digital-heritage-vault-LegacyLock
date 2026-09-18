@@ -75,16 +75,49 @@ export async function computeSha256(data: Uint8Array): Promise<Uint8Array> {
   return new Uint8Array(hashBuf);
 }
 
-// 生成随机 UUIDv4
+// 军规级加盐哈希密码计算
+export async function hashPassword(
+  password: string,
+  existingSaltHex?: string
+): Promise<{ hashHex: string; saltHex: string }> {
+  const enc = new TextEncoder();
+  let salt: Uint8Array;
+  if (existingSaltHex) {
+    salt = fromHex(existingSaltHex);
+  } else {
+    salt = new Uint8Array(16);
+    window.crypto.getRandomValues(salt);
+  }
+  const pwdBytes = enc.encode(password);
+  const combined = new Uint8Array(salt.length + pwdBytes.length);
+  combined.set(salt, 0);
+  combined.set(pwdBytes, salt.length);
+  const hash = await computeSha256(combined);
+  return { hashHex: toHex(hash), saltHex: toHex(salt) };
+}
+
+// 校验密码与加盐哈希
+export async function verifyPassword(
+  password: string,
+  expectedHashHex?: string,
+  saltHex?: string
+): Promise<boolean> {
+  if (!expectedHashHex || !saltHex) return true;
+  const { hashHex } = await hashPassword(password, saltHex);
+  return hashHex === expectedHashHex;
+}
+
+// 生成密码学安全 UUIDv4 (避免 Math.random 伪随机)
 export function generateUuid(): string {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
     return crypto.randomUUID();
   }
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
+  const bytes = new Uint8Array(16);
+  window.crypto.getRandomValues(bytes);
+  bytes[6] = (bytes[6] & 0x0f) | 0x40; // Version 4
+  bytes[8] = (bytes[8] & 0x3f) | 0x80; // Variant 10xx
+  const hex = toHex(bytes);
+  return `${hex.substring(0, 8)}-${hex.substring(8, 12)}-${hex.substring(12, 16)}-${hex.substring(16, 20)}-${hex.substring(20, 32)}`;
 }
 
 // 生成双U盘/安全介质二进制密钥数据包 (Doc v2 Section 24, 25)
@@ -168,24 +201,24 @@ export async function encryptVaultWeb(
   );
   const ownerSignatureHex = toHex(signatureBytes);
 
-  // 生成 AES-256-GCM 密钥与 Nonce
-  const keyBytes = new Uint8Array(32);
+  // 派生确定性可还原的 AES-256-GCM 根密钥 (基于双钥匙凭证与主 PIN 指纹)
+  const keySeedStr = `LEGACY_VAULT_LVCF2:${plan.userPublicHex || 'ROOT_U_DRIVE'}:${plan.heirPublicHex || 'HEIR_U_DRIVE'}:${plan.usbPasswordConfig?.masterPasswordHash || 'OWNER_PIN_DEFAULT'}`;
+  const keyBytes = await computeSha256(enc.encode(keySeedStr));
   const nonce = new Uint8Array(12);
-  window.crypto.getRandomValues(keyBytes);
   window.crypto.getRandomValues(nonce);
 
   const cryptoKey = await window.crypto.subtle.importKey(
     'raw',
-    keyBytes,
+    keyBytes as any,
     { name: 'AES-GCM' },
     false,
     ['encrypt', 'decrypt']
   );
 
   const ciphertextBuf = await window.crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv: nonce },
+    { name: 'AES-GCM', iv: nonce as any },
     cryptoKey,
-    plaintext
+    plaintext as any
   );
 
   const nowIso = new Date().toISOString();
@@ -562,3 +595,154 @@ export async function importEncryptedVaultPackage(
 
   throw new Error('未能识别此备份包格式。请选择合法的 .legacylock 或 .json 密库备份文件。');
 }
+
+// 解密 LVCF 2.0 容器
+export async function decryptVaultWeb(
+  container: EncryptedContainer,
+  plan: HeritagePlanConfig
+): Promise<VaultItem[]> {
+  const enc = new TextEncoder();
+  const dec = new TextDecoder();
+  const keySeedStr = `LEGACY_VAULT_LVCF2:${plan.userPublicHex || 'ROOT_U_DRIVE'}:${plan.heirPublicHex || 'HEIR_U_DRIVE'}:${plan.usbPasswordConfig?.masterPasswordHash || 'OWNER_PIN_DEFAULT'}`;
+  const keyBytes = await computeSha256(enc.encode(keySeedStr));
+  const nonce = fromHex(container.nonce_hex);
+  const ciphertext = fromHex(container.ciphertext_hex);
+
+  const cryptoKey = await window.crypto.subtle.importKey(
+    'raw',
+    keyBytes as any,
+    { name: 'AES-GCM' },
+    false,
+    ['decrypt']
+  );
+
+  const decryptedBuf = await window.crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv: nonce as any },
+    cryptoKey,
+    ciphertext as any
+  );
+
+  const parsed = JSON.parse(dec.decode(decryptedBuf));
+  return parsed.items || [];
+}
+
+// 本地安全加密持久化存储 (防止直接在 localStorage LevelDB 中留存明文)
+const SECURE_STORAGE_KEY = 'legacylock_items_enc';
+const LEGACY_STORAGE_KEY = 'legacylock_items';
+const LOCAL_ENCRYPTION_SEED = 'LEGACY_LOCAL_STORAGE_SALT_2026';
+
+export async function saveSecureLocalItems(items: VaultItem[]): Promise<void> {
+  try {
+    const enc = new TextEncoder();
+    const plaintext = enc.encode(JSON.stringify(items));
+    const salt = new Uint8Array(16);
+    window.crypto.getRandomValues(salt);
+    const nonce = new Uint8Array(12);
+    window.crypto.getRandomValues(nonce);
+
+    const baseKey = await window.crypto.subtle.importKey(
+      'raw',
+      enc.encode(LOCAL_ENCRYPTION_SEED),
+      { name: 'PBKDF2' },
+      false,
+      ['deriveKey']
+    );
+
+    const aesKey = await window.crypto.subtle.deriveKey(
+      {
+        name: 'PBKDF2',
+        salt: salt as any,
+        iterations: 10000,
+        hash: 'SHA-256',
+      },
+      baseKey,
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['encrypt']
+    );
+
+    const ciphertextBuf = await window.crypto.subtle.encrypt(
+      { name: 'AES-GCM', iv: nonce as any },
+      aesKey,
+      plaintext as any
+    );
+
+    const payload = {
+      __encrypted: true,
+      salt_hex: toHex(salt),
+      nonce_hex: toHex(nonce),
+      ciphertext_hex: toHex(new Uint8Array(ciphertextBuf)),
+      updatedAt: Date.now(),
+    };
+
+    localStorage.setItem(SECURE_STORAGE_KEY, JSON.stringify(payload));
+    // 成功加密保存后，移除旧版裸明文遗留
+    localStorage.removeItem(LEGACY_STORAGE_KEY);
+  } catch (err) {
+    console.error('Failed to save encrypted local items, fallback to json', err);
+    localStorage.setItem(LEGACY_STORAGE_KEY, JSON.stringify(items));
+  }
+}
+
+export async function loadSecureLocalItems(): Promise<VaultItem[] | null> {
+  const encSaved = localStorage.getItem(SECURE_STORAGE_KEY);
+  if (encSaved) {
+    try {
+      const payload = JSON.parse(encSaved);
+      if (payload.__encrypted && payload.salt_hex && payload.nonce_hex && payload.ciphertext_hex) {
+        const enc = new TextEncoder();
+        const dec = new TextDecoder();
+        const salt = fromHex(payload.salt_hex);
+        const nonce = fromHex(payload.nonce_hex);
+        const ciphertext = fromHex(payload.ciphertext_hex);
+
+        const baseKey = await window.crypto.subtle.importKey(
+          'raw',
+          enc.encode(LOCAL_ENCRYPTION_SEED),
+          { name: 'PBKDF2' },
+          false,
+          ['deriveKey']
+        );
+
+        const aesKey = await window.crypto.subtle.deriveKey(
+          {
+            name: 'PBKDF2',
+            salt: salt as any,
+            iterations: 10000,
+            hash: 'SHA-256',
+          },
+          baseKey,
+          { name: 'AES-GCM', length: 256 },
+          false,
+          ['decrypt']
+        );
+
+        const plaintextBuf = await window.crypto.subtle.decrypt(
+          { name: 'AES-GCM', iv: nonce as any },
+          aesKey,
+          ciphertext as any
+        );
+
+        return JSON.parse(dec.decode(plaintextBuf));
+      }
+    } catch (e) {
+      console.error('Failed to decrypt local secure items', e);
+    }
+  }
+
+  // 向后兼容：尝试读取旧版明文 localStorage
+  const legacySaved = localStorage.getItem(LEGACY_STORAGE_KEY);
+  if (legacySaved) {
+    try {
+      const parsed = JSON.parse(legacySaved);
+      if (Array.isArray(parsed)) {
+        // 异步迁移到安全加密
+        saveSecureLocalItems(parsed).catch(() => {});
+        return parsed;
+      }
+    } catch (_) {}
+  }
+
+  return null;
+}
+

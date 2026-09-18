@@ -16,6 +16,7 @@ import {
   Key,
 } from 'lucide-react';
 import { UsbDrive, UsbPasswordConfig } from '../types';
+import { hashPassword } from '../services/cryptoService';
 
 interface UsbPasswordModalProps {
   isOpen: boolean;
@@ -82,10 +83,30 @@ export const UsbPasswordModal: React.FC<UsbPasswordModalProps> = ({
 
     setIsSaving(true);
     try {
+      let masterHash = config?.masterPasswordHash;
+      let masterSalt = config?.masterPasswordSalt;
+      if (masterPassword.trim()) {
+        const h = await hashPassword(masterPassword.trim());
+        masterHash = h.hashHex;
+        masterSalt = h.saltHex;
+      }
+
+      let heirHash = config?.heirPasswordHash;
+      let heirSalt = config?.heirPasswordSalt;
+      if (heirPassword.trim()) {
+        const h = await hashPassword(heirPassword.trim());
+        heirHash = h.hashHex;
+        heirSalt = h.saltHex;
+      }
+
       const newConfig: UsbPasswordConfig = {
-        hasMasterPassword: Boolean(masterPassword || config?.hasMasterPassword),
+        hasMasterPassword: Boolean(masterHash),
+        masterPasswordHash: masterHash,
+        masterPasswordSalt: masterSalt,
         masterPasswordHint: masterHint || config?.masterPasswordHint,
-        hasHeirPassword: Boolean(heirPassword || config?.hasHeirPassword),
+        hasHeirPassword: Boolean(heirHash),
+        heirPasswordHash: heirHash,
+        heirPasswordSalt: heirSalt,
         heirPasswordHint: heirHint || config?.heirPasswordHint,
         autoLockMinutes: config?.autoLockMinutes || 15,
         lastChangedAt: Date.now(),
