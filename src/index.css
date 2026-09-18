@@ -1,22 +1,34 @@
 :root {
-  --color-primary: #0A2540;
-  --color-accent: #00D4FF;
-  --color-accent-hover: #38E1FF;
-  --color-accent-glow: rgba(0, 212, 255, 0.25);
-  --color-bg-dark: #061524;
-  --color-bg-card: #0A1C30;
-  --color-bg-hover: #112842;
-  --color-border: #1F2937;
-  --color-border-bright: #1E3A8A;
-  --color-text-main: #F8FAFC;
-  --color-text-muted: #94A3B8;
-  --color-danger: #EF4444;
-  --color-success: #10B981;
-  --color-warning: #F59E0B;
+  /* 1Password 8 Signature Palette */
+  --op-bg-base: #0E1525;
+  --op-bg-surface: #161F30;
+  --op-bg-sidebar: #0A0F1D;
+  --op-bg-card: #1C283F;
+  --op-bg-hover: #22314E;
+  --op-bg-active: #273757;
   
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
+  --op-primary: #0572EC;
+  --op-primary-hover: #1882FB;
+  --op-primary-light: rgba(5, 114, 236, 0.15);
+  --op-primary-glow: rgba(5, 114, 236, 0.35);
+
+  --op-cyan: #00D4FF;
+  --op-cyan-glow: rgba(0, 212, 255, 0.25);
+  
+  --op-border: rgba(255, 255, 255, 0.08);
+  --op-border-focus: #0572EC;
+  --op-border-subtle: rgba(255, 255, 255, 0.04);
+
+  --op-text-primary: #F8FAFC;
+  --op-text-secondary: #94A3B8;
+  --op-text-tertiary: #64748B;
+
+  --op-success: #10B981;
+  --op-warning: #F59E0B;
+  --op-danger: #EF4444;
+  --op-purple: #8B5CF6;
+
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   color-scheme: dark;
 }
 
@@ -27,218 +39,243 @@
 }
 
 body {
-  background-color: var(--color-bg-dark);
-  color: var(--color-text-main);
+  background-color: var(--op-bg-base);
+  color: var(--op-text-primary);
   min-height: 100vh;
-  overflow-x: hidden;
+  overflow: hidden;
+  user-select: none;
   -webkit-font-smoothing: antialiased;
 }
 
-/* 顶部背景微弱科技网格与渐变光晕 */
-body::before {
-  content: '';
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 400px;
-  background: radial-gradient(circle at 50% -20%, rgba(0, 212, 255, 0.15), transparent 70%);
-  pointer-events: none;
-  z-index: 0;
-}
-
-code, .font-mono {
-  font-family: 'JetBrains Mono', monospace;
-}
-
-/* 自定义滚动条 */
+/* 1Password 风格滚动条 */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #061524;
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #1F2937;
-  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #00D4FF;
+  background: rgba(255, 255, 255, 0.25);
 }
 
-/* 军规卡片通用样式 */
-.vault-card {
-  background: rgba(10, 28, 48, 0.85);
-  backdrop-filter: blur(12px);
-  border: 1px solid var(--color-border);
+code, .font-mono {
+  font-family: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+}
+
+/* 1Password 卡片通用样式 */
+.op-card {
+  background: var(--op-bg-surface);
+  border: 1px solid var(--op-border);
   border-radius: 12px;
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.vault-card:hover {
-  border-color: rgba(0, 212, 255, 0.4);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 0 16px rgba(0, 212, 255, 0.1);
+.op-card-hover:hover {
+  background: var(--op-bg-hover);
+  border-color: rgba(255, 255, 255, 0.15);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.4);
 }
 
-/* 按钮设计 */
-.btn-primary {
-  background: linear-gradient(135deg, #0A2540 0%, #0077B6 50%, #00D4FF 100%);
+/* 1Password 按钮体系 */
+.op-btn-primary {
+  background: var(--op-primary);
   color: #FFFFFF;
-  border: 1px solid rgba(0, 212, 255, 0.6);
-  box-shadow: 0 4px 14px var(--color-accent-glow);
-  font-weight: 600;
-  padding: 0.65rem 1.25rem;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  font-weight: 500;
+  font-size: 0.8125rem;
+  padding: 0.5rem 1rem;
   border-radius: 8px;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 0.5rem;
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
+  box-shadow: 0 2px 8px var(--op-primary-glow);
 }
 
-.btn-primary:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: 0 6px 20px rgba(0, 212, 255, 0.4);
-  border-color: #00D4FF;
+.op-btn-primary:hover:not(:disabled) {
+  background: var(--op-primary-hover);
+  box-shadow: 0 4px 14px var(--op-primary-glow);
+  transform: translateY(-0.5px);
 }
 
-.btn-primary:active:not(:disabled) {
+.op-btn-primary:active:not(:disabled) {
   transform: translateY(0);
 }
 
-.btn-primary:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  filter: grayscale(0.6);
-}
-
-.btn-secondary {
-  background: rgba(31, 41, 55, 0.6);
-  color: var(--color-text-main);
-  border: 1px solid var(--color-border);
-  padding: 0.65rem 1.25rem;
+.op-btn-secondary {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--op-text-primary);
+  border: 1px solid var(--op-border);
+  font-weight: 500;
+  font-size: 0.8125rem;
+  padding: 0.5rem 0.875rem;
   border-radius: 8px;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 0.5rem;
-  font-weight: 500;
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
 }
 
-.btn-secondary:hover:not(:disabled) {
-  background: var(--color-bg-hover);
-  border-color: rgba(0, 212, 255, 0.3);
+.op-btn-secondary:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.18);
 }
 
-/* 双U盘插槽特效 */
-.usb-slot {
-  position: relative;
-  border: 2px dashed rgba(255, 255, 255, 0.15);
-  border-radius: 12px;
-  padding: 1.5rem;
+.op-btn-ghost {
+  background: transparent;
+  color: var(--op-text-secondary);
+  border: none;
+  font-size: 0.8125rem;
+  padding: 0.375rem 0.625rem;
+  border-radius: 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  transition: all 0.15s ease;
+}
+
+.op-btn-ghost:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--op-text-primary);
+}
+
+/* 1Password 分组表单字段 */
+.op-field-group {
+  background: var(--op-bg-surface);
+  border: 1px solid var(--op-border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.op-field-row {
+  padding: 0.75rem 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--op-border);
+  transition: background 0.15s ease;
+}
+
+.op-field-row:last-child {
+  border-bottom: none;
+}
+
+.op-field-row:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+/* 1Password 输入框 */
+.op-input {
+  width: 100%;
+  background: rgba(10, 15, 29, 0.7);
+  border: 1px solid var(--op-border);
+  border-radius: 8px;
+  padding: 0.55rem 0.85rem;
+  color: #FFFFFF;
+  font-size: 0.875rem;
+  outline: none;
+  transition: all 0.15s ease;
+}
+
+.op-input:focus {
+  border-color: var(--op-primary);
+  box-shadow: 0 0 0 3px var(--op-primary-light);
+  background: rgba(10, 15, 29, 0.95);
+}
+
+.op-input::placeholder {
+  color: var(--op-text-tertiary);
+}
+
+/* 密码强度指示条 */
+.op-strength-bar {
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+  display: flex;
+}
+
+.op-strength-fill {
+  height: 100%;
   transition: all 0.3s ease;
-  background: rgba(6, 21, 36, 0.7);
-}
-
-.usb-slot.active {
-  border-color: #10B981;
-  background: rgba(16, 185, 129, 0.08);
-  box-shadow: 0 0 20px rgba(16, 185, 129, 0.2);
-}
-
-.usb-slot.waiting {
-  border-color: #F59E0B;
-  background: rgba(245, 158, 11, 0.05);
-  animation: pulse-border 2s infinite ease-in-out;
-}
-
-.usb-slot.error {
-  border-color: #EF4444;
-  background: rgba(239, 68, 68, 0.08);
-}
-
-@keyframes pulse-border {
-  0%, 100% {
-    border-color: rgba(245, 158, 11, 0.4);
-    box-shadow: 0 0 0 rgba(245, 158, 11, 0);
-  }
-  50% {
-    border-color: rgba(245, 158, 11, 0.9);
-    box-shadow: 0 0 16px rgba(245, 158, 11, 0.25);
-  }
-}
-
-/* 解锁中心仪表盘特效 */
-.unlock-core-glow {
-  animation: core-rotate 20s linear infinite;
-}
-
-@keyframes core-rotate {
-  0% {
-    transform: rotate(0deg);
-  }
-  100% {
-    transform: rotate(360deg);
-  }
 }
 
 /* 徽章 Badge */
-.badge {
+.op-badge {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  font-size: 0.75rem;
+  font-size: 0.6875rem;
   font-weight: 600;
-  padding: 0.2rem 0.6rem;
-  border-radius: 9999px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  padding: 0.15rem 0.5rem;
+  border-radius: 6px;
+  letter-spacing: 0.02em;
 }
 
-.badge-cyan {
-  background: rgba(0, 212, 255, 0.15);
-  color: #00D4FF;
-  border: 1px solid rgba(0, 212, 255, 0.3);
+.op-badge-blue {
+  background: rgba(5, 114, 236, 0.15);
+  color: #60A5FA;
+  border: 1px solid rgba(5, 114, 236, 0.3);
 }
 
-.badge-green {
+.op-badge-green {
   background: rgba(16, 185, 129, 0.15);
-  color: #10B981;
+  color: #34D399;
   border: 1px solid rgba(16, 185, 129, 0.3);
 }
 
-.badge-red {
-  background: rgba(239, 68, 68, 0.15);
-  color: #EF4444;
-  border: 1px solid rgba(239, 68, 68, 0.3);
-}
-
-.badge-amber {
+.op-badge-amber {
   background: rgba(245, 158, 11, 0.15);
-  color: #F59E0B;
+  color: #FBBF24;
   border: 1px solid rgba(245, 158, 11, 0.3);
 }
 
-/* 输入框样式 */
-.vault-input {
-  width: 100%;
-  background: rgba(6, 21, 36, 0.9);
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  padding: 0.65rem 0.9rem;
-  color: #FFFFFF;
-  font-size: 0.9rem;
-  outline: none;
-  transition: all 0.2s ease;
+.op-badge-cyan {
+  background: rgba(0, 212, 255, 0.15);
+  color: #38E1FF;
+  border: 1px solid rgba(0, 212, 255, 0.3);
 }
 
-.vault-input:focus {
-  border-color: #00D4FF;
-  box-shadow: 0 0 0 2px rgba(0, 212, 255, 0.2);
+/* 物理U盘插槽特效 */
+.op-usb-port {
+  position: relative;
+  background: #0E1626;
+  border: 2px dashed rgba(255, 255, 255, 0.15);
+  border-radius: 14px;
+  padding: 1.5rem;
+  transition: all 0.25s ease;
 }
 
-.vault-input::placeholder {
-  color: #64748B;
+.op-usb-port.connected {
+  border-color: #10B981;
+  background: rgba(16, 185, 129, 0.04);
+  box-shadow: 0 0 20px rgba(16, 185, 129, 0.15);
+}
+
+.op-usb-port.waiting {
+  border-color: #F59E0B;
+  background: rgba(245, 158, 11, 0.04);
+  animation: pulse-amber 2s infinite ease-in-out;
+}
+
+@keyframes pulse-amber {
+  0%, 100% {
+    border-color: rgba(245, 158, 11, 0.3);
+  }
+  50% {
+    border-color: rgba(245, 158, 11, 0.8);
+    box-shadow: 0 0 15px rgba(245, 158, 11, 0.2);
+  }
 }

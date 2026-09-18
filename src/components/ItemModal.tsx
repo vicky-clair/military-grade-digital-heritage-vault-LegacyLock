@@ -1,5 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { X, KeyRound, Plus, Trash2, Eye, EyeOff, RefreshCw } from 'lucide-react';
+import {
+  X,
+  Plus,
+  Trash2,
+  Eye,
+  EyeOff,
+  RefreshCw,
+  KeyRound,
+  FileText,
+  CreditCard,
+  Award,
+  Gamepad2,
+  Shield,
+  Sliders,
+} from 'lucide-react';
 import { VaultCategory, VaultField, VaultItem } from '../types';
 
 interface ItemModalProps {
@@ -23,6 +37,9 @@ export const ItemModal: React.FC<ItemModalProps> = ({
   const [notes, setNotes] = useState('');
   const [customFields, setCustomFields] = useState<VaultField[]>([]);
   const [showPassword, setShowPassword] = useState(false);
+  const [showGenerator, setShowGenerator] = useState(false);
+  const [genLength, setGenLength] = useState(20);
+  const [includeSymbols, setIncludeSymbols] = useState(true);
 
   useEffect(() => {
     if (initialItem) {
@@ -46,11 +63,16 @@ export const ItemModal: React.FC<ItemModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleGeneratePassword = () => {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+-=';
+  const generatePassword = (length = genLength, symbols = includeSymbols) => {
+    const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
+    const numbers = '0123456789';
+    const syms = '!@#$%^&*()_+-=[]{}|;:,.<>?';
+    let pool = letters + numbers;
+    if (symbols) pool += syms;
+
     let result = '';
-    for (let i = 0; i < 20; i++) {
-      result += chars.charAt(Math.floor(Math.random() * chars.length));
+    for (let i = 0; i < length; i++) {
+      result += pool.charAt(Math.floor(Math.random() * pool.length));
     }
     setPassword(result);
   };
@@ -98,166 +120,251 @@ export const ItemModal: React.FC<ItemModalProps> = ({
     onClose();
   };
 
+  const getCategoryIcon = (cat: VaultCategory) => {
+    switch (cat) {
+      case 'game':
+        return <Gamepad2 className="w-4 h-4 text-purple-400" />;
+      case 'login':
+        return <KeyRound className="w-4 h-4 text-cyan-400" />;
+      case 'note':
+        return <FileText className="w-4 h-4 text-emerald-400" />;
+      case 'card':
+        return <CreditCard className="w-4 h-4 text-amber-400" />;
+      case 'license':
+        return <Award className="w-4 h-4 text-rose-400" />;
+      default:
+        return <Shield className="w-4 h-4 text-blue-400" />;
+    }
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-      <div className="bg-[#0A1C30] border border-[#1F2937] rounded-xl w-full max-w-xl max-h-[90vh] overflow-y-auto shadow-2xl flex flex-col">
-        {/* Modal 头部 */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#1F2937]">
-          <div className="flex items-center gap-2">
-            <KeyRound className="w-5 h-5 text-[#00D4FF]" />
-            <h3 className="text-base font-semibold text-white">
-              {initialItem ? '编辑数字遗产资产' : '添加新数字遗产凭证'}
-            </h3>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fadeIn">
+      <div className="bg-[#121A2B] border border-white/10 rounded-2xl w-full max-w-xl max-h-[92vh] overflow-y-auto shadow-2xl flex flex-col">
+        {/* 1Password 风格头部 */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-white/5 bg-[#0E1525]">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-[#1C283F] border border-white/10 flex items-center justify-center">
+              {getCategoryIcon(category)}
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-white">
+                {initialItem ? '编辑数字遗产项目' : '新建数字遗产项目'}
+              </h2>
+              <p className="text-[11px] text-slate-400 font-mono">
+                数据以军规级 AES-256-GCM 离线加密存储
+              </p>
+            </div>
           </div>
+
           <button
             onClick={onClose}
-            className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/10"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Modal 表单内容 */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4 flex-1">
-          {/* 资产分类与标题 */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">
-                分类
-              </label>
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value as VaultCategory)}
-                className="vault-input"
-              >
-                <option value="login">登录账号 (Web/App)</option>
-                <option value="game">游戏资产 (Steam/Epic)</option>
-                <option value="note">安全备忘 (信托/保管箱)</option>
-                <option value="card">支付卡片 (银行/结算)</option>
-                <option value="license">产品授权 (软件/Key)</option>
-                <option value="identity">身份凭据 (证件/信令)</option>
-              </select>
-            </div>
-            <div className="sm:col-span-2">
-              <label className="block text-xs font-semibold text-slate-300 mb-1">
-                资产标题 *
-              </label>
-              <input
-                type="text"
-                required
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="例如：Steam 游戏典藏库 / 瑞士信贷主保管箱"
-                className="vault-input"
-              />
-            </div>
-          </div>
-
-          {/* 账号与密码 */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">
-                用户名 / 账号ID
-              </label>
-              <input
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="user@example.com 或 账号ID"
-                className="vault-input"
-              />
-            </div>
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="block text-xs font-semibold text-slate-300">
-                  密码 / 安全代码
+        {/* 表单内容 */}
+        <form onSubmit={handleSubmit} className="p-6 space-y-5 flex-1">
+          {/* 分类与标题 */}
+          <div className="space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
+                  分类
                 </label>
-                <button
-                  type="button"
-                  onClick={handleGeneratePassword}
-                  className="text-[11px] text-[#00D4FF] hover:underline flex items-center gap-1"
+                <select
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value as VaultCategory)}
+                  className="op-input font-medium"
                 >
-                  <RefreshCw className="w-3 h-3" />
-                  随机高强密码
-                </button>
+                  <option value="login">登录凭据 (Logins)</option>
+                  <option value="game">游戏遗产 (Steam/Epic)</option>
+                  <option value="note">安全便签 (Secure Notes)</option>
+                  <option value="card">财务卡片 (Credit Cards)</option>
+                  <option value="license">软件许可 (Licenses)</option>
+                </select>
               </div>
-              <div className="relative">
+
+              <div className="sm:col-span-2">
+                <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
+                  项目标题 *
+                </label>
                 <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="军规加密存储的密码"
-                  className="vault-input pr-10 font-mono"
+                  type="text"
+                  required
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="例如: Steam 游戏库 / 瑞士信贷银行"
+                  className="op-input font-medium"
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-2 top-2.5 text-slate-400 hover:text-slate-200"
-                >
-                  {showPassword ? (
-                    <EyeOff className="w-4 h-4" />
-                  ) : (
-                    <Eye className="w-4 h-4" />
-                  )}
-                </button>
               </div>
             </div>
           </div>
 
-          {/* 关联网站 / 服务 URL */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">
-              服务入口 / 网站地址 (可选)
-            </label>
-            <input
-              type="text"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              placeholder="https://..."
-              className="vault-input"
-            />
+          {/* 登录详情分组 */}
+          <div className="space-y-1.5">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 block px-1">
+              登录信息 (LOGIN)
+            </span>
+
+            <div className="op-field-group">
+              <div className="p-3 border-b border-white/5">
+                <label className="block text-[10px] font-mono text-slate-400 mb-1">
+                  用户名 / 账号凭证
+                </label>
+                <input
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="用户名、邮箱或账号识别码"
+                  className="op-input font-mono text-xs"
+                />
+              </div>
+
+              <div className="p-3 border-b border-white/5 space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block text-[10px] font-mono text-slate-400">
+                    密码 (PASSWORD)
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setShowGenerator(!showGenerator)}
+                    className="text-[11px] text-[#0572EC] hover:text-[#00D4FF] flex items-center gap-1 font-medium"
+                  >
+                    <Sliders className="w-3 h-3" />
+                    <span>{showGenerator ? '收起生成器' : '密码生成器'}</span>
+                  </button>
+                </div>
+
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="输入密码或点击右侧生成"
+                    className="op-input pr-10 font-mono text-xs"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-2.5 top-2 text-slate-400 hover:text-white"
+                  >
+                    {showPassword ? (
+                      <EyeOff className="w-4 h-4" />
+                    ) : (
+                      <Eye className="w-4 h-4" />
+                    )}
+                  </button>
+                </div>
+
+                {/* 1Password 内置密码生成器展开面板 */}
+                {showGenerator && (
+                  <div className="p-3 rounded-lg bg-[#0E1525] border border-white/10 space-y-2.5 text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400 font-mono">
+                        长度: {genLength} 位字符
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => generatePassword()}
+                        className="op-btn-secondary text-[11px] py-1 px-2.5"
+                      >
+                        <RefreshCw className="w-3 h-3 text-[#00D4FF]" />
+                        <span>重新生成</span>
+                      </button>
+                    </div>
+
+                    <input
+                      type="range"
+                      min={12}
+                      max={36}
+                      value={genLength}
+                      onChange={(e) => {
+                        const len = Number(e.target.value);
+                        setGenLength(len);
+                        generatePassword(len);
+                      }}
+                      className="w-full accent-[#0572EC] cursor-pointer"
+                    />
+
+                    <div className="flex items-center justify-between text-[11px] text-slate-300 pt-1">
+                      <label className="flex items-center gap-1.5 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={includeSymbols}
+                          onChange={(e) => {
+                            setIncludeSymbols(e.target.checked);
+                            generatePassword(genLength, e.target.checked);
+                          }}
+                        />
+                        <span>包含特殊符号 (!@#$...)</span>
+                      </label>
+                      <span className="text-emerald-400 font-mono">
+                        军规强度
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="p-3">
+                <label className="block text-[10px] font-mono text-slate-400 mb-1">
+                  服务网址 (URL)
+                </label>
+                <input
+                  type="text"
+                  value={url}
+                  onChange={(e) => setUrl(e.target.value)}
+                  placeholder="https://example.com"
+                  className="op-input font-mono text-xs"
+                />
+              </div>
+            </div>
           </div>
 
-          {/* 嘱托备忘录 */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">
-              继承人提示 & 资产说明 (安全备忘)
-            </label>
-            <textarea
-              rows={3}
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="详细说明此资产在离世后的操作方式、二次验证器备份码、实体钥匙存放位置等..."
-              className="vault-input resize-none"
-            />
+          {/* 继承人遗嘱与嘱托备忘录 */}
+          <div className="space-y-1.5">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-amber-400 block px-1">
+              继承人离世后指示 (HERITAGE WILL)
+            </span>
+            <div className="op-field-group p-3">
+              <textarea
+                rows={3}
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="详细说明此资产在双U盘解锁后的操作指示，例如：2FA备用恢复码位置、银行保管箱钥匙所在等..."
+                className="op-input resize-none text-xs leading-relaxed"
+              />
+            </div>
           </div>
 
-          {/* 自定义字段 */}
-          <div className="border-t border-[#1F2937] pt-3">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-semibold text-slate-300">
-                自定义凭据字段 (安全问题、PIN码、助记词)
+          {/* 自定义敏感字段 */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between px-1">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                自定义附加字段
               </span>
               <button
                 type="button"
                 onClick={handleAddField}
-                className="text-xs text-[#00D4FF] hover:underline flex items-center gap-1"
+                className="text-xs text-[#0572EC] hover:text-[#00D4FF] flex items-center gap-1 font-medium"
               >
                 <Plus className="w-3.5 h-3.5" />
-                添加字段
+                <span>添加字段</span>
               </button>
             </div>
 
             {customFields.map((field) => (
-              <div key={field.id} className="flex items-center gap-2 mb-2">
+              <div key={field.id} className="flex items-center gap-2">
                 <input
                   type="text"
                   value={field.name}
                   onChange={(e) =>
                     handleFieldChange(field.id, 'name', e.target.value)
                   }
-                  placeholder="字段名 (如: 助记词/CVV)"
-                  className="vault-input flex-1"
+                  placeholder="字段名称"
+                  className="op-input flex-1 text-xs"
                 />
                 <input
                   type="text"
@@ -265,10 +372,10 @@ export const ItemModal: React.FC<ItemModalProps> = ({
                   onChange={(e) =>
                     handleFieldChange(field.id, 'value', e.target.value)
                   }
-                  placeholder="字段值"
-                  className="vault-input flex-1 font-mono"
+                  placeholder="字段内容"
+                  className="op-input flex-1 font-mono text-xs"
                 />
-                <label className="flex items-center gap-1 text-[11px] text-slate-400 whitespace-nowrap cursor-pointer">
+                <label className="flex items-center gap-1 text-[10px] text-slate-400 whitespace-nowrap cursor-pointer">
                   <input
                     type="checkbox"
                     checked={field.isSecret}
@@ -276,12 +383,12 @@ export const ItemModal: React.FC<ItemModalProps> = ({
                       handleFieldChange(field.id, 'isSecret', e.target.checked)
                     }
                   />
-                  隐藏
+                  <span>隐藏</span>
                 </label>
                 <button
                   type="button"
                   onClick={() => handleRemoveField(field.id)}
-                  className="p-1 text-red-400 hover:text-red-300"
+                  className="p-1.5 text-red-400 hover:text-red-300"
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
@@ -289,17 +396,17 @@ export const ItemModal: React.FC<ItemModalProps> = ({
             ))}
           </div>
 
-          {/* 底部按钮 */}
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#1F2937]">
+          {/* 底部操作条 */}
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-white/5">
             <button
               type="button"
               onClick={onClose}
-              className="btn-secondary text-xs"
+              className="op-btn-secondary text-xs"
             >
               取消
             </button>
-            <button type="submit" className="btn-primary text-xs">
-              保存至加密遗产库
+            <button type="submit" className="op-btn-primary text-xs px-5">
+              保存到遗产库
             </button>
           </div>
         </form>

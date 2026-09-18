@@ -1,18 +1,19 @@
 @echo off
 chcp 65001 >nul
-title LegacyLock 遗产保险锁 (军规级数字遗产双保险箱)
-echo ===================================================
-echo   LegacyLock 遗产保险锁 · 正在为您打开桌面客户端与界面
-echo ===================================================
+cd /d "%~dp0"
+title LegacyLock 遗产保险锁 (1Password 级军规数字遗产箱)
+
+echo =========================================================
+echo    LegacyLock (遗产保险锁) · 1Password 级数字遗产保险箱
+echo =========================================================
+echo.
+echo 正在为您打开界面与桌面应用...
 echo.
 
-:: 打开浏览器前端
-start "" "http://localhost:5173"
+:: 1. 在默认浏览器中直接打开界面
+start "" "http://127.0.0.1:5173"
 
-:: 启动 Electron 桌面主窗口
-start "" "%~dp0node_modules\electron\dist\electron.exe" "%~dp0."
+:: 2. 启动 Electron 原生桌面客户端
+"%~dp0node_modules\electron\dist\electron.exe" .
 
-echo 已完成启动命令调用！
-echo 若未自动弹出，请在任意浏览器中访问: http://localhost:5173
-echo.
-exit
+pause

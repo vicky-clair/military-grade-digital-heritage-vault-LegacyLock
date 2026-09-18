@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Navbar } from './components/Navbar';
+import { Sidebar } from './components/Sidebar';
 import { VaultView } from './components/VaultView';
 import { HeritagePlan } from './components/HeritagePlan';
 import { UnlockVault } from './components/UnlockVault';
 import { ItemModal } from './components/ItemModal';
 import { INITIAL_VAULT_ITEMS } from './services/mockData';
-import { EncryptedContainer, HeritagePlanConfig, VaultItem } from './types';
+import { EncryptedContainer, HeritagePlanConfig, VaultCategory, VaultItem } from './types';
 import { encryptVaultWeb, isElectronApp } from './services/cryptoService';
 
 export const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'vault' | 'plan' | 'unlock'>('vault');
+  const [selectedNav, setSelectedNav] = useState<'all' | VaultCategory | 'plan' | 'unlock'>('all');
   const [items, setItems] = useState<VaultItem[]>(() => {
     const saved = localStorage.getItem('legacylock_items');
     if (saved) {
@@ -31,7 +31,7 @@ export const App: React.FC = () => {
       heirName: '李华 (长子/法定继承人)',
       heirContact: 'lihua_heir@family.org / 138-8888-9999',
       heirNotes:
-        '在收到继承生效通知后，请携带本人专用的继承人U盘，前往书房保险柜获取用户U盘，同时插入电脑解锁全部数字资产。',
+        '在收到继承生效通知后，请携带本人专用的继承人U盘，前往书房保险箱获取用户U盘，同时插入电脑解锁全部数字资产。',
       expiryDays: 365,
       expiryTimestamp: Math.floor(Date.now() / 1000) + 365 * 86400,
       isConfigured: true,
@@ -55,7 +55,16 @@ export const App: React.FC = () => {
     heir_public_hex: plan.heirPublicHex || '',
   });
 
-  // 状态持久化与自动更新密文容器
+  // 统计各分类数量
+  const itemCounts = {
+    all: items.length,
+    login: items.filter((i) => i.category === 'login').length,
+    note: items.filter((i) => i.category === 'note').length,
+    card: items.filter((i) => i.category === 'card').length,
+    license: items.filter((i) => i.category === 'license').length,
+    game: items.filter((i) => i.category === 'game').length,
+  };
+
   useEffect(() => {
     localStorage.setItem('legacylock_items', JSON.stringify(items));
     encryptVaultWeb(items, plan).then((c) => {
@@ -81,7 +90,7 @@ export const App: React.FC = () => {
   };
 
   const handleDeleteItem = (id: string) => {
-    if (window.confirm('确定要从数字遗产库中删除该资产凭证吗？')) {
+    if (window.confirm('确定要从数字遗产库中删除该资产项目吗？')) {
       setItems((prev) => prev.filter((i) => i.id !== id));
     }
   };
@@ -99,33 +108,31 @@ export const App: React.FC = () => {
     setItems(unlockedItems);
   };
 
+  const handleToggleLock = () => {
+    if (isUnlocked) {
+      setIsUnlocked(false);
+    } else {
+      setSelectedNav('unlock');
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-[#061524] text-slate-100 flex flex-col selection:bg-[#00D4FF]/30 selection:text-white">
-      {/* 顶部导航 */}
-      <Navbar
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
+    <div className="flex h-screen w-screen bg-[#0E1525] text-[#F8FAFC] overflow-hidden select-none">
+      {/* 1Password 左侧边栏 */}
+      <Sidebar
+        selectedNav={selectedNav}
+        onSelectNav={setSelectedNav}
+        itemCounts={itemCounts}
         isUnlocked={isUnlocked}
-        itemCount={items.length}
+        onAddNew={handleAddItem}
+        onToggleLock={handleToggleLock}
       />
 
       {/* 主视图区域 */}
-      <div className="flex-1 flex flex-col">
-        {activeTab === 'vault' && (
-          <VaultView
-            items={items}
-            onAddItem={handleAddItem}
-            onEditItem={handleEditItem}
-            onDeleteItem={handleDeleteItem}
-            isUnlocked={isUnlocked}
-          />
-        )}
-
-        {activeTab === 'plan' && (
+      <div className="flex-1 flex overflow-hidden">
+        {selectedNav === 'plan' ? (
           <HeritagePlan plan={plan} onUpdatePlan={setPlan} />
-        )}
-
-        {activeTab === 'unlock' && (
+        ) : selectedNav === 'unlock' ? (
           <UnlockVault
             plan={plan}
             container={container}
@@ -133,10 +140,19 @@ export const App: React.FC = () => {
             onUnlockSuccess={handleUnlockSuccess}
             isAlreadyUnlocked={isUnlocked}
           />
+        ) : (
+          <VaultView
+            items={items}
+            selectedCategory={selectedNav}
+            onAddItem={handleAddItem}
+            onEditItem={handleEditItem}
+            onDeleteItem={handleDeleteItem}
+            isUnlocked={isUnlocked}
+          />
         )}
       </div>
 
-      {/* 资产凭据新建/编辑弹窗 */}
+      {/* 1Password 新建/编辑弹窗 */}
       <ItemModal
         isOpen={isItemModalOpen}
         onClose={() => setIsItemModalOpen(false)}

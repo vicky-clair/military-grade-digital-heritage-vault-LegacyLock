@@ -9,7 +9,6 @@ import {
   AlertOctagon,
   FileCheck,
   RefreshCw,
-  Clock,
   Sparkles,
 } from 'lucide-react';
 import { DualUnlockState, EncryptedContainer, HeritagePlanConfig, VaultItem } from '../types';
@@ -57,7 +56,6 @@ export const UnlockVault: React.FC<UnlockVaultProps> = ({
   const [isVerifying, setIsVerifying] = useState(false);
   const [verificationLogs, setVerificationLogs] = useState<string[]>([]);
 
-  // 检查状态更新
   useEffect(() => {
     const bothKeysPresent =
       (unlockState.userKeyPresent || !!userKeyBuffer) &&
@@ -82,7 +80,6 @@ export const UnlockVault: React.FC<UnlockVaultProps> = ({
     plan.expiryTimestamp,
   ]);
 
-  // 处理用户 U 盘插入或选择
   const handleSelectUserKey = async () => {
     if (isElectronApp() && window.legacyLockAPI) {
       const res = await window.legacyLockAPI.selectKeyFile('user');
@@ -93,10 +90,9 @@ export const UnlockVault: React.FC<UnlockVaultProps> = ({
           userKeyPresent: true,
           userKeyPath: res.path,
         }));
-        addLog(`已检测并挂载【用户U盘】: ${res.path}`);
+        addLog(`已挂载【用户U盘】: ${res.path}`);
       }
     } else {
-      // 浏览器端 input file
       const input = document.createElement('input');
       input.type = 'file';
       input.accept = '.bin';
@@ -107,14 +103,13 @@ export const UnlockVault: React.FC<UnlockVaultProps> = ({
           setUserKeyBuffer(new Uint8Array(buf));
           setUserFileName(file.name);
           setUnlockState((prev) => ({ ...prev, userKeyPresent: true }));
-          addLog(`已载入【用户U盘密钥】: ${file.name} (${file.size} 字节)`);
+          addLog(`已载入【用户U盘】: ${file.name} (64 字节)`);
         }
       };
       input.click();
     }
   };
 
-  // 处理继承人 U 盘插入或选择
   const handleSelectHeirKey = async () => {
     if (isElectronApp() && window.legacyLockAPI) {
       const res = await window.legacyLockAPI.selectKeyFile('heir');
@@ -125,7 +120,7 @@ export const UnlockVault: React.FC<UnlockVaultProps> = ({
           heirKeyPresent: true,
           heirKeyPath: res.path,
         }));
-        addLog(`已检测并挂载【继承人U盘】: ${res.path}`);
+        addLog(`已挂载【继承人U盘】: ${res.path}`);
       }
     } else {
       const input = document.createElement('input');
@@ -138,14 +133,13 @@ export const UnlockVault: React.FC<UnlockVaultProps> = ({
           setHeirKeyBuffer(new Uint8Array(buf));
           setHeirFileName(file.name);
           setUnlockState((prev) => ({ ...prev, heirKeyPresent: true }));
-          addLog(`已载入【继承人U盘密钥】: ${file.name} (${file.size} 字节)`);
+          addLog(`已载入【继承人U盘】: ${file.name} (64 字节)`);
         }
       };
       input.click();
     }
   };
 
-  // 处理配置文件
   const handleSelectConfig = async () => {
     if (isElectronApp() && window.legacyLockAPI) {
       const res = await window.legacyLockAPI.selectKeyFile('config');
@@ -156,7 +150,7 @@ export const UnlockVault: React.FC<UnlockVaultProps> = ({
           configPresent: true,
           configPath: res.path,
         }));
-        addLog(`已载入继承防篡改配置: ${res.path}`);
+        addLog(`已载入配置文件: ${res.path}`);
       }
     } else {
       const input = document.createElement('input');
@@ -169,18 +163,17 @@ export const UnlockVault: React.FC<UnlockVaultProps> = ({
           setConfigBuffer(new Uint8Array(buf));
           setConfigFileName(file.name);
           setUnlockState((prev) => ({ ...prev, configPresent: true }));
-          addLog(`已载入配置文件: ${file.name} (${file.size} 字节)`);
+          addLog(`已载入防篡改配置文件: ${file.name} (40 字节)`);
         }
       };
       input.click();
     }
   };
 
-  // 快速模拟双U盘同时接入 (用于演示和无物理盘测试)
   const handleSimulateDualUsbInsert = () => {
-    setUserFileName('虚拟U盘A:/user-key.bin');
-    setHeirFileName('虚拟U盘B:/heir-key.bin');
-    setConfigFileName('虚拟U盘B:/config.bin');
+    setUserFileName('虚拟USB插槽A:/user-key.bin');
+    setHeirFileName('虚拟USB插槽B:/heir-key.bin');
+    setConfigFileName('虚拟USB插槽B:/config.bin');
 
     const dummyUserKey = new Uint8Array(64);
     const dummyHeirKey = new Uint8Array(64);
@@ -201,9 +194,9 @@ export const UnlockVault: React.FC<UnlockVaultProps> = ({
       canUnlock: true,
     }));
 
-    addLog('【硬件侦测】检测到插槽 1 插入用户物理U盘 [user-key.bin]');
-    addLog('【硬件侦测】检测到插槽 2 插入继承人物理U盘 [heir-key.bin + config.bin]');
-    addLog('【双钥就绪】双物理U盘已全部在位，满足军规联合解锁前置条件！');
+    addLog('【硬件就绪】检测到用户主U盘已插入');
+    addLog('【硬件就绪】检测到继承人副U盘已插入');
+    addLog('【状态同步】两枚物理U盘均已在位，满足军规联合解锁条件！');
   };
 
   const handleEjectAll = () => {
@@ -222,7 +215,7 @@ export const UnlockVault: React.FC<UnlockVaultProps> = ({
       canUnlock: false,
       isUnlocked: false,
     });
-    addLog('【物理隔离生效】已安全拔出全部 U 盘，遗产密码库进入物理闭锁状态。');
+    addLog('【物理隔离】已弹出所有U盘，数字遗产保险库进入绝对闭锁状态。');
   };
 
   const addLog = (msg: string) => {
@@ -232,11 +225,9 @@ export const UnlockVault: React.FC<UnlockVaultProps> = ({
     ]);
   };
 
-  // 执行双U盘军规解锁
   const handleExecuteUnlock = async () => {
     setIsVerifying(true);
-    addLog('开始执行军规级联合解密流水线...');
-    addLog('1. 读取两个U盘的物理介质密钥 (X25519 Diffie-Hellman)...');
+    addLog('正在启动 X25519 双钥匙 Diffie-Hellman 协商解密...');
 
     try {
       const res = await verifyAndUnlockVault({
@@ -251,9 +242,9 @@ export const UnlockVault: React.FC<UnlockVaultProps> = ({
       });
 
       if (res.success && res.items) {
-        addLog('2. 验证时间戳与服务器哈希防篡改签名... 通过！');
-        addLog('3. 计算 DH(user_secret, heir_public) == DH(heir_secret, user_public)... 密钥完全一致！');
-        addLog('4. AES-256-GCM 密文数据解密成功，遗产资产库已激活！');
+        addLog('【签名校验通过】继承人公钥哈希与服务器防篡改记录一致！');
+        addLog('【时效核验通过】当前时间在继承有效生命周期内。');
+        addLog('【解密成功】AES-256-GCM 密文库解密完成，全部数字遗产已就绪。');
 
         setUnlockState((prev) => ({ ...prev, isUnlocked: true }));
         onUnlockSuccess(res.items);
@@ -261,20 +252,18 @@ export const UnlockVault: React.FC<UnlockVaultProps> = ({
         throw new Error(res.error || '解锁失败');
       }
     } catch (e: any) {
-      addLog(`【解密拦截】${e.message}`);
+      addLog(`【安全拦截】${e.message}`);
       setUnlockState((prev) => ({ ...prev, error: e.message }));
     } finally {
       setIsVerifying(false);
     }
   };
 
-  // 导出解密后遗产数据
   const handleExportDecryptedData = () => {
     const dataStr = JSON.stringify(
       {
         product: 'LegacyLock (遗产保险锁)',
-        exportTimestamp: Date.now(),
-        date: new Date().toISOString(),
+        exportedAt: new Date().toISOString(),
         owner: plan.heirName,
         items: currentItems,
       },
@@ -286,64 +275,62 @@ export const UnlockVault: React.FC<UnlockVaultProps> = ({
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `legacylock-heritage-decrypted-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `legacylock-1password-export-${new Date().toISOString().slice(0, 10)}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    addLog('继承人已成功导出完整解密数字资产归档。');
+    addLog('已成功导出 1Password 兼容的 JSON 离线遗产归档。');
   };
 
   return (
-    <div className="flex-1 overflow-y-auto p-6 max-w-5xl mx-auto space-y-6">
-      {/* 头部标题与仪式感说明 */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-[#1F2937]">
+    <div className="flex-1 overflow-y-auto p-8 max-w-5xl mx-auto space-y-6">
+      {/* 头部标题与控制条 */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-white/5">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
             <h1 className="text-xl font-bold text-white tracking-tight">
               双 U 盘联合解锁仪式
             </h1>
-            <span className="badge badge-amber text-xs">军规物理隔离</span>
+            <span className="op-badge op-badge-amber">双物理隔离校验</span>
           </div>
           <p className="text-xs text-slate-400 mt-1">
-            必须**同时拥有并插入用户U盘与继承人U盘**。任意单盘或伪造密钥将被硬件拦截。
+            依照军规安全标准，必须**同时插入用户U盘与继承人U盘**才可完成量子安全解密。
           </p>
         </div>
 
         <div className="flex items-center gap-2">
           <button
             onClick={handleSimulateDualUsbInsert}
-            className="btn-secondary text-xs"
-            title="模拟同时插上两个带有密钥的U盘"
+            className="op-btn-secondary text-xs"
           >
             <Sparkles className="w-3.5 h-3.5 text-[#00D4FF]" />
-            模拟同时插上两个U盘
+            <span>一键模拟双U盘插入</span>
           </button>
 
           {(userFileName || heirFileName) && (
             <button
               onClick={handleEjectAll}
-              className="p-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 text-xs"
-              title="拔出所有U盘"
+              className="op-btn-secondary text-xs hover:text-red-400"
             >
-              拔出U盘
+              <span>弹出全部U盘</span>
             </button>
           )}
         </div>
       </div>
 
-      {/* 双 U 盘物理插槽实时侦测面板 */}
+      {/* 双 U 盘硬件插槽卡片 */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* 插槽 1: 用户U盘 */}
+        {/* 插槽 1: 用户主U盘 */}
         <div
-          className={`usb-slot ${
-            unlockState.userKeyPresent ? 'active' : 'waiting'
+          className={`op-usb-port ${
+            unlockState.userKeyPresent ? 'connected' : 'waiting'
           }`}
         >
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
               <div
-                className={`p-2 rounded-lg border ${
+                className={`w-10 h-10 rounded-xl flex items-center justify-center border ${
                   unlockState.userKeyPresent
                     ? 'bg-emerald-950/60 border-emerald-500/40 text-emerald-400'
                     : 'bg-amber-950/40 border-amber-500/30 text-amber-400'
@@ -355,39 +342,39 @@ export const UnlockVault: React.FC<UnlockVaultProps> = ({
                 <h3 className="text-sm font-bold text-white">
                   插槽 1：用户持有的主U盘
                 </h3>
-                <span className="text-[11px] text-slate-400 font-mono">
-                  要求介质内含: user-key.bin
-                </span>
+                <p className="text-[11px] text-slate-400 font-mono">
+                  要求介质含: user-key.bin
+                </p>
               </div>
             </div>
 
             <span
-              className={`badge text-[10px] ${
-                unlockState.userKeyPresent ? 'badge-green' : 'badge-amber'
+              className={`op-badge ${
+                unlockState.userKeyPresent ? 'op-badge-green' : 'op-badge-amber'
               }`}
             >
-              {unlockState.userKeyPresent ? '已插入' : '等待插入...'}
+              {unlockState.userKeyPresent ? '已就绪' : '等待插入...'}
             </span>
           </div>
 
-          <div className="p-3 rounded-lg bg-[#061524] border border-[#1F2937] text-xs space-y-2">
+          <div className="p-3.5 rounded-xl bg-[#080D1A] border border-white/5 text-xs space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-slate-400">挂载状态:</span>
+              <span className="text-slate-400">密钥状态:</span>
               <span
-                className={`font-mono font-semibold ${
+                className={`font-mono font-medium ${
                   unlockState.userKeyPresent
                     ? 'text-emerald-400'
                     : 'text-amber-400'
                 }`}
               >
                 {unlockState.userKeyPresent
-                  ? '已识别用户专用 X25519 密钥'
+                  ? '已识别用户主公钥'
                   : '未检测到用户U盘'}
               </span>
             </div>
 
             {userFileName && (
-              <div className="flex items-center gap-1.5 text-slate-300 font-mono text-[11px] truncate">
+              <div className="flex items-center gap-1.5 text-slate-300 font-mono text-[11px] truncate pt-1 border-t border-white/5">
                 <FileCheck className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
                 <span className="truncate">{userFileName}</span>
               </div>
@@ -397,24 +384,24 @@ export const UnlockVault: React.FC<UnlockVaultProps> = ({
           <div className="mt-4">
             <button
               onClick={handleSelectUserKey}
-              className="btn-secondary w-full justify-center text-xs py-2"
+              className="op-btn-secondary w-full text-xs py-2"
             >
-              <Key className="w-3.5 h-3.5" />
-              {unlockState.userKeyPresent ? '更换/重选用户U盘' : '插槽 1: 选择用户U盘'}
+              <Key className="w-3.5 h-3.5 text-[#00D4FF]" />
+              <span>{unlockState.userKeyPresent ? '更换用户U盘' : '选择用户U盘密钥'}</span>
             </button>
           </div>
         </div>
 
-        {/* 插槽 2: 继承人U盘 */}
+        {/* 插槽 2: 继承人副U盘 */}
         <div
-          className={`usb-slot ${
-            unlockState.heirKeyPresent ? 'active' : 'waiting'
+          className={`op-usb-port ${
+            unlockState.heirKeyPresent ? 'connected' : 'waiting'
           }`}
         >
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
               <div
-                className={`p-2 rounded-lg border ${
+                className={`w-10 h-10 rounded-xl flex items-center justify-center border ${
                   unlockState.heirKeyPresent
                     ? 'bg-emerald-950/60 border-emerald-500/40 text-emerald-400'
                     : 'bg-amber-950/40 border-amber-500/30 text-amber-400'
@@ -426,41 +413,47 @@ export const UnlockVault: React.FC<UnlockVaultProps> = ({
                 <h3 className="text-sm font-bold text-white">
                   插槽 2：继承人持有的副U盘
                 </h3>
-                <span className="text-[11px] text-slate-400 font-mono">
-                  要求介质内含: heir-key.bin + config.bin
-                </span>
+                <p className="text-[11px] text-slate-400 font-mono">
+                  要求介质含: heir-key.bin + config.bin
+                </p>
               </div>
             </div>
 
             <span
-              className={`badge text-[10px] ${
-                unlockState.heirKeyPresent ? 'badge-green' : 'badge-amber'
+              className={`op-badge ${
+                unlockState.heirKeyPresent ? 'op-badge-green' : 'op-badge-amber'
               }`}
             >
-              {unlockState.heirKeyPresent ? '已插入' : '等待插入...'}
+              {unlockState.heirKeyPresent ? '已就绪' : '等待插入...'}
             </span>
           </div>
 
-          <div className="p-3 rounded-lg bg-[#061524] border border-[#1F2937] text-xs space-y-2">
+          <div className="p-3.5 rounded-xl bg-[#080D1A] border border-white/5 text-xs space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-slate-400">挂载状态:</span>
+              <span className="text-slate-400">密钥状态:</span>
               <span
-                className={`font-mono font-semibold ${
+                className={`font-mono font-medium ${
                   unlockState.heirKeyPresent
                     ? 'text-emerald-400'
                     : 'text-amber-400'
                 }`}
               >
                 {unlockState.heirKeyPresent
-                  ? '已识别继承人专用 X25519 密钥'
+                  ? '已识别继承人公钥'
                   : '未检测到继承人U盘'}
               </span>
             </div>
 
             {heirFileName && (
-              <div className="flex items-center gap-1.5 text-slate-300 font-mono text-[11px] truncate">
+              <div className="flex items-center gap-1.5 text-slate-300 font-mono text-[11px] truncate pt-1 border-t border-white/5">
                 <FileCheck className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
                 <span className="truncate">{heirFileName}</span>
+              </div>
+            )}
+            {configFileName && (
+              <div className="flex items-center gap-1.5 text-slate-400 font-mono text-[10px] truncate">
+                <FileCheck className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />
+                <span className="truncate">配置: {configFileName}</span>
               </div>
             )}
           </div>
@@ -468,33 +461,32 @@ export const UnlockVault: React.FC<UnlockVaultProps> = ({
           <div className="mt-4 grid grid-cols-2 gap-2">
             <button
               onClick={handleSelectHeirKey}
-              className="btn-secondary justify-center text-xs py-2"
+              className="op-btn-secondary text-xs py-2"
             >
-              <Key className="w-3.5 h-3.5" />
-              {unlockState.heirKeyPresent ? '重选继承人Key' : '选择 heir-key.bin'}
+              <Key className="w-3.5 h-3.5 text-purple-400" />
+              <span>选择 heir-key</span>
             </button>
             <button
               onClick={handleSelectConfig}
-              className="btn-secondary justify-center text-xs py-2"
+              className="op-btn-secondary text-xs py-2"
             >
-              <Clock className="w-3.5 h-3.5" />
-              {configFileName ? '配置已载入' : '选择 config.bin'}
+              <FileCheck className="w-3.5 h-3.5 text-slate-400" />
+              <span>选择 config.bin</span>
             </button>
           </div>
         </div>
       </div>
 
-      {/* 中央军规联合解锁控制区 */}
-      <div className="vault-card p-6 flex flex-col items-center justify-center text-center space-y-4">
-        {/* 中心光晕指示球 */}
+      {/* 中央军规联合解锁操作卡 */}
+      <div className="op-card p-8 flex flex-col items-center justify-center text-center space-y-5">
         <div className="relative">
           <div
             className={`w-20 h-20 rounded-full flex items-center justify-center transition-all duration-500 ${
               unlockState.isUnlocked
-                ? 'bg-emerald-500/20 border-2 border-emerald-400 shadow-[0_0_30px_rgba(16,185,129,0.4)]'
+                ? 'bg-emerald-500/20 border-2 border-emerald-400 shadow-[0_0_30px_rgba(16,185,129,0.3)]'
                 : unlockState.canUnlock
-                ? 'bg-[#00D4FF]/20 border-2 border-[#00D4FF] shadow-[0_0_30px_rgba(0,212,255,0.4)] animate-pulse'
-                : 'bg-slate-800/40 border border-slate-700'
+                ? 'bg-[#0572EC]/20 border-2 border-[#00D4FF] shadow-[0_0_30px_rgba(0,212,255,0.3)] animate-pulse'
+                : 'bg-white/5 border border-white/10'
             }`}
           >
             {unlockState.isUnlocked ? (
@@ -502,55 +494,54 @@ export const UnlockVault: React.FC<UnlockVaultProps> = ({
             ) : unlockState.canUnlock ? (
               <ShieldCheck className="w-9 h-9 text-[#00D4FF]" />
             ) : (
-              <Lock className="w-9 h-9 text-slate-500" />
+              <Lock className="w-9 h-9 text-slate-400" />
             )}
           </div>
         </div>
 
-        <div>
+        <div className="space-y-1">
           <h2 className="text-base font-bold text-white">
             {unlockState.isUnlocked
-              ? '双 U 盘认证通过 · 数字遗产已完全解密'
+              ? '双 U 盘认证通过 · 数字遗产库已激活'
               : unlockState.canUnlock
-              ? '两个 U 盘已同时插在电脑上，可执行军规解密'
+              ? '两枚硬件钥匙已就绪，可执行联合解锁'
               : !unlockState.userKeyPresent && !unlockState.heirKeyPresent
-              ? '请同时插入用户U盘与继承人U盘'
+              ? '请在电脑上同时插入两枚硬件 U 盘'
               : !unlockState.userKeyPresent
-              ? '等待用户主U盘插入 (插槽 1 缺失)'
-              : '等待继承人副U盘插入 (插槽 2 缺失)'}
+              ? '等待用户主 U 盘插入 (插槽 1 缺失)'
+              : '等待继承人副 U 盘插入 (插槽 2 缺失)'}
           </h2>
 
-          <p className="text-xs text-slate-400 mt-1 max-w-lg mx-auto">
+          <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
             {unlockState.isUnlocked
-              ? '已成功联合求解 Diffie-Hellman 派生密钥。您现在可在此设备上查阅所有被继承遗产账号，或一键导出归档。'
-              : '安全物理隔离验证：若缺失任意一根U盘，数据密文在数学上不可逆，保证离世前账号永不泄露。'}
+              ? '已通过双钥 Diffie-Hellman 求解对称解密向量。您现在可以直接在左侧分类查阅所有遗产资产，或一键导出归档。'
+              : '物理隔离保护机制：任何单一U盘在数学上无法反推密钥，离世前任何人均无法解密。'}
           </p>
         </div>
 
-        {/* 解锁操作按钮 */}
-        <div className="flex items-center gap-3">
+        <div>
           {!unlockState.isUnlocked ? (
             <button
               onClick={handleExecuteUnlock}
               disabled={!unlockState.canUnlock || isVerifying}
-              className="btn-primary px-8 py-3 text-sm shadow-xl"
+              className="op-btn-primary px-8 py-3 text-sm font-semibold shadow-lg"
             >
               {isVerifying ? (
                 <>
                   <RefreshCw className="w-4 h-4 animate-spin" />
-                  <span>正在执行 X25519 联合解密...</span>
+                  <span>正在执行 Diffie-Hellman 联合解密...</span>
                 </>
               ) : (
                 <>
                   <Key className="w-4 h-4" />
-                  <span>执行双U盘联合解锁</span>
+                  <span>执行双 U 盘联合解锁</span>
                 </>
               )}
             </button>
           ) : (
             <button
               onClick={handleExportDecryptedData}
-              className="btn-primary px-8 py-3 text-sm bg-gradient-to-r from-emerald-600 to-teal-500 border-emerald-400 shadow-emerald-950/40"
+              className="op-btn-primary px-8 py-3 text-sm bg-gradient-to-r from-emerald-600 to-teal-500 border-emerald-400/50 shadow-lg"
             >
               <Download className="w-4 h-4" />
               <span>一键离线导出全部解密遗产数据 (JSON)</span>
@@ -559,28 +550,28 @@ export const UnlockVault: React.FC<UnlockVaultProps> = ({
         </div>
 
         {unlockState.error && (
-          <div className="p-3 rounded-lg bg-red-950/40 border border-red-500/40 text-red-300 text-xs flex items-center gap-2">
+          <div className="p-3 rounded-xl bg-red-950/40 border border-red-500/30 text-red-300 text-xs flex items-center gap-2">
             <AlertOctagon className="w-4 h-4 text-red-400 flex-shrink-0" />
             <span>{unlockState.error}</span>
           </div>
         )}
       </div>
 
-      {/* 解锁流水线实时审计日志 */}
-      <div className="vault-card p-4 space-y-2">
-        <div className="flex items-center justify-between text-xs pb-2 border-b border-[#1F2937]">
-          <span className="font-mono uppercase tracking-wider text-slate-400 font-semibold flex items-center gap-1.5">
-            <FileCheck className="w-3.5 h-3.5 text-[#00D4FF]" />
-            硬件插槽侦测与密码学审计日志
+      {/* 解锁审计流水日志 */}
+      <div className="op-card p-4 space-y-2">
+        <div className="flex items-center justify-between text-xs pb-2 border-b border-white/5">
+          <span className="font-mono uppercase tracking-wider text-slate-400 font-semibold flex items-center gap-2">
+            <ShieldCheck className="w-3.5 h-3.5 text-[#00D4FF]" />
+            硬件插槽事件与密码学审计日志
           </span>
-          <span className="font-mono text-[10px] text-slate-500">
+          <span className="font-mono text-[10px] text-slate-400">
             {verificationLogs.length} 条记录
           </span>
         </div>
 
-        <div className="p-3 rounded-lg bg-[#061524] border border-[#1F2937] font-mono text-[11px] text-slate-300 space-y-1 max-h-36 overflow-y-auto">
+        <div className="p-3 rounded-lg bg-[#080D1A] border border-white/5 font-mono text-[11px] text-slate-300 space-y-1 max-h-32 overflow-y-auto">
           {verificationLogs.length === 0 ? (
-            <span className="text-slate-500">等待硬件插槽事件...</span>
+            <span className="text-slate-400">等待硬件插槽事件...</span>
           ) : (
             verificationLogs.map((log, index) => (
               <div key={index} className="leading-tight">

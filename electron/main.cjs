@@ -48,16 +48,68 @@ function runVaultCli(args) {
   });
 }
 
-function createWindow() {
+const http = require('http');
+
+let embeddedServerUrl = 'http://127.0.0.1:5173';
+
+function startEmbeddedServer(port = 5173) {
+  return new Promise((resolve) => {
+    const distDir = path.join(__dirname, '..', 'dist');
+    const mimes = {
+      '.html': 'text/html; charset=utf-8',
+      '.js': 'application/javascript; charset=utf-8',
+      '.css': 'text/css; charset=utf-8',
+      '.json': 'application/json; charset=utf-8',
+      '.png': 'image/png',
+      '.jpg': 'image/jpeg',
+      '.svg': 'image/svg+xml',
+      '.ico': 'image/x-icon',
+    };
+
+    const server = http.createServer((req, res) => {
+      let reqPath = req.url.split('?')[0];
+      if (reqPath === '/' || !reqPath) reqPath = '/index.html';
+      let filePath = path.join(distDir, reqPath);
+      if (!fs.existsSync(filePath)) {
+        filePath = path.join(distDir, 'index.html');
+      }
+      const ext = path.extname(filePath);
+      const contentType = mimes[ext] || 'application/octet-stream';
+      try {
+        const content = fs.readFileSync(filePath);
+        res.writeHead(200, {
+          'Content-Type': contentType,
+          'Access-Control-Allow-Origin': '*',
+        });
+        res.end(content);
+      } catch (e) {
+        res.writeHead(500);
+        res.end(e.message);
+      }
+    });
+
+    server.on('error', () => {
+      // 端口已被占用时（例如已运行 vite），直接复用
+      resolve(`http://127.0.0.1:${port}`);
+    });
+
+    server.listen(port, '127.0.0.1', () => {
+      console.log(`[Local Server] Serving on http://127.0.0.1:${port}`);
+      resolve(`http://127.0.0.1:${port}`);
+    });
+  });
+}
+
+async function createWindow() {
   console.log('[Electron Main] Creating main browser window...');
   mainWindow = new BrowserWindow({
-    width: 1240,
-    height: 840,
+    width: 1260,
+    height: 860,
     minWidth: 1024,
     minHeight: 700,
     title: 'LegacyLock 遗产保险锁 (军规级数字遗产双保险箱)',
-    backgroundColor: '#061524',
-    show: false, // 先隐藏，等 ready-to-show 再显示
+    backgroundColor: '#0E1525',
+    show: true, // 确保直接可见
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
@@ -67,13 +119,8 @@ function createWindow() {
     },
   });
 
-  mainWindow.once('ready-to-show', () => {
-    console.log('[Electron Main] Window ready-to-show event fired! Showing and focusing window.');
-    mainWindow.show();
-    mainWindow.setAlwaysOnTop(true);
-    mainWindow.focus();
-    mainWindow.setAlwaysOnTop(false);
-  });
+  mainWindow.show();
+  mainWindow.focus();
 
   mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
     console.error('[Electron Main] Failed to load URL:', validatedURL, 'Error:', errorCode, errorDescription);
@@ -83,9 +130,9 @@ function createWindow() {
     console.log('[Electron Main] WebContents did-finish-load successfully!');
   });
 
-  const distPath = path.join(__dirname, '..', 'dist', 'index.html');
-  console.log('[Electron Main] Loading file from:', distPath);
-  mainWindow.loadFile(distPath);
+  const url = await startEmbeddedServer();
+  console.log('[Electron Main] Loading URL:', url);
+  mainWindow.loadURL(url);
 }
 
 // 注册 IPC 通信

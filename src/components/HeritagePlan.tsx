@@ -9,6 +9,7 @@ import {
   Calendar,
   Key,
   Info,
+  Sparkles,
 } from 'lucide-react';
 import { HeritagePlanConfig } from '../types';
 import { generateDualUsbKeyBlobs, isElectronApp } from '../services/cryptoService';
@@ -25,21 +26,20 @@ export const HeritagePlan: React.FC<HeritagePlanProps> = ({
   const [heirName, setHeirName] = useState(plan.heirName || '李华 (长子/法定继承人)');
   const [heirContact, setHeirContact] = useState(plan.heirContact || 'lihua_heir@family.org / 138-8888-9999');
   const [heirNotes, setHeirNotes] = useState(
-    plan.heirNotes || '在收到继承生效通知后，请携带本人专用的继承人U盘，前往父亲书房获取用户U盘，同时插入电脑解锁全部数字资产。'
+    plan.heirNotes ||
+      '在收到继承生效通知后，请携带本人专用的继承人U盘，前往书房保险箱获取用户U盘，同时插入电脑解锁全部数字资产。'
   );
   const [expiryDays, setExpiryDays] = useState(plan.expiryDays || 365);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generateSuccess, setGenerateSuccess] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
-  // 一键生成双U盘军规密钥包
   const handleGenerateUsbKeys = async () => {
     setIsGenerating(true);
-    setStatusMessage('正在生成 X25519 量子安全密钥对并构建双U盘镜像...');
+    setStatusMessage('正在生成 X25519 密钥对并计算服务器防篡改时间戳...');
 
     try {
       if (isElectronApp() && window.legacyLockAPI) {
-        // Electron 原生环境下优先调用 Rust 二进制
         const res = await window.legacyLockAPI.generateKeys({
           expiryDays,
         });
@@ -58,12 +58,11 @@ export const HeritagePlan: React.FC<HeritagePlanProps> = ({
           };
           onUpdatePlan(newPlan);
           setGenerateSuccess(true);
-          setStatusMessage('Rust 军规核心已成功生成 user-key.bin, heir-key.bin, config.bin！');
+          setStatusMessage('Rust 军规核心已成功写入 user-key.bin, heir-key.bin, config.bin！');
         } else {
-          throw new Error(res.error || 'Rust CLI 生成密钥失败');
+          throw new Error(res.error || 'Rust CLI 生成失败');
         }
       } else {
-        // 浏览器端 WebCrypto 仿真
         const res = await generateDualUsbKeyBlobs(expiryDays);
 
         const newPlan: HeritagePlanConfig = {
@@ -79,16 +78,15 @@ export const HeritagePlan: React.FC<HeritagePlanProps> = ({
         };
         onUpdatePlan(newPlan);
         setGenerateSuccess(true);
-        setStatusMessage('军规双U盘密钥对已生成！您可以直接下载各U盘专用二进制文件。');
+        setStatusMessage('双U盘军规密钥包生成成功！请点击下方卡片下载文件分别拷入两个不同U盘。');
       }
     } catch (e: any) {
-      setStatusMessage(`生成失败: ${e.message}`);
+      setStatusMessage(`生成异常: ${e.message}`);
     } finally {
       setIsGenerating(false);
     }
   };
 
-  // 触发浏览器下载单个密钥文件
   const handleDownloadFile = async (type: 'user' | 'heir' | 'config') => {
     const res = await generateDualUsbKeyBlobs(expiryDays);
     let blob: Blob;
@@ -120,37 +118,37 @@ export const HeritagePlan: React.FC<HeritagePlanProps> = ({
   );
 
   return (
-    <div className="flex-1 overflow-y-auto p-6 max-w-5xl mx-auto space-y-6">
-      {/* 头部介绍 */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-[#1F2937]">
+    <div className="flex-1 overflow-y-auto p-8 max-w-5xl mx-auto space-y-6">
+      {/* 1Password 风格主横幅 */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-white/5">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
             <h1 className="text-xl font-bold text-white tracking-tight">
-              数字遗产继承计划设置
+              数字遗产继承计划与硬件 U 盘配置
             </h1>
-            <span className="badge badge-cyan text-xs">军规级双钥匙模型</span>
+            <span className="op-badge op-badge-cyan">1Password Emergency Kit 标准</span>
           </div>
           <p className="text-xs text-slate-400 mt-1">
-            设置继承人信息与有效截止时间戳。系统将生成两枚必须同时使用的物理U盘密钥。
+            设置法定继承人、有效失效时间戳，并制作专用的两张硬件钥匙 U 盘。
           </p>
         </div>
 
         <button
           onClick={handleGenerateUsbKeys}
           disabled={isGenerating}
-          className="btn-primary"
+          className="op-btn-primary shadow-lg"
         >
-          <Usb className="w-4 h-4" />
-          <span>{isGenerating ? '正在生成密钥中...' : '生成并重置双U盘密钥'}</span>
+          <Sparkles className="w-4 h-4 text-[#00D4FF]" />
+          <span>{isGenerating ? '正在生成中...' : '生成并重置双 U 盘密钥'}</span>
         </button>
       </div>
 
       {statusMessage && (
         <div
-          className={`p-3 rounded-xl border text-xs flex items-center gap-2 ${
+          className={`p-4 rounded-xl border text-xs flex items-center gap-2.5 ${
             generateSuccess
-              ? 'bg-emerald-950/40 text-emerald-300 border-emerald-500/40'
-              : 'bg-amber-950/40 text-amber-300 border-amber-500/40'
+              ? 'bg-emerald-950/30 text-emerald-300 border-emerald-500/30'
+              : 'bg-amber-950/30 text-amber-300 border-amber-500/30'
           }`}
         >
           {generateSuccess ? (
@@ -162,173 +160,171 @@ export const HeritagePlan: React.FC<HeritagePlanProps> = ({
         </div>
       )}
 
+      {/* 两列配置卡片 */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* 继承人资料配置 */}
-        <div className="vault-card p-5 space-y-4">
-          <div className="flex items-center gap-2 text-slate-200">
-            <Shield className="w-4 h-4 text-[#00D4FF]" />
-            <h3 className="text-sm font-bold">法定/指定继承人设定</h3>
+        <div className="op-card p-6 space-y-4">
+          <div className="flex items-center gap-2 text-white">
+            <Shield className="w-4 h-4 text-[#0572EC]" />
+            <h3 className="text-sm font-bold">法定指定继承人资料</h3>
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1">
+            <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
               继承人姓名 / 称谓
             </label>
             <input
               type="text"
               value={heirName}
               onChange={(e) => setHeirName(e.target.value)}
-              className="vault-input"
+              className="op-input font-medium"
               placeholder="例如: 李华 (长子)"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1">
-              紧急联络信箱 / 手机号
+            <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
+              紧急信箱 / 联络电话
             </label>
             <input
               type="text"
               value={heirContact}
               onChange={(e) => setHeirContact(e.target.value)}
-              className="vault-input"
+              className="op-input font-mono text-xs"
               placeholder="例如: heir@example.com / 138-0000-0000"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1">
-              继承人离世激活指引 (操作信函)
+            <label className="block text-[11px] font-semibold uppercase tracking-wider text-amber-400 mb-1.5">
+              离世激活指引函 (安全便签说明)
             </label>
             <textarea
               rows={4}
               value={heirNotes}
               onChange={(e) => setHeirNotes(e.target.value)}
-              className="vault-input resize-none"
-              placeholder="告知继承人两枚U盘分别存放在何处..."
+              className="op-input resize-none text-xs leading-relaxed"
+              placeholder="说明两枚U盘各自存放的位置..."
             />
           </div>
         </div>
 
-        {/* 计划有效期限与失效时间戳 */}
-        <div className="vault-card p-5 space-y-4 flex flex-col justify-between">
+        {/* 计划有效期与时间戳 */}
+        <div className="op-card p-6 space-y-4 flex flex-col justify-between">
           <div className="space-y-4">
-            <div className="flex items-center gap-2 text-slate-200">
-              <Clock className="w-4 h-4 text-[#00D4FF]" />
-              <h3 className="text-sm font-bold">继承有效期限与防滥用时间戳</h3>
+            <div className="flex items-center gap-2 text-white">
+              <Clock className="w-4 h-4 text-amber-400" />
+              <h3 className="text-sm font-bold">继承有效周期与防滥用时间戳</h3>
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1">
-                计划有效期 (天)
+              <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
+                继承计划有效期限
               </label>
               <select
                 value={expiryDays}
                 onChange={(e) => setExpiryDays(Number(e.target.value))}
-                className="vault-input font-mono"
+                className="op-input font-mono text-xs"
               >
-                <option value={30}>30 天 (短期测试)</option>
+                <option value={30}>30 天 (快速测试)</option>
                 <option value={90}>90 天 (3 个月)</option>
                 <option value={180}>180 天 (半年)</option>
                 <option value={365}>365 天 (1 年标准期)</option>
                 <option value={1095}>1095 天 (3 年长周期)</option>
-                <option value={3650}>3650 天 (10 年长久期)</option>
+                <option value={3650}>3650 天 (10 年守护期)</option>
               </select>
             </div>
 
-            {/* 时间戳与倒计时展示卡 */}
-            <div className="p-4 rounded-xl bg-[#061524] border border-[#1F2937] space-y-2">
+            <div className="p-4 rounded-xl bg-[#0E1525] border border-white/5 space-y-2.5">
               <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-400">预计失效截止日期:</span>
-                <span className="font-mono text-[#00D4FF] font-semibold flex items-center gap-1">
+                <span className="text-slate-400">失效截止时间:</span>
+                <span className="font-mono text-[#00D4FF] font-semibold flex items-center gap-1.5">
                   <Calendar className="w-3.5 h-3.5" />
                   {expiryDate.toLocaleDateString()} {expiryDate.toLocaleTimeString()}
                 </span>
               </div>
               <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-400">Unix 截止时间戳:</span>
-                <span className="font-mono text-slate-200">
+                <span className="text-slate-400">Unix 硬件校验时间戳:</span>
+                <span className="font-mono text-slate-300">
                   {plan.expiryTimestamp ||
                     Math.floor(Date.now() / 1000) + expiryDays * 86400}
                 </span>
               </div>
-              <div className="text-[11px] text-slate-500 pt-1 border-t border-[#1F2937]">
-                超过此截止时间后，服务器将失效并销毁对应记录，即使拥有物理U盘也无法解锁，确保不会被未授权长期滥用。
+              <div className="text-[11px] text-slate-400 pt-2 border-t border-white/5 leading-relaxed">
+                超过截止时间后，即使两枚U盘同时插入也将被拦截拒绝，彻底避免历史计划被非法人员长期滥用。
               </div>
             </div>
           </div>
 
-          <div className="p-3 rounded-lg bg-[#0A2540]/40 border border-[#00D4FF]/20 flex items-start gap-2 text-xs text-slate-300">
+          <div className="p-3 rounded-lg bg-[#0572EC]/10 border border-[#0572EC]/25 flex items-start gap-2 text-xs text-slate-300">
             <Info className="w-4 h-4 text-[#00D4FF] flex-shrink-0 mt-0.5" />
             <p>
-              保存修改后，请务必重新写入继承人与用户U盘，确保时间戳和公钥哈希处于同步状态。
+              修改继承人或时间后，请务必点击上方按钮重新生成并下载对应的 U 盘密钥文件。
             </p>
           </div>
         </div>
       </div>
 
-      {/* 两个物理U盘制作与写入面板 */}
-      <div className="vault-card p-6 space-y-5">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-sm font-bold text-white flex items-center gap-2">
-              <Usb className="w-4 h-4 text-[#00D4FF]" />
-              物理 U 盘制作与文件下载 (纯两个U盘模式)
-            </h3>
-            <p className="text-xs text-slate-400 mt-0.5">
-              将生成的专有密钥文件分别拷入两个不同的 U 盘根目录。解锁时两根U盘必须同时插在电脑上。
-            </p>
-          </div>
+      {/* 两个硬件U盘制作与文件下载 */}
+      <div className="op-card p-6 space-y-5">
+        <div>
+          <h3 className="text-sm font-bold text-white flex items-center gap-2">
+            <Usb className="w-4 h-4 text-[#0572EC]" />
+            物理硬件 U 盘制作（纯两个U盘模式）
+          </h3>
+          <p className="text-xs text-slate-400 mt-1">
+            将生成的专有密钥文件分别拷入两只不同的物理 U 盘根目录。
+          </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* U盘 A：用户U盘 */}
-          <div className="p-4 rounded-xl bg-[#061524] border border-blue-500/30 flex flex-col justify-between space-y-3">
+          {/* U盘 1: 用户持有的主U盘 */}
+          <div className="p-4 rounded-xl bg-[#0E1525] border border-[#0572EC]/30 flex flex-col justify-between space-y-4">
             <div>
               <div className="flex items-center justify-between">
-                <span className="font-semibold text-xs text-blue-400 flex items-center gap-1.5">
+                <span className="font-semibold text-xs text-[#00D4FF] flex items-center gap-1.5">
                   <Key className="w-3.5 h-3.5" />
-                  U 盘 1：用户持有的主钥匙
+                  硬件 U 盘 1：用户主钥匙
                 </span>
-                <span className="badge badge-cyan text-[10px]">user-key.bin</span>
+                <span className="op-badge op-badge-blue">user-key.bin</span>
               </div>
-              <p className="text-[11px] text-slate-400 mt-2">
-                由被继承人随身携带或锁入个人保险箱。内含 X25519 用户私钥与用户公钥。
+              <p className="text-[11px] text-slate-400 mt-2 leading-relaxed">
+                由被继承人随身携带或锁入个人保险箱。内含 X25519 用户私钥与公钥。
               </p>
               {plan.userPublicHex && (
-                <div className="mt-2 text-[10px] font-mono text-slate-500 truncate">
-                  公钥: {plan.userPublicHex.slice(0, 24)}...
+                <div className="mt-2 text-[10px] font-mono text-slate-400 truncate">
+                  公钥指纹: {plan.userPublicHex.slice(0, 28)}...
                 </div>
               )}
             </div>
 
             <button
               onClick={() => handleDownloadFile('user')}
-              className="btn-secondary w-full justify-center text-xs py-2"
+              className="op-btn-secondary w-full text-xs py-2"
             >
-              <Download className="w-3.5 h-3.5" />
-              下载 user-key.bin 写入用户U盘
+              <Download className="w-3.5 h-3.5 text-[#00D4FF]" />
+              <span>下载 user-key.bin 写入用户U盘</span>
             </button>
           </div>
 
-          {/* U盘 B：继承人U盘 */}
-          <div className="p-4 rounded-xl bg-[#061524] border border-purple-500/30 flex flex-col justify-between space-y-3">
+          {/* U盘 2: 继承人持有的副U盘 */}
+          <div className="p-4 rounded-xl bg-[#0E1525] border border-purple-500/30 flex flex-col justify-between space-y-4">
             <div>
               <div className="flex items-center justify-between">
                 <span className="font-semibold text-xs text-purple-400 flex items-center gap-1.5">
                   <Key className="w-3.5 h-3.5" />
-                  U 盘 2：继承人持有的副钥匙
+                  硬件 U 盘 2：继承人副钥匙
                 </span>
-                <span className="badge badge-cyan text-[10px]">
+                <span className="op-badge op-badge-cyan">
                   heir-key.bin + config.bin
                 </span>
               </div>
-              <p className="text-[11px] text-slate-400 mt-2">
-                由继承人单独保管。内含继承人私钥及附带有效时间戳的防篡改配置文件。
+              <p className="text-[11px] text-slate-400 mt-2 leading-relaxed">
+                由指定继承人单独妥善保管。内含继承人私钥与防篡改有效期签名配置。
               </p>
               {plan.heirPublicHex && (
-                <div className="mt-2 text-[10px] font-mono text-slate-500 truncate">
-                  公钥: {plan.heirPublicHex.slice(0, 24)}...
+                <div className="mt-2 text-[10px] font-mono text-slate-400 truncate">
+                  公钥指纹: {plan.heirPublicHex.slice(0, 28)}...
                 </div>
               )}
             </div>
@@ -336,17 +332,17 @@ export const HeritagePlan: React.FC<HeritagePlanProps> = ({
             <div className="grid grid-cols-2 gap-2">
               <button
                 onClick={() => handleDownloadFile('heir')}
-                className="btn-secondary justify-center text-xs py-2"
+                className="op-btn-secondary text-xs py-2"
               >
                 <Download className="w-3.5 h-3.5" />
-                heir-key.bin
+                <span>heir-key.bin</span>
               </button>
               <button
                 onClick={() => handleDownloadFile('config')}
-                className="btn-secondary justify-center text-xs py-2"
+                className="op-btn-secondary text-xs py-2"
               >
                 <Download className="w-3.5 h-3.5" />
-                config.bin
+                <span>config.bin</span>
               </button>
             </div>
           </div>
