@@ -1,4 +1,4 @@
-# 🛡️ LegacyLock (军规遗产密钥库)
+# 🛡️ LegacyLock (Military-Grade Digital Heritage Vault)
 
 <div align="center">
 
@@ -6,205 +6,194 @@
 ![Security Standard](https://img.shields.io/badge/Security-Military_Grade_LLCS--1-10B981?style=for-the-badge)
 ![Security Audit](https://img.shields.io/badge/Audit-Passed_Zero_Vulnerability-059669?style=for-the-badge)
 ![Encryption](https://img.shields.io/badge/Cipher-AES--256--GCM_+_PBKDF2_100k-8B5CF6?style=for-the-badge)
-![Zero Cloud](https://img.shields.io/badge/Network-100%25_Offline_Cold_Storage-F59E0B?style=for-the-badge)
+![Zero Cloud](https://img.shields.io/badge/Network-100%25_Offline_Air--Gapped-F59E0B?style=for-the-badge)
 ![Cross Platform](https://img.shields.io/badge/Platform-Windows_%7C_macOS_%7C_Linux-6366F1?style=for-the-badge)
 
 <br/>
 
-**100% 纯离线冷存储 · 物理隔离双钥匙协同 · 跨世代数字遗产安全保险箱**
+**100% Offline Air-Gapped Cold Storage · 2-of-2 Hardware Key Separation · Cross-Generational Digital Heritage Vault**
 
-*两个硬件介质（U盘 / 移动硬盘）同时接入设备方可解密，让数字遗产离世后永不丢失，生前绝对安全。*
+*Two physical storage media (USB Flash / External HDD / SSD) must be plugged into the device simultaneously to unlock. Digital heritage is never lost after passing, and 100% secure during lifetime.*
 
-[📖 完整开发手册 (DEVELOPMENT.md)](./DEVELOPMENT.md) · [👤 所有者使用手册 (USER_MANUAL.md)](./USER_MANUAL.md) · [🗝️ 继承人接管手册 (HEIR_MANUAL.md)](./HEIR_MANUAL.md) · [❓ 敏感安全 FAQ](./DEVELOPMENT.md#九-数据保存继承流程与敏感安全威胁深度问答-inheritance-flow--security-faq) · [🚀 快速开始](#-快速上手运行)
+<br/>
+
+### 🌐 Language Navigation / 语言切换 / 言語切替
+**[English](#-english)** · **[中文 (Chinese)](#-中文-chinese)** · **[日本語 (Japanese)](#-日本語-japanese)**
+
+<br/>
+
+### 📚 Official Manuals / 核心手册 / 公式マニュアル
+[👤 **Owner Manual (USER_MANUAL.md)**](./USER_MANUAL.md) · [🗝️ **Heir Manual (HEIR_MANUAL.md)**](./HEIR_MANUAL.md)  
+[📖 **Dev & Audit Guide (DEVELOPMENT.md)**](./DEVELOPMENT.md) · [❓ **Security FAQ**](./DEVELOPMENT.md#九-数据保存继承流程与敏感安全威胁深度问答-inheritance-flow--security-faq)
 
 </div>
 
 ---
 
-## 🌟 项目愿景与设计哲学
+<div id="-english"></div>
 
-在数字化时代，助记词、比特币私钥、银行凭证、房产信托合约与核心网络账号分散在各个角落。传统的云端密码管理器存在被攻破、服务商跑路或账号封禁的不可逆风险；而单点明文保存又无法合法、安全地交付给法定继承人。
+## 🇬🇧 English
 
-**LegacyLock** 专为跨世代（30 年+）数字遗产安全保管而生：
-- **零网络、零云端（100% Offline）**：全系统无中心化服务器，绝不发起任何网络请求，彻底阻断黑客远程嗅探与云端泄露；
-- **双钥匙物理隔离（2-of-2 Hardware Threshold）**：所有者钥匙（`user-key.bin`）与继承人钥匙（`heir-key.bin`）在数学上严格正交。任何单把钥匙在数学上绝对无法解密资产，必须双物理介质同时接入方可激活；
-- **外接硬盘与 U 盘普适支持**：深度适配普通 USB 闪存盘、USB 移动机械硬盘（HDD）与移动固态硬盘（SSD），支持 Windows（含 D 盘及后续盘符）、macOS 与 Linux；
-- **继承人单向只读接管**：继承人使用副盘接管时，系统处于只读模式，禁止篡改或删除历史密库，捍卫数字遗产法律真实性。
+### 1. Overview & Core Philosophy
 
----
+In the digital era, private keys, crypto seed phrases, bank credentials, real-estate trusts, and server root credentials are fragmented and vulnerable. Centralized cloud password managers suffer from single-point cloud breaches, account terminations, or provider bankruptcy; simple plaintext files, on the other hand, cannot be safely bequeathed without risking premature exposure.
 
-## ⚡ 核心功能特性一览
-
-### 1. 12 大维度数字资产结构化存储
-支持录入管理 12 类核心数字遗产，每种类型配备专属字段模型：
-- **🔑 登录信息**：网站凭据、应用账号、2FA 恢复码；
-- **📝 安全备注**：私密遗嘱、便签说明、物理保险箱暗码；
-- **🪪 身份标识**：身份证、护照、社保号与法律身份凭据；
-- **💳 信用卡与金融**：银行卡、国际账户、定期存单；
-- **🔒 独立密码**：设备锁屏口令、BIOS 与硬件密码；
-- **📑 加密文档**：房产合约、信托协议、软件授权许可；
-- **💻 SSH 密钥**：服务器根私钥、代码仓库部署凭证；
-- **🌐 API 凭据**：云服务令牌、AI 开发者密钥；
-- **🪙 加密钱包**：区块链冷钱包、BIP-39 助记词、私钥明文；
-- **🖥️ 服务器与数据库**：VPS 主机、生产数据库访问凭据；
-- **📶 无线路由器**：家庭主路由口令、WiFi 密码、NAS 存储；
-- **🎖️ 会员与资产**：积分会员、游戏资产、医疗健康档案。
-
-### 2. 紧凑平衡的现代化军规美学界面
-- **左侧导航侧边栏**：分类与资产实时联动，动态显示真实收录徽标计数；底端设立常驻 **「系统设置」** 入口；
-- **顶部均衡工具栏**：
-  - 左侧：**`[+ 添加新资产 / 密钥]`** 主行动按钮 + 实时搜索框；
-  - 中部快捷工具组：
-    - **`[🎨 渐变主题]`**：支持实时切换 5 套军规渐变配色；
-    - **`[🔑 U盘密码]`**：高亮快捷设置硬件介质保护口令；
-    - **`[🛡️ 密库自检]`**：一键执行 6 项密码学完整性健康检查。
-- **美化资产录入弹窗**：分类选择器 + 独立模态表单，内置 20 位高强度真随机密码生成器与明文/掩码切换。
-
-### 3. 系统设置与安全控制中心 (`SettingsView`)
-- **外部存储硬件识别卡片**：实时展示外接介质的挂载路径（如 `D:\`）、型号、文件系统、物理容量与可用空间比例，探查钥匙文件状态；
-- **重要安全提醒指南**：U 盘丢失永久不可逆灭失警示、无后门重置机制说明、双盘异地容灾策略与闪存电荷寿命维护防范；
-- **高级实用安全偏好**：
-  - 无操作自动锁定时间（5/15/30/60分钟/从不）；
-  - 敏感凭据剪贴板 30 秒自动清空；
-  - 资产卡片默认以 `••••••••` 掩码隐藏；
-  - **纸质应急救援密封单（Paper Key Sheet）**：生成包含密库唯一标识码与保管指南的标准 A4 离线卡片，支持一键打印与密封物理留档；
-  - **介质无损平滑迁移向导**：支持旧介质数据克隆至新移动固态硬盘；
-- **系统外观永久保存**：配色设置联动系统底层 `settings.json`，重启软件 100% 沿用最后一次修改，杜绝还原；
-- **全链路 UTF-8 防乱码保障**：规范文件导入/导出编解码与中文字体降级栈，确保中文与符号永不乱码；
-- **军规级紧急数据销毁**：需输入防误触指令 `ERASE-ALL`，一键物理擦除清空本地与介质数据。
+**LegacyLock** is purpose-built for multi-decade (30+ years) digital asset preservation with strict military-grade principles:
+- **100% Offline & Air-Gapped**: Zero telemetry, zero analytics, zero external network requests. Internal data never leaves the device, and inbound connections are blocked at the loopback interface (`127.0.0.1`).
+- **2-of-2 Hardware Separation (Threshold DH)**: The Owner Key (`user-key.bin`) and Heir Key (`heir-key.bin`) are mathematically orthogonal. Neither party alone can compute the master key. Both physical devices must be plugged into the machine simultaneously to derive the AES-256-GCM session key.
+- **Convenient Daily Usage vs. Secure Posthumous Succession**: The owner uses a **Master PIN** for daily management on their PC without needing to constantly carry USB drives. The dual-USB mechanism is reserved for offline disaster recovery and posthumous execution.
+- **Heir Read-Only Mode**: When the heir activates the vault posthumously, the software enters an enforced read-only view, prohibiting any modification or deletion to preserve legal authenticity.
 
 ---
 
-## 🔐 军规密码学与安全架构 (LLCS-1)
+### 2. Dual-USB Cryptographic Architecture
 
 ```text
-       ┌─────────────────────────────────────────────────────────────┐
-       │              物理隔离双钥匙联合激活架构 (2-of-2)               │
-       └─────────────────────────────────────────────────────────────┘
-                                      │
-               ┌──────────────────────┴──────────────────────┐
-               ▼                                             ▼
-     【所有者主介质 (User USB)】                   【继承人副介质 (Heir USB)】
-    存放: user-key.bin (64B)                      存放: heir-key.bin (64B)
-    (X25519 私钥 + 公钥)                          (X25519 私钥 + 公钥)
-               │                                             │
-               └──────────────────────┬──────────────────────┘
-                                      ▼
-                        Curve25519 双向密钥协商
-                 DH(User_Priv, Heir_Pub) == DH(Heir_Priv, User_Pub)
-                                      │
-                                      ▼
-                          PBKDF2-HMAC-SHA256 派生
-                       (100,000 轮安全迭代 + 16B 随机盐)
-                                      │
-                                      ▼
-                     AES-256-GCM (256位高强度认证解密)
-                     (12B 随机 Nonce + 内置 Auth Tag 验签)
-                                      │
-                                      ▼
-                       【解锁还原本地数字遗产资产库】
+               ┌─────────────────────────────────────────────────────────────┐
+               │         LegacyLock 2-of-2 Hardware Key Separation           │
+               └─────────────────────────────────────────────────────────────┘
+                                              │
+                       ┌──────────────────────┴──────────────────────┐
+                       ▼                                             ▼
+            【Owner Drive A】                             【Heir Drive B】
+           user-key.bin (64B)                            heir-key.bin (64B)
+         (X25519 Secret + Public)                      (X25519 Secret + Public)
+         Kept in Owner's Home Safe                     Held by Legal Heir / Escrow
+                       │                                             │
+                       ├──────────────────────┬──────────────────────┤
+                       ▼                      ▼                      ▼
+               【Single Drive A】     【Single Drive B】    【Simultaneous Insertion A + B】
+                 Cannot Decrypt         Cannot Decrypt        Curve25519 Diffie-Hellman Exchange
+                (Missing Key B)        (Missing Key A)       DH(A_priv, B_pub) == DH(B_priv, A_pub)
+                                                                     │
+                                                                     ▼
+                                                             PBKDF2-HMAC-SHA256
+                                                            (100,000 Iterations)
+                                                                     │
+                                                                     ▼
+                                                            AES-256-GCM Decryption
+                                                            (Input Heir PIN -> Vault Unlocked!)
 ```
 
-### 安全算法指标
-- **主对称加密**：`AES-256-GCM` (AEAD 认证加密，256 位密钥，$2^{256}$ 宇宙级抗穷举空间)；
-- **密钥派生算法**：`PBKDF2-HMAC-SHA256`（100,000 次强化迭代，免疫彩虹表与 GPU 暴力破解）；
-- **非对称协议**：`Curve25519 (X25519)` 椭圆曲线 Diffie-Hellman 密钥协商；
-- **数字签名体制**：`Ed25519` 所有者非对称数字签名，防范中间人篡改；
-- **随机源保障**：操作系统内核安全熵池（WebCrypto / Rust `OsRng`）；
-- **防回滚防重放**：`Sequence` 序号递增 + `Generation` 世代计数双重哈希校验。
+---
+
+### 3. Key Feature Matrix
+
+| Feature Domain | Implementation & Defense Mechanism |
+| :--- | :--- |
+| **12 Asset Categories** | Structured fields for Logins, Notes, Identity, Banking Cards, Master Passwords, Legal Documents, SSH Keys, API Tokens, Crypto Wallets, Servers, Routers, and Memberships. |
+| **CSPRNG Password Generator** | Generates 20-character military-grade passwords using `window.crypto.getRandomValues` with unbiased rejection sampling (CWE-338 eliminated). |
+| **Air-Gapped CSP & Zero Telemetry** | Strict Content Security Policy blocks any external network traffic. External fonts replaced with native system font stacks. Zero `fetch` / `axios` calls. |
+| **Lock Screen Protection** | Global idle timer triggers a full-screen frosted glass lock screen after inactivity (5~60 min). Top-bar one-click **Lock Screen** button for immediate departure security. |
+| **30-Second Clipboard Purge** | Copying passwords or seed phrases automatically arms a 30-second destruction timer, silently wiping the system clipboard to thwart malware sniffing. |
+| **Zero Footprint Cold Mode** | Owners who share PCs can wipe local LevelDB cache (`ERASE-ALL`), storing assets exclusively on Drive A. Eject the drive, and the computer is 100% clean. |
+| **Universal Media Support** | Scans external USB Flash drives, USB External HDDs, and USB SSDs across Windows (including `D:\`), macOS (`/Volumes`), and Linux (`lsblk`). |
 
 ---
 
-## 💾 全平台硬件识别 (Windows / macOS / Linux)
+### 4. Quick Start Guide
 
-LegacyLock 具备强大的原生驱动器探查引擎，彻底打破传统工具只能读取特定 U 盘盘符的限制：
+#### Prerequisites
+- [Node.js](https://nodejs.org/) (v18.0 or later)
+- [Rust & Cargo](https://www.rust-lang.org/) (Optional, for building native Rust cryptographic CLI)
 
-| 平台 | 底层探测机制 | 支持介质与特性 |
-| :--- | :--- | :--- |
-| **Windows** | PowerShell WMI/CIM `Win32_LogicalDisk` 结合 `Get-Disk (BusType: USB)` 与分区映射 | 完美识别包括 **`D:` 盘** 在内的所有逻辑盘符；智能区分 **USB 移动机械硬盘 (HDD)**、**移动固态 (SSD)** 与普通 U 盘；提供 A~Z 字母盘符轮询兜底。 |
-| **macOS** | 扫描 `/Volumes/*` 并结合 `statfs` 系统调用 | 自动过滤 `Macintosh HD`、`Recovery` 等内置宗卷，获取外接卷标、容量与文件系统。 |
-| **Linux** | 原生 `lsblk -J -b` 结合 `/media` 与 `/run/media` 挂载扫描 | 精准捕获 `TRAN == "usb"` 以及可移动热插拔存储设备。 |
-
----
-
-## 🎨 5 套军规深色渐变主题
-
-系统提供精心调优的高对比度现代渐变主题，并在系统设置中提供实时选择与永久持久化：
-1. **幻紫星雲 (Royal Indigo)**：经典深紫与宝石蓝微光；
-2. **極光深空 (Midnight Aurora)**：赛博青绿与极地深邃暗夜；
-3. **黑曜玄金 (Obsidian Gold)**：高贵黑曜石底色与香槟金质感；
-4. **深海冰川 (Ocean Glacier)**：深海湛蓝与冰川晶莹高光；
-5. **賽博暗夜 (Cyberpunk Neon)**：深空纯黑与赛博霓虹粉紫点缀。
-
----
-
-## 🛡️ 军规级安全审计与加固 (Audit & Hardening)
-
-本项目通过全链路白盒代码审计与密码学健全性验证，完成对以下核心关键威胁的纵深防御：
-- 🛡️ **抗路径穿越与隔离 (CWE-22)**：内嵌静态服务器强制限定本机回环（`127.0.0.1`）并实施 `startsWith` 边界 Containment 校验，杜绝 `../` 目录穿越；
-- 🎲 **真随机数发生器 (CSPRNG, CWE-338)**：密码生成器基于 `window.crypto.getRandomValues` 配合无偏模数拒绝采样算法，彻底替代弱伪随机数；
-- 🔐 **完备闭环确定性密钥派生**：通过主 PIN + 16 字节随机 Salt 经 `PBKDF2-100k` 派生 AES 密钥，密文头自包含参数，消灭不可逆解密死锁；
-- 🗄️ **本地持久化零明文 (Zero Plaintext)**：所有保存在本地 LevelDB 的数据统一经 `AES-256-GCM` 认证加密，并在保存时自动清除旧版明文键；
-- 🔒 **智能无操作锁屏保护**：支持可配置空闲超时自动触发全屏模糊锁屏，必须验证主 PIN 方可唤醒查看；顶部支持一键“立即锁屏”；
-- ⏱️ **30 秒敏感剪贴板自毁**：复制密码或私钥后自动挂载 30s 销毁定时器，超时主动擦除系统剪贴板，防止木马后台窃听；
-- 🌐 **安全链接防注入**：外部 URL 点击前实施协议白名单校验（仅放行 `http:`/`https:`），防范恶意 `javascript:` XSS 伪协议注入；
-- 🧹 **死代码工程瘦身**：彻底移除 9 个历史重构遗留孤儿组件，保持代码库极简纯粹。
-
----
-
-## 🚀 快速上手运行
-
-### 环境准备
-- [Node.js](https://nodejs.org/) (v18.0 或更高版本)
-- [Rust & Cargo](https://www.rust-lang.org/) (可选，用于本地构建密码学底层)
-
-### 1. 克隆项目与安装依赖
+#### Installation & Launch
 ```bash
+# 1. Clone repository
 git clone https://github.com/vicky-clair/military-grade-digital-heritage-vault-LegacyLock.git
 cd military-grade-digital-heritage-vault-LegacyLock
-npm install
-```
 
-### 2. 启动开发与桌面客户端
-```bash
-# 启动本地开发服务 (支持前端热重载)
+# 2. Install dependencies
+npm install
+
+# 3. Start local development server
 npm run dev
 
-# 启动 Electron 原生桌面客户端
+# 4. Launch native Electron desktop client
 npm run electron
 
-# Windows 用户可直接双击运行启动脚本：
+# Windows one-click batch launcher:
 .\启动LegacyLock.bat
 ```
 
-### 3. 构建生产包
+#### Production Build
 ```bash
-# 执行 TypeScript 类型安全检查
-npx tsc --noEmit
-
-# 构建生产包 (静态资产输出至 dist/ 目录)
+# Type check and build distribution bundle
 npm run build
 ```
 
 ---
 
-## ❓ 继承流程与敏感安全核心热点 (FAQ Highlights)
+<div id="-中文-chinese"></div>
 
-- 🔒 **所有者日常使用到底需不需要插 U 盘？**  
-  **答：生前日常使用完全不需要插 2 个 U 盘！** 数据由 `AES-256-GCM` 密文保存在本地电脑，用户日常通过 **Master PIN (所有者主口令)** 与全屏毛玻璃锁屏实现随用随开。2 个 U 盘仅用于物理灾备与身后继承。
-- 🛡️ **如何防止同住亲属/继承人生前在电脑前冒充所有者偷看？**  
-  **答：双密码隔离 + 纯冷模式双重阻断。** 锁屏只认 Master PIN（从不告知继承人）；若需极致保密，可在设置中选择擦除本地数据开启「纯冷存物理模式」——关软件后电脑内零字节残留，拔盘即走，彻底杜绝任何本地偷看机会。
-- ⚡ **如果丢失了其中一个 U 盘，数据是否永久消失？**  
-  **答：严格 2-of-2 方案在数学上不可逆。** 因此系统提供了两道容灾机制：支持制作主盘克隆备件（Cold Spare），并支持一键导出带口令保护的 `.legacylock` 离线备份包。
-- 🌐 **如何验证软件绝无联网偷跑数据（零遥测）？**  
-  **答：支持 Wireshark/Fiddler 全程抓包验证。** 物理拔掉网线、关闭 WiFi，所有加解密、硬件识别与密钥协商 100% 离线顺畅运行。
+## 🇨🇳 中文 (Chinese)
 
-> 更多关于**防胁迫紧急擦除、30年跨世代格式长存、多继承人分配与闪存电荷维护**的详细解读，请阅读：  
-> 👉 [《DEVELOPMENT.md 第九章：数据保存继承流程与敏感安全威胁深度问答》](./DEVELOPMENT.md#九-数据保存继承流程与敏感安全威胁深度问答-inheritance-flow--security-faq)
+### 1. 项目愿景与设计哲学
+
+在数字化时代，助记词、私钥、银行凭证与商业机密高度碎片化。中心化云端密码库存在单点被攻破或服务商跑路的风险；纯本地明文存储又无法在身后安全交付给法定继承人。
+
+**LegacyLock 军规遗产密钥库** 专为跨世代（30 年+）数字遗产安全保管而生：
+- **100% 纯离线冷存储（Air-Gapped）**：绝不发起任何网络请求，内嵌服务仅绑定 `127.0.0.1` 本机环回接口，外网进不来，数据出不去；
+- **双钥匙物理隔离（2-of-2 Threshold）**：所有者钥匙（`user-key.bin`）与继承人钥匙（`heir-key.bin`）在数学上严格正交。单持任何一方在数学上绝无破解可能，必须身后双盘同时接入方可解密；
+- **生前日常便捷 vs. 身后接管安全**：所有者在自己电脑上使用 **Master PIN** 与本地 AES-256 密文库，日常无需翻找 U 盘；双 U 盘作为物理冷存与身后钥匙隔离保管；
+- **继承人单向只读接管**：继承人解锁后自动进入只读模式，允许查阅与复制，但严禁修改与删除，捍卫数字遗产法律真实性。
 
 ---
 
-## 📂 项目结构概览
+### 2. 核心功能亮点
+
+1. **12 大维度数字资产管理**：支持账号登录、安全便签、身份信息、银行金融、独立密码、加密文档、SSH私钥、API凭据、加密冷钱包、服务器数据库、路由器和会员资产；
+2. **真随机数密码发生器 (CSPRNG)**：基于底层内核高熵安全随机源与拒绝采样算法生成 20 位军规口令；
+3. **全屏防暂离锁屏**：无操作超时自动全屏模糊锁定，强制验证 Master PIN 唤醒，顶部常驻一键「立即锁屏」；
+4. **30 秒敏感剪贴板自毁**：复制密码或助记词后自动挂载 30s 销毁定时器，超时主动清空剪贴板，防止木马嗅探；
+5. **全平台外部存储识别**：原生兼容 USB 闪存盘、USB 移动机械硬盘 (HDD) 与移动固态 (SSD)，完美支持 Windows（含 `D:\` 盘及后续盘符）、macOS 与 Linux。
+
+---
+
+### 3. 两部专属实操手册导读
+
+- [👤 **所有者使用手册 (USER_MANUAL.md)**](./USER_MANUAL.md)：资产录入、双密码配置（Master PIN vs Heir PIN）、制作双 U 盘、纯冷存物理模式（电脑不存数据）、介质健康自检与纸质留档单封存；
+- [🗝️ **法定继承人接管手册 (HEIR_MANUAL.md)**](./HEIR_MANUAL.md)：三大凭证核对（副盘B、主盘A、Heir PIN）、免安装便携版运行、双盘插机联合激活、只读接管实操与区块链/金融资产落地转移指引。
+
+---
+
+<div id="-日本語-japanese"></div>
+
+## 🇯🇵 日本語 (Japanese)
+
+### 1. プロジェクト概要と設計思想
+
+デジタル時代において、暗号資産のシードフレーズ、秘密鍵、銀行口座、サーバー認証情報は分散して保管されています。一般的なクラウド型パスワードマネージャーは、サーバー侵入やサービス終了のリスクを抱えており、プレーンテキストでのローカル保存は生前漏洩や相続トラブルの原因となります。
+
+**LegacyLock（ミリタリーグレード・デジタル遺産保管庫）** は、世代を超えた長期（30年以上）の安全なデジタル遺産継承を実現するために設計されました：
+- **100% 完全オフライン（エアギャップ）**：インターネット接続は一切行いません。内部サーバーは `127.0.0.1`（ローカルループバック）にのみバインドされ、外部ネットワークからの侵入やデータ流出を完全に遮断します。
+- **2-of-2 ハードウェア完全分離**：所有者キー（`user-key.bin`）と相続人キー（`heir-key.bin`）は暗号学的に直交しています。単一のUSBだけでは数学的に復号不可能であり、死後に両方のUSBを同時に接続することでのみ資産をアンロックできます。
+- **日常の利便性と死後の高安全性の両立**：所有者は日常PC上で **Master PIN** を使って便利に管理でき、普段から2本のUSBを接続し続ける必要はありません。USBキーは金庫での物理保管および死後相続のために使用します。
+- **相続人専用の読み取り専用モード**：相続人がアンロックした後は、誤操作や改ざんを防止するため「読み取り専用ビュー」に切り替わり、確実な法的資産保全を行います。
+
+---
+
+### 2. 主な機能とセキュリティ仕様
+
+| 機能カテゴリ | セキュリティ仕様と防御メカニズム |
+| :--- | :--- |
+| **12種類の資産管理** | ログイン情報、メモ、個人識別、銀行口座、パスワード、暗号化文書、SSH鍵、APIトークン、暗号資産ウォレット、サーバー、ルーター、会員権。 |
+| **暗号学的に安全な乱数生成器 (CSPRNG)** | `window.crypto.getRandomValues` と拒絶サンプリング法を用いて、予測不能な20桁の高強度パスワードを生成。 |
+| **自動スクリーンロック** | 一定時間操作がない場合、高密度ガウスぼかしスクリーンロックが作動。トップバーの「今すぐロック」ボタンで即座に離席保護。 |
+| **30秒クリップボード自動消去** | パスワードや秘密鍵をコピーした後、30秒後に自動的にクリップボードをクリアし、マルウェアによる盗聴を防止。 |
+| **ゼロ・フットプリント（完全コールドモード）** | 家族とPCを共有している場合、ローカルデータを消去し、Drive A のみに保存可能。USBを抜けばPC上に痕跡は一切残りません。 |
+| **クロスプラットフォーム対応** | Windows（`D:\` ドライブを含む全ドライブ）、macOS、Linux でのUSBフラッシュメモリ、外付けHDD/SSDの自動検出に対応。 |
+
+---
+
+### 3. 公式マニュアル案内
+
+- [👤 **所有者向け利用マニュアル (USER_MANUAL.md)**](./USER_MANUAL.md)：資産登録、デュアルPIN設定（Master PIN / Heir PIN）、デュアルUSB作成、完全コールドモード運用、ペーパーバックアップ手順。
+- [🗝️ **相続人向け継承マニュアル (HEIR_MANUAL.md)**](./HEIR_MANUAL.md)：必須3大要素の確認（副USB B、主USB A、Heir PIN）、ポータブル版の起動、デュアルUSB同時接続による復号、暗号資産移行ガイド。
+
+---
+
+## 📂 项目结构概览 / Project Structure / プロジェクト構成
 
 ```text
 xr-LegacyLock/
@@ -218,16 +207,16 @@ xr-LegacyLock/
 │   ├── types/               # 接口规范与 LVCF 2.0 数据结构
 │   ├── App.tsx              # 应用状态编排、空闲锁屏监听与密文解密恢复
 │   └── index.css            # 现代军规设计系统、中文字体栈与样式
-├── USER_MANUAL.md           # 所有者日常管理与安全配置手册
-├── HEIR_MANUAL.md           # 法定继承人身后接管与解密指南
-├── DEVELOPMENT.md           # 详细技术架构与军规安全审计报告
-├── README.md                # 本文档
+├── USER_MANUAL.md           # 所有者日常管理与安全配置手册 (Owner Manual)
+├── HEIR_MANUAL.md           # 法定继承人身后接管与解密指南 (Heir Manual)
+├── DEVELOPMENT.md           # 详细技术架构与军规安全审计报告 (Dev & Audit Report)
+├── README.md                # 本开源主文档 (Multi-language Document)
 └── 启动LegacyLock.bat       # Windows 桌面一键启动脚本
 ```
 
 ---
 
-## 📄 开源许可证与安全申明
+## 📄 开源许可证与安全申明 / License & Disclaimer
 
-- **许可证**：基于 [MIT License](./LICENSE) 开源发布。
-- **免责申明**：LegacyLock 遵循纯离线冷存储规范，无任何云端备份与恢复后门。请务必妥善保管物理介质与备份口令，执行「双盘异地容灾」策略。物理介质丢失且未留备份所造成的资产灭失属于不可逆密码学现象。
+- **License**: Released under the [MIT License](./LICENSE).
+- **Disclaimer**: LegacyLock operates strictly on an offline cold storage model with zero cloud dependencies and no backdoors. Always safeguard your physical storage media and backup credentials, adhering to the "Dual-Device Geographic Redundancy" policy. Loss of physical media without backup will result in mathematically irreversible asset loss.
