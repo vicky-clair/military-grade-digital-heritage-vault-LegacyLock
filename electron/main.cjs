@@ -161,8 +161,6 @@ async function createWindow() {
   }
 }
 
-// 注册 IPC 通信
-function registerIpcHandlers() {
 // ====== 跨平台驱动器识别引擎 (Windows, macOS, Linux) ======
 function scanWindowsDrives() {
   const drives = [];
