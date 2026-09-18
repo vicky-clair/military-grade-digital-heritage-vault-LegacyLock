@@ -22,4 +22,9 @@ contextBridge.exposeInMainWorld('legacyLockAPI', {
   // 本地存储管理
   readVaultContainer: () => ipcRenderer.invoke('vault:read-container'),
   saveVaultContainer: (data) => ipcRenderer.invoke('vault:save-container', data),
+
+  // 应用配置与主题持久化
+  getAppSettings: () => ipcRenderer.invoke('app:get-settings'),
+  saveAppSettings: (settings) => ipcRenderer.invoke('app:save-settings', settings),
 });
+

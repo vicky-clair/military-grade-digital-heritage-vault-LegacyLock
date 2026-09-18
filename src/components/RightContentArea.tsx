@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import {
   KeyRound,
   Copy,
-  RotateCcw,
   Plus,
   Minus,
   X,
@@ -11,8 +10,6 @@ import {
   Check,
   Trash2,
   Edit,
-  HardDrive,
-  Usb,
   ShieldCheck,
   Compass,
   Palette,
@@ -37,13 +34,14 @@ interface RightContentAreaProps {
   onSaveToDrive?: () => void;
   onCopyAll?: () => void;
   onImportSuccess: (newItems: VaultItem[], isOverwrite: boolean) => void;
-  onRescanDrives: () => void;
-  isScanningDrives: boolean;
+  onRescanDrives?: () => void;
+  isScanningDrives?: boolean;
   onOpenHealthCheck: () => void;
   onOpenMigration: () => void;
-  onSwitchToHeirMode: () => void;
+  onSwitchToHeirMode?: () => void;
   currentTheme: ThemeDefinition;
   onSelectTheme: (themeId: string) => void;
+  onEmergencyWipe?: () => void;
 }
 
 export const RightContentArea: React.FC<RightContentAreaProps> = ({
@@ -55,15 +53,14 @@ export const RightContentArea: React.FC<RightContentAreaProps> = ({
   onEditItem,
   onDeleteItem,
   onOpenUsbPassword,
-  onSaveToDrive,
   onImportSuccess,
   onRescanDrives,
   isScanningDrives,
   onOpenHealthCheck,
   onOpenMigration,
-  onSwitchToHeirMode,
   currentTheme,
   onSelectTheme,
+  onEmergencyWipe,
 }) => {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [revealedIds, setRevealedIds] = useState<Record<string, boolean>>({});
@@ -94,7 +91,6 @@ export const RightContentArea: React.FC<RightContentAreaProps> = ({
     if (selectedNav === 'router') return item.category === 'router';
     if (selectedNav === 'email') return item.category === 'email';
     if (selectedNav === 'membership') return item.category === 'membership' || item.category === 'game' || item.category === 'reward' || item.category === 'medical';
-    if (selectedNav === 'external_drive') return true;
     return item.category === selectedNav;
   });
 
@@ -112,8 +108,8 @@ export const RightContentArea: React.FC<RightContentAreaProps> = ({
     switch (selectedNav) {
       case 'settings':
         return {
-          title: '系统设置',
-          subtitle: '应用信息、安全提醒、技术规格与数据统计',
+          title: '系统设置与安全中心',
+          subtitle: '软件版本、LVCF 2.0 规格标准、灾难防范重要提醒与高级安全控制',
         };
       case 'import_export':
         return {
@@ -148,9 +144,8 @@ export const RightContentArea: React.FC<RightContentAreaProps> = ({
         return { title: '电子邮件', subtitle: '安全企業郵局、私人密郵與通訊賬號' };
       case 'membership':
         return { title: '会员与资产', subtitle: '私人會員卡、積分獎勵、醫療檔案與遊戲資產' };
-      case 'external_drive':
       default:
-        return { title: '外接式硬碟', subtitle: `掃描外接式硬碟 ${drives.length}` };
+        return { title: '所有密鑰', subtitle: `已收錄所有核心密匙與資產 ${items.length} 項` };
     }
   };
 
@@ -162,12 +157,23 @@ export const RightContentArea: React.FC<RightContentAreaProps> = ({
       style={{ background: currentTheme.mainStyle.background }}
       onClick={() => setIsThemeMenuOpen(false)}
     >
-      {/* 顶部工具栏 (严格还原截图：右上角 儲存, 複製, U盘密码, 漸變主題 + 窗口控制) */}
+      {/* 顶部工具栏：消除大面积空隙，紧凑且功能完善 */}
       <header
         className="main-topbar"
         style={{ background: currentTheme.mainStyle.topbarBg }}
       >
         <div className="topbar-left">
+          {/* 添加新资产/密钥 主行动按钮 (替换原上面的新增密钥按钮) */}
+          <button
+            onClick={() => onAddNew()}
+            className="btn-topbar-add-primary"
+            title="点击打开资产分类选择面板，添加新资产或密钥"
+          >
+            <Plus style={{ width: 15, height: 15 }} />
+            <span>添加新资产 / 密钥</span>
+          </button>
+
+          {/* 搜索框 */}
           <div className="search-container">
             <Search style={{ width: 14, height: 14, color: '#7E92C4' }} />
             <input
@@ -177,38 +183,41 @@ export const RightContentArea: React.FC<RightContentAreaProps> = ({
               placeholder="搜尋已收錄密匙或資產..."
               className="search-input"
             />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                style={{ color: '#7E92C4', cursor: 'pointer', padding: 2 }}
+                title="清除搜索"
+              >
+                <X style={{ width: 12, height: 12 }} />
+              </button>
+            )}
           </div>
-
-          <button onClick={() => onAddNew()} className="btn-topbar-add">
-            <Plus style={{ width: 14, height: 14 }} />
-            <span>添加新资产 / 密匙</span>
-          </button>
         </div>
 
-        <div className="topbar-right">
-          {/* 用户要求的核心功能：渐变主题切换按钮 */}
+        {/* 中间快捷安全操作与主题工具组 (重新布局，填充横向空间) */}
+        <div className="topbar-center-tools">
+          {/* 渐变主题切换按钮 */}
           <div style={{ position: 'relative' }}>
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 setIsThemeMenuOpen(!isThemeMenuOpen);
               }}
-              className="action-tile-btn"
-              title="切换渐变主题配色"
+              className="topbar-tool-pill"
+              title="切换渐变配色主题"
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                <Palette className="action-tile-icon" style={{ width: 16, height: 16, color: '#FCD34D' }} />
-                <span
-                  style={{
-                    width: 7,
-                    height: 7,
-                    borderRadius: '50%',
-                    background: currentTheme.previewGradient,
-                    border: '1px solid rgba(255,255,255,0.6)',
-                  }}
-                />
-              </div>
-              <span className="action-tile-label">漸變主題</span>
+              <Palette style={{ width: 15, height: 15, color: '#FCD34D' }} />
+              <span
+                style={{
+                  width: 9,
+                  height: 9,
+                  borderRadius: '50%',
+                  background: currentTheme.previewGradient,
+                  border: '1px solid rgba(255,255,255,0.7)',
+                }}
+              />
+              <span className="tool-pill-label">渐变主题</span>
             </button>
 
             {/* 主题选择下拉菜单 */}
@@ -248,22 +257,29 @@ export const RightContentArea: React.FC<RightContentAreaProps> = ({
             )}
           </div>
 
-          {/* 用户专门要求的核心功能按钮：【U盘密码】 */}
+          {/* 用户要求的核心功能按钮：【U盘密码】 */}
           <button
             onClick={onOpenUsbPassword}
-            className="action-tile-btn cyan-highlight"
+            className="topbar-tool-pill cyan-highlight"
             title="设置/修改U盘硬件保护PIN码与副盘接管口令"
           >
-            <KeyRound className="action-tile-icon" style={{ color: '#00D4FF' }} />
-            <span className="action-tile-label" style={{ color: '#38E1FF', fontWeight: 600 }}>
-              U盤密碼
-            </span>
+            <KeyRound style={{ width: 15, height: 15, color: '#00D4FF' }} />
+            <span className="tool-pill-label cyan-text">U盘密码</span>
           </button>
 
-          {/* 分割线 */}
-          <div className="window-controls-divider" />
+          {/* 密库健康自检快捷入口 */}
+          <button
+            onClick={onOpenHealthCheck}
+            className="topbar-tool-pill green-highlight"
+            title="执行密库完整性与密码学 6 项自检"
+          >
+            <ShieldCheck style={{ width: 15, height: 15, color: '#34D399' }} />
+            <span className="tool-pill-label green-text">密库自检</span>
+          </button>
+        </div>
 
-          {/* 窗口控制小按钮（模拟截图右上角下拉、最小化、关闭） */}
+        {/* 右侧窗口控制 */}
+        <div className="topbar-right">
           <div className="window-controls">
             <button className="win-btn" title="菜单/全屏">
               <ChevronDown style={{ width: 14, height: 14 }} />
@@ -280,9 +296,8 @@ export const RightContentArea: React.FC<RightContentAreaProps> = ({
 
       {/* 主工作滚动区域 */}
       <div className="main-scroll-content">
-        {/* 顶部横幅（严格还原截图：3D 外接式硬碟 + 重新掃描胶囊按钮） */}
+        {/* 顶部横幅 */}
         <div className="content-header-banner">
-          {/* 3D 硬盘与钥匙插画 */}
           <div className="hd-icon-3d">
             <div className="hd-drive-body">
               <div className="hd-platter-disc" />
@@ -295,21 +310,6 @@ export const RightContentArea: React.FC<RightContentAreaProps> = ({
           <div className="header-info">
             <div className="header-title-row">
               <h2 className="header-title">{navInfo.title}</h2>
-              {selectedNav === 'external_drive' && (
-                <span
-                  style={{
-                    fontSize: 11,
-                    fontFamily: 'JetBrains Mono',
-                    padding: '2px 8px',
-                    borderRadius: 9999,
-                    background: 'rgba(0, 212, 255, 0.15)',
-                    color: '#00D4FF',
-                    border: '1px solid rgba(0, 212, 255, 0.3)',
-                  }}
-                >
-                  SMAL 抽象层
-                </span>
-              )}
               {selectedNav === 'import_export' && (
                 <span
                   style={{
@@ -325,29 +325,43 @@ export const RightContentArea: React.FC<RightContentAreaProps> = ({
                   AES-256-GCM 认证加密
                 </span>
               )}
+              {selectedNav === 'settings' && (
+                <span
+                  style={{
+                    fontSize: 11,
+                    fontFamily: 'JetBrains Mono',
+                    padding: '2px 8px',
+                    borderRadius: 9999,
+                    background: 'rgba(167, 139, 250, 0.15)',
+                    color: '#C4B5FD',
+                    border: '1px solid rgba(167, 139, 250, 0.3)',
+                  }}
+                >
+                  LVCF 2.0 规格标准
+                </span>
+              )}
             </div>
 
             <div className="header-subtitle-row">
               <span>{navInfo.subtitle}</span>
-              {selectedNav === 'external_drive' && (
-                <button
-                  onClick={onRescanDrives}
-                  disabled={isScanningDrives}
-                  className="btn-rescan-pill"
-                >
-                  <RotateCcw style={{ width: 12, height: 12 }} className={isScanningDrives ? 'animate-spin' : ''} />
-                  <span>重新掃描</span>
-                </button>
-              )}
             </div>
           </div>
         </div>
 
-        {/* 视图内容分流：若选中的是「加密导入导出」 */}
+        {/* 视图内容分流 */}
         {selectedNav === 'settings' ? (
           <SettingsView
             totalItems={items.length}
             drivesCount={drives.length}
+            drives={drives}
+            onRescanDrives={onRescanDrives}
+            isScanningDrives={isScanningDrives}
+            currentTheme={currentTheme}
+            onSelectTheme={onSelectTheme}
+            onOpenHealthCheck={onOpenHealthCheck}
+            onOpenMigration={onOpenMigration}
+            onOpenUsbPassword={onOpenUsbPassword}
+            onEmergencyWipe={onEmergencyWipe}
           />
         ) : selectedNav === 'import_export' ? (
           <ImportExportView
@@ -356,9 +370,9 @@ export const RightContentArea: React.FC<RightContentAreaProps> = ({
             drives={drives}
             onImportSuccess={onImportSuccess}
           />
-        ) : selectedNav === 'external_drive' && drives.length === 0 ? (
+        ) : filteredItems.length === 0 ? (
           <div className="empty-state-wrapper">
-            {/* 3D 质感打开的紫色纸盒 + 悬浮发光青色放大镜 */}
+            {/* 3D 质感打开的纸盒 + 青色放大镜 */}
             <div className="empty-3d-box-stage">
               <div className="box-isometric">
                 <div className="box-face-front" />
@@ -374,218 +388,21 @@ export const RightContentArea: React.FC<RightContentAreaProps> = ({
               </div>
             </div>
 
-            {/* 严格匹配参考截图文本: 未找到資料。 */}
-            <p className="empty-text-label">未找到資料。</p>
+            <p className="empty-text-label">
+              {searchQuery ? `未找到与 “${searchQuery}” 匹配的密匙或资产` : '暂未录入此类别的密匙与资产'}
+            </p>
+            <p style={{ fontSize: 12, color: '#7E92C4', marginBottom: 16 }}>
+              点击下方按钮即可一键录入该分类的账号、密码、密钥或数字资产
+            </p>
 
             <button
               onClick={() => onAddNew()}
-              className="btn-topbar-add"
-              style={{ height: 38, padding: '0 20px', borderRadius: 10, fontSize: 13 }}
+              className="btn-topbar-add-primary"
+              style={{ height: 40, padding: '0 24px', borderRadius: 10, fontSize: 13, gap: 8 }}
             >
               <Plus style={{ width: 16, height: 16 }} />
-              <span>添加新密钥 / 资产</span>
+              <span>添加新资产 / 密钥</span>
             </button>
-          </div>
-        ) : selectedNav === 'external_drive' ? (
-          /* 当有检测到介质时，展示外接式硬碟主介质与副介质管理卡片 */
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16 }}>
-              {/* 主盘卡片 */}
-              <div
-                style={{
-                  background: 'rgba(23, 30, 86, 0.75)',
-                  border: '1px solid rgba(16, 185, 129, 0.35)',
-                  borderRadius: 16,
-                  padding: 20,
-                  boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <HardDrive style={{ width: 20, height: 20, color: '#34D399' }} />
-                    <span style={{ fontSize: 14, fontWeight: 700, color: '#FFFFFF' }}>
-                      用户主介质 (读写全控)
-                    </span>
-                  </div>
-                  <span style={{ fontSize: 10, fontFamily: 'JetBrains Mono', padding: '2px 8px', borderRadius: 4, background: 'rgba(16, 185, 129, 0.2)', color: '#6EE7B7' }}>
-                    Owner Media
-                  </span>
-                </div>
-
-                <p style={{ fontSize: 12, color: '#A0B4DE', lineHeight: 1.6, marginBottom: 16 }}>
-                  持有所有者 Ed25519 签名私钥，可随时增删修改密库，并对副介质进行签发与口令设定。
-                </p>
-
-                <div style={{ background: 'rgba(14, 18, 56, 0.8)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: 12, display: 'flex', flexDirection: 'column', gap: 8, fontSize: 12, marginBottom: 16 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: '#7E92C4' }}>检测驱动器：</span>
-                    <span style={{ color: '#34D399', fontFamily: 'JetBrains Mono' }}>
-                      {drives.length > 0 ? `${drives[0].name} (${drives[0].mountPath})` : '未插入介质'}
-                    </span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: '#7E92C4' }}>U盘密码保护：</span>
-                    <span style={{ color: '#00D4FF', fontFamily: 'JetBrains Mono' }}>PIN 码保护就绪</span>
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', gap: 10 }}>
-                  <button
-                    onClick={onOpenUsbPassword}
-                    style={{
-                      flex: 1,
-                      height: 36,
-                      borderRadius: 8,
-                      background: '#059669',
-                      color: '#FFFFFF',
-                      fontSize: 12,
-                      fontWeight: 600,
-                      gap: 6,
-                    }}
-                  >
-                    <KeyRound style={{ width: 14, height: 14 }} />
-                    <span>设置/修改主U盘密码</span>
-                  </button>
-                  <button
-                    onClick={onSaveToDrive}
-                    style={{
-                      padding: '0 14px',
-                      height: 36,
-                      borderRadius: 8,
-                      background: 'rgba(255,255,255,0.1)',
-                      color: '#FFFFFF',
-                      fontSize: 12,
-                    }}
-                  >
-                    写入同步
-                  </button>
-                </div>
-              </div>
-
-              {/* 副盘卡片 */}
-              <div
-                style={{
-                  background: 'rgba(23, 30, 86, 0.75)',
-                  border: '1px solid rgba(139, 92, 246, 0.35)',
-                  borderRadius: 16,
-                  padding: 20,
-                  boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <Usb style={{ width: 20, height: 20, color: '#A78BFA' }} />
-                    <span style={{ fontSize: 14, fontWeight: 700, color: '#FFFFFF' }}>
-                      继承人副介质 (只读接管)
-                    </span>
-                  </div>
-                  <span style={{ fontSize: 10, fontFamily: 'JetBrains Mono', padding: '2px 8px', borderRadius: 4, background: 'rgba(139, 92, 246, 0.2)', color: '#C4B5FD' }}>
-                    Heir Media
-                  </span>
-                </div>
-
-                <p style={{ fontSize: 12, color: '#A0B4DE', lineHeight: 1.6, marginBottom: 16 }}>
-                  供法定继承人接管使用。单向只读查看，防篡改失效，附带 30 年国际离线单页救援协议。
-                </p>
-
-                <div style={{ background: 'rgba(14, 18, 56, 0.8)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: 12, display: 'flex', flexDirection: 'column', gap: 8, fontSize: 12, marginBottom: 16 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: '#7E92C4' }}>副介质槽位：</span>
-                    <span style={{ color: '#C4B5FD', fontFamily: 'JetBrains Mono' }}>
-                      {drives.length > 1 ? `${drives[1].name} (${drives[1].mountPath})` : '待插入第二介质'}
-                    </span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: '#7E92C4' }}>接管口令保护：</span>
-                    <span style={{ color: '#E2E8F0', fontFamily: 'JetBrains Mono' }}>双钥匙 + 接管口令</span>
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', gap: 10 }}>
-                  <button
-                    onClick={onOpenUsbPassword}
-                    style={{
-                      flex: 1,
-                      height: 36,
-                      borderRadius: 8,
-                      background: '#7C3AED',
-                      color: '#FFFFFF',
-                      fontSize: 12,
-                      fontWeight: 600,
-                      gap: 6,
-                    }}
-                  >
-                    <KeyRound style={{ width: 14, height: 14 }} />
-                    <span>设置副U盘接管口令</span>
-                  </button>
-                  <button
-                    onClick={onSwitchToHeirMode}
-                    style={{
-                      padding: '0 14px',
-                      height: 36,
-                      borderRadius: 8,
-                      background: 'rgba(255,255,255,0.1)',
-                      color: '#FFFFFF',
-                      fontSize: 12,
-                    }}
-                  >
-                    预览接管
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* 辅助工具栏 */}
-            <div
-              style={{
-                background: 'rgba(18, 25, 75, 0.65)',
-                border: '1px solid rgba(255,255,255,0.08)',
-                borderRadius: 12,
-                padding: '12px 16px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                flexWrap: 'wrap',
-                gap: 12,
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#A0B4DE' }}>
-                <ShieldCheck style={{ width: 16, height: 16, color: '#00D4FF' }} />
-                <span>军规密码学套件：LVCF 2.0 (Argon2id + AES-256-GCM + Ed25519)</span>
-              </div>
-              <div style={{ display: 'flex', gap: 10 }}>
-                <button
-                  onClick={onOpenHealthCheck}
-                  style={{
-                    height: 32,
-                    padding: '0 12px',
-                    borderRadius: 8,
-                    background: 'rgba(16, 185, 129, 0.15)',
-                    border: '1px solid rgba(16, 185, 129, 0.3)',
-                    color: '#34D399',
-                    fontSize: 12,
-                    fontWeight: 600,
-                  }}
-                >
-                  密库 6 项自检
-                </button>
-                <button
-                  onClick={onOpenMigration}
-                  style={{
-                    height: 32,
-                    padding: '0 12px',
-                    borderRadius: 8,
-                    background: 'rgba(5, 114, 236, 0.15)',
-                    border: '1px solid rgba(5, 114, 236, 0.3)',
-                    color: '#60A5FA',
-                    fontSize: 12,
-                    fontWeight: 600,
-                  }}
-                >
-                  介质无缝迁移
-                </button>
-              </div>
-            </div>
           </div>
         ) : (
           /* 展示资产卡片网格 */

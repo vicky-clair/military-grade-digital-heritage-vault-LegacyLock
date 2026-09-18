@@ -162,13 +162,19 @@ export interface HeritagePlanConfig {
 export interface UsbDrive {
   mountPath: string;
   name: string;
+  volumeLabel?: string;
+  driveLetter?: string;
   hasUserKey: boolean;
   hasHeirKey: boolean;
   hasConfig: boolean;
   hasPasswordProtected?: boolean;
   mediaType?: MediaType;
   size?: number;
+  freeSpace?: number;
+  fileSystem?: string;
   isRemovable?: boolean;
+  isExternal?: boolean;
+  isSystem?: boolean;
   isMock?: boolean;
 }
 

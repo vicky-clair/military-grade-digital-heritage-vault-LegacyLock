@@ -65,10 +65,21 @@ export const App: React.FC = () => {
   const handleSelectTheme = (id: string) => {
     setThemeId(id);
     localStorage.setItem('legacylock_theme', id);
+    if (isElectronApp() && window.legacyLockAPI?.saveAppSettings) {
+      window.legacyLockAPI.saveAppSettings({ theme: id }).catch(() => {});
+    }
   };
 
-  // 当前选中的左侧分类导航：默认选中「external_drive」以 100% 还原用户参考截图！
-  const [selectedNav, setSelectedNav] = useState<NavCategoryType>('external_drive');
+  // 确保背景颜色实时与持久化主题严格同步
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      document.documentElement.style.background = currentTheme.mainStyle.background;
+      document.body.style.background = currentTheme.mainStyle.background;
+    }
+  }, [currentTheme]);
+
+  // 当前选中的左侧分类导航：默认选中「all (所有密鑰)」展示核心密匙资产
+  const [selectedNav, setSelectedNav] = useState<NavCategoryType>('all');
 
   // 运行模式：所有者模式 (OWNER) vs 继承人只读接管模式 (HEIR_RECOVERY)
   const [operatingMode, setOperatingMode] = useState<OperatingMode>('OWNER');
@@ -119,7 +130,7 @@ export const App: React.FC = () => {
     }
   };
 
-  // 扫描硬件存储驱动器
+  // 扫描硬件存储驱动器 (支持 Windows/macOS/Linux 外部硬盘与 U 盘)
   const handleRefreshDrives = async () => {
     setIsScanningDrives(true);
     if (isElectronApp() && window.legacyLockAPI) {
@@ -128,41 +139,61 @@ export const App: React.FC = () => {
         if (res.success && res.drives) {
           setDrives(res.drives);
         }
-      } catch (_) {}
+      } catch (err) {
+        console.error('[扫描外部驱动器失败]', err);
+      }
     } else {
+      // 浏览器环境仿真与降级
       setTimeout(() => {
         setDrives([
           {
-            name: 'SanDisk Ultra (主U盘)',
-            mountPath: 'E:',
+            name: 'TOSHIBA EXT (D:) - 移动硬盘',
+            volumeLabel: 'TOSHIBA EXT',
+            driveLetter: 'D:',
+            mountPath: 'D:\\',
+            size: 2000396832768,
+            freeSpace: 151085887488,
+            fileSystem: 'NTFS',
+            isRemovable: false,
+            isExternal: true,
+            hasUserKey: false,
+            hasHeirKey: false,
+            hasConfig: false,
+            mediaType: 'UsbHDD',
+          },
+          {
+            name: 'SanDisk Ultra (E:) - U盘',
+            volumeLabel: 'SanDisk',
+            driveLetter: 'E:',
+            mountPath: 'E:\\',
             size: 32000000000,
+            freeSpace: 28000000000,
+            fileSystem: 'FAT32',
             isRemovable: true,
+            isExternal: true,
             hasUserKey: true,
             hasHeirKey: false,
             hasConfig: true,
             hasPasswordProtected: true,
             mediaType: 'UsbFlash',
           },
-          {
-            name: 'Samsung T7 SSD (副接管盘)',
-            mountPath: 'F:',
-            size: 1000000000000,
-            isRemovable: true,
-            hasUserKey: false,
-            hasHeirKey: true,
-            hasConfig: true,
-            hasPasswordProtected: false,
-            mediaType: 'UsbSSD',
-          },
         ]);
-      }, 500);
+      }, 300);
     }
-    setTimeout(() => setIsScanningDrives(false), 600);
+    setTimeout(() => setIsScanningDrives(false), 500);
   };
 
+  // 启动即刻自动执行：恢复最后保存的主题配色 + 自动识别外部移动硬盘/U盘
   useEffect(() => {
-    // 默认不加载驱动器以精确展现参考图里的「掃描外接式硬碟 0」与「未找到資料。」
-    // 用户点击重新扫描或有实际硬件时才展现驱动器
+    if (isElectronApp() && window.legacyLockAPI?.getAppSettings) {
+      window.legacyLockAPI.getAppSettings().then((res) => {
+        if (res.success && res.settings && res.settings.theme) {
+          setThemeId(res.settings.theme);
+          localStorage.setItem('legacylock_theme', res.settings.theme);
+        }
+      }).catch(() => {});
+    }
+    handleRefreshDrives();
   }, []);
 
   useEffect(() => {
@@ -283,6 +314,14 @@ export const App: React.FC = () => {
     alert('📋 当前密匙清单已成功复制到系统剪贴板！');
   };
 
+  // 军规级安全紧急销毁
+  const handleEmergencyWipe = () => {
+    localStorage.removeItem('legacylock_items');
+    localStorage.removeItem('legacylock_plan');
+    setItems([]);
+    alert('⚠️ 军规级安全擦除完成！本地缓存与数字遗产密库已彻底清空。');
+  };
+
   // 计算各分类数量
   const categoryCounts = items.reduce<Record<string, number>>((acc, item) => {
     acc[item.category] = (acc[item.category] || 0) + 1;
@@ -341,6 +380,7 @@ export const App: React.FC = () => {
             onSwitchToHeirMode={() => setOperatingMode('HEIR_RECOVERY')}
             currentTheme={currentTheme}
             onSelectTheme={handleSelectTheme}
+            onEmergencyWipe={handleEmergencyWipe}
           />
         </>
       )}

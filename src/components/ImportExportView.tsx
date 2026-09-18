@@ -90,7 +90,7 @@ export const ImportExportView: React.FC<ImportExportViewProps> = ({
     reader.onerror = () => {
       setImportErrorMsg('无法读取所选文件，请重试');
     };
-    reader.readAsText(file);
+    reader.readAsText(file, 'UTF-8');
   };
 
   // 执行加密导出
@@ -145,7 +145,7 @@ export const ImportExportView: React.FC<ImportExportViewProps> = ({
   };
 
   const triggerDownload = (content: string) => {
-    const blob = new Blob([content], { type: 'application/json' });
+    const blob = new Blob([new TextEncoder().encode(content)], { type: 'application/json;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;

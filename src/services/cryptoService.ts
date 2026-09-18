@@ -42,6 +42,8 @@ declare global {
       }) => Promise<{ success: boolean; data?: any; error?: string }>;
       readVaultContainer: () => Promise<{ exists: boolean; container?: EncryptedContainer; error?: string }>;
       saveVaultContainer: (data: EncryptedContainer) => Promise<{ success: boolean; path?: string }>;
+      getAppSettings: () => Promise<{ success: boolean; settings: Record<string, any> }>;
+      saveAppSettings: (settings: Record<string, any>) => Promise<{ success: boolean; error?: string }>;
     };
   }
 }

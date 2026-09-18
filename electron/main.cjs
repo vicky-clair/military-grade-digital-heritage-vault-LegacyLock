@@ -1,7 +1,7 @@
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
-const { spawn } = require('child_process');
+const { spawn, execSync } = require('child_process');
 
 let mainWindow = null;
 
@@ -137,31 +137,311 @@ async function createWindow() {
 
 // 注册 IPC 通信
 function registerIpcHandlers() {
-  // 1. 扫描可移动驱动器 (U盘)
-  ipcMain.handle('vault:scan-usb-drives', async () => {
+// ====== 跨平台驱动器识别引擎 (Windows, macOS, Linux) ======
+function scanWindowsDrives() {
+  const drives = [];
+  const systemDrive = (process.env.SystemDrive || 'C:').toUpperCase();
+  const seenPaths = new Set();
+
+  try {
+    let usbDiskNumbers = new Set();
     try {
-      const drives = [];
-      // 在 Windows 下检查常见盘符
-      const letters = 'EFGHIJKLMNOPQRSTUVWXYZ'.split('');
-      for (const letter of letters) {
-        const root = `${letter}:\\`;
-        if (fs.existsSync(root)) {
-          try {
-            const hasUserKey = fs.existsSync(path.join(root, 'user-key.bin'));
-            const hasHeirKey = fs.existsSync(path.join(root, 'heir-key.bin'));
-            const hasConfig = fs.existsSync(path.join(root, 'config.bin'));
+      const diskCmd = `Get-Disk | Where-Object { $_.BusType -eq 'USB' } | Select-Object -ExpandProperty Number | ConvertTo-Json`;
+      const diskOut = execSync(`powershell -NoProfile -Command "${diskCmd}"`, { encoding: 'utf8', timeout: 3500 });
+      const parsedDisks = JSON.parse(diskOut.trim());
+      const diskList = Array.isArray(parsedDisks) ? parsedDisks : (parsedDisks !== '' && parsedDisks !== null ? [parsedDisks] : []);
+      for (const n of diskList) usbDiskNumbers.add(Number(n));
+    } catch (_) {}
+
+    const driveUsbMap = new Map();
+    try {
+      const partCmd = `Get-Partition | Where-Object DriveLetter | Select-Object DiskNumber, DriveLetter | ConvertTo-Json`;
+      const partOut = execSync(`powershell -NoProfile -Command "${partCmd}"`, { encoding: 'utf8', timeout: 3500 });
+      const parsedParts = JSON.parse(partOut.trim());
+      const partList = Array.isArray(parsedParts) ? parsedParts : [parsedParts];
+      for (const p of partList) {
+        if (p && p.DriveLetter) {
+          const letter = `${p.DriveLetter}:`.toUpperCase();
+          if (usbDiskNumbers.has(Number(p.DiskNumber))) {
+            driveUsbMap.set(letter, true);
+          }
+        }
+      }
+    } catch (_) {}
+
+    const psCmd = `Get-CimInstance Win32_LogicalDisk | Select-Object DeviceID, VolumeName, DriveType, Size, FreeSpace, FileSystem | ConvertTo-Json`;
+    const out = execSync(`powershell -NoProfile -Command "${psCmd}"`, { encoding: 'utf8', timeout: 4000 });
+    const parsed = JSON.parse(out.trim());
+    const list = Array.isArray(parsed) ? parsed : [parsed];
+
+    for (const d of list) {
+      if (!d || !d.DeviceID) continue;
+      const letter = d.DeviceID.toUpperCase();
+      if (d.DriveType === 5) continue; // 忽略光驱
+
+      const isSystem = letter === systemDrive;
+      const root = `${letter}\\`;
+      const sizeBytes = Number(d.Size) || 0;
+      const freeBytes = Number(d.FreeSpace) || 0;
+      const label = d.VolumeName ? d.VolumeName.trim() : '';
+      const isUsbBus = driveUsbMap.get(letter) === true;
+      const isRemovable = d.DriveType === 2;
+      const isExternal = isUsbBus || isRemovable || (!isSystem && d.DriveType === 3);
+
+      let mediaType = 'UsbFlash';
+      if (sizeBytes > 256 * 1024 * 1024 * 1024) {
+        mediaType = 'UsbHDD';
+      } else if (sizeBytes > 64 * 1024 * 1024 * 1024) {
+        mediaType = 'UsbSSD';
+      }
+
+      let typeTag = 'U盘';
+      if (mediaType === 'UsbHDD') typeTag = '移动硬盘';
+      else if (mediaType === 'UsbSSD') typeTag = '移动SSD';
+
+      const displayName = label
+        ? `${label} (${letter}) - ${typeTag}`
+        : `${isSystem ? '本地系统盘' : '外部存储'} (${letter}) - ${typeTag}`;
+
+      let hasUserKey = false;
+      let hasHeirKey = false;
+      let hasConfig = false;
+      try {
+        hasUserKey = fs.existsSync(path.join(root, 'user-key.bin'));
+        hasHeirKey = fs.existsSync(path.join(root, 'heir-key.bin'));
+        hasConfig = fs.existsSync(path.join(root, 'config.bin'));
+      } catch (_) {}
+
+      seenPaths.add(letter);
+      drives.push({
+        mountPath: root,
+        name: displayName,
+        volumeLabel: label,
+        driveLetter: letter,
+        size: sizeBytes,
+        freeSpace: freeBytes,
+        fileSystem: d.FileSystem || 'NTFS',
+        isRemovable,
+        isExternal,
+        isSystem,
+        mediaType,
+        hasUserKey,
+        hasHeirKey,
+        hasConfig,
+      });
+    }
+  } catch (err) {
+    console.error('[Windows PowerShell Scan Error, using fallback]', err.message);
+  }
+
+  // 兜底轮询 A~Z 盘符（跳过系统盘），确保 100% 检测到 D: 及其他所有外接盘符
+  const allLetters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+  for (const letter of allLetters) {
+    const devId = `${letter}:`;
+    if (seenPaths.has(devId)) continue;
+    const root = `${devId}\\`;
+    if (fs.existsSync(root)) {
+      const isSystem = devId === systemDrive;
+      let hasUserKey = false;
+      let hasHeirKey = false;
+      let hasConfig = false;
+      try {
+        hasUserKey = fs.existsSync(path.join(root, 'user-key.bin'));
+        hasHeirKey = fs.existsSync(path.join(root, 'heir-key.bin'));
+        hasConfig = fs.existsSync(path.join(root, 'config.bin'));
+      } catch (_) {}
+
+      drives.push({
+        mountPath: root,
+        name: `${isSystem ? '系统本地磁盘' : '外部存储设备'} (${devId})`,
+        volumeLabel: '',
+        driveLetter: devId,
+        size: 0,
+        freeSpace: 0,
+        fileSystem: 'NTFS',
+        isRemovable: !isSystem,
+        isExternal: !isSystem,
+        isSystem,
+        mediaType: 'UsbHDD',
+        hasUserKey,
+        hasHeirKey,
+        hasConfig,
+      });
+    }
+  }
+
+  return drives;
+}
+
+function scanMacDrives() {
+  const drives = [];
+  try {
+    const volumesDir = '/Volumes';
+    if (fs.existsSync(volumesDir)) {
+      const entries = fs.readdirSync(volumesDir, { withFileTypes: true });
+      for (const entry of entries) {
+        if (!entry.isDirectory() && !entry.isSymbolicLink()) continue;
+        const name = entry.name;
+        if (name === 'Macintosh HD' || name === 'Macintosh HD - Data' || name === 'Recovery' || name === 'Preboot') continue;
+        const mountPath = path.join(volumesDir, name);
+        
+        let hasUserKey = false;
+        let hasHeirKey = false;
+        let hasConfig = false;
+        try {
+          hasUserKey = fs.existsSync(path.join(mountPath, 'user-key.bin'));
+          hasHeirKey = fs.existsSync(path.join(mountPath, 'heir-key.bin'));
+          hasConfig = fs.existsSync(path.join(mountPath, 'config.bin'));
+        } catch (_) {}
+
+        let size = 0;
+        let free = 0;
+        try {
+          if (fs.statfsSync) {
+            const stat = fs.statfsSync(mountPath);
+            size = stat.bsize * stat.blocks;
+            free = stat.bsize * stat.bfree;
+          }
+        } catch (_) {}
+
+        const isHdd = size > 256 * 1024 * 1024 * 1024;
+        drives.push({
+          mountPath,
+          name: `${name} (${isHdd ? '移动硬盘' : '外部存储'})`,
+          volumeLabel: name,
+          size,
+          freeSpace: free,
+          isRemovable: true,
+          isExternal: true,
+          isSystem: false,
+          mediaType: isHdd ? 'UsbHDD' : 'UsbFlash',
+          hasUserKey,
+          hasHeirKey,
+          hasConfig,
+        });
+      }
+    }
+  } catch (e) {
+    console.error('[Mac Drive Scan Error]', e.message);
+  }
+  return drives;
+}
+
+function scanLinuxDrives() {
+  const drives = [];
+  const seenPaths = new Set();
+  try {
+    const lsblkCmd = 'lsblk -J -b -o NAME,MOUNTPOINT,LABEL,RM,HOTPLUG,SIZE,TYPE,FSTYPE,TRAN,MODEL';
+    const out = execSync(lsblkCmd, { encoding: 'utf8', timeout: 3500 });
+    const data = JSON.parse(out);
+    
+    function traverse(devices) {
+      if (!devices || !Array.isArray(devices)) return;
+      for (const dev of devices) {
+        if (dev.mountpoint && dev.mountpoint !== '/' && dev.mountpoint !== '/boot' && !dev.mountpoint.startsWith('/snap')) {
+          const isUsb = dev.tran === 'usb' || dev.rm === true || dev.rm === '1' || dev.hotplug === true || dev.hotplug === '1' || dev.mountpoint.startsWith('/media') || dev.mountpoint.startsWith('/run/media');
+          if (isUsb || dev.mountpoint.startsWith('/media') || dev.mountpoint.startsWith('/run/media')) {
+            const label = dev.label || dev.model || dev.name || '外部存储';
+            const mp = dev.mountpoint;
+            seenPaths.add(mp);
+
+            let hasUserKey = false;
+            let hasHeirKey = false;
+            let hasConfig = false;
+            try {
+              hasUserKey = fs.existsSync(path.join(mp, 'user-key.bin'));
+              hasHeirKey = fs.existsSync(path.join(mp, 'heir-key.bin'));
+              hasConfig = fs.existsSync(path.join(mp, 'config.bin'));
+            } catch (_) {}
+
+            const size = Number(dev.size) || 0;
+            const isHdd = size > 256 * 1024 * 1024 * 1024;
+
             drives.push({
-              mountPath: root,
-              name: `可移动磁盘 (${letter}:)`,
+              mountPath: mp,
+              name: `${label} (${dev.name}) - ${isHdd ? '移动硬盘' : 'U盘'}`,
+              volumeLabel: label,
+              size,
+              freeSpace: 0,
+              fileSystem: dev.fstype || 'ext4',
+              isRemovable: true,
+              isExternal: true,
+              isSystem: false,
+              mediaType: isHdd ? 'UsbHDD' : 'UsbFlash',
               hasUserKey,
               hasHeirKey,
               hasConfig,
             });
-          } catch (_) {}
+          }
         }
+        if (dev.children) traverse(dev.children);
+      }
+    }
+    traverse(data.blockdevices);
+  } catch (_) {
+    const candidateDirs = ['/media', '/run/media', '/mnt'];
+    for (const base of candidateDirs) {
+      if (!fs.existsSync(base)) continue;
+      try {
+        const subList = fs.readdirSync(base);
+        for (const sub of subList) {
+          const p = path.join(base, sub);
+          if (fs.existsSync(p) && fs.statSync(p).isDirectory()) {
+            const inner = fs.readdirSync(p);
+            for (const item of inner) {
+              const itemPath = path.join(p, item);
+              try {
+                if (fs.existsSync(itemPath) && fs.statSync(itemPath).isDirectory() && !seenPaths.has(itemPath)) {
+                  seenPaths.add(itemPath);
+                  drives.push({
+                    mountPath: itemPath,
+                    name: `${item} (${itemPath}) - 移动介质`,
+                    volumeLabel: item,
+                    size: 0,
+                    freeSpace: 0,
+                    fileSystem: 'ext4',
+                    isRemovable: true,
+                    isExternal: true,
+                    isSystem: false,
+                    mediaType: 'UsbHDD',
+                    hasUserKey: fs.existsSync(path.join(itemPath, 'user-key.bin')),
+                    hasHeirKey: fs.existsSync(path.join(itemPath, 'heir-key.bin')),
+                    hasConfig: fs.existsSync(path.join(itemPath, 'config.bin')),
+                  });
+                }
+              } catch (_) {}
+            }
+          }
+        }
+      } catch (_) {}
+    }
+  }
+  return drives;
+}
+
+function getSettingsFilePath() {
+  try {
+    return path.join(app.getPath('userData'), 'legacylock_settings.json');
+  } catch (_) {
+    return path.join(__dirname, '..', 'legacylock_settings.json');
+  }
+}
+
+// 注册 IPC 通信
+function registerIpcHandlers() {
+  // 1. 扫描可移动驱动器 (U盘 / 移动硬盘 / 外置SSD，支持 Windows / macOS / Linux)
+  ipcMain.handle('vault:scan-usb-drives', async () => {
+    try {
+      let drives = [];
+      if (process.platform === 'win32') {
+        drives = scanWindowsDrives();
+      } else if (process.platform === 'darwin') {
+        drives = scanMacDrives();
+      } else {
+        drives = scanLinuxDrives();
       }
 
-      // 添加项目目录下的模拟U盘槽位支持 (用于开发/无物理U盘测试)
+      // 添加项目目录下的模拟U盘槽位支持 (用于开发/仿真测试)
       const mockDir = path.join(__dirname, '..', 'mock_usb');
       if (fs.existsSync(mockDir)) {
         const userSlot = path.join(mockDir, 'user_usb');
@@ -188,9 +468,45 @@ function registerIpcHandlers() {
         }
       }
 
-      return { success: true, drives };
+      // 智能排序：有密钥文件 > 外部/移动硬盘 > 本地驱动器
+      drives.sort((a, b) => {
+        const scoreA = (a.hasUserKey || a.hasHeirKey ? 10 : 0) + (a.isExternal ? 5 : 0) - (a.isSystem ? 5 : 0);
+        const scoreB = (b.hasUserKey || b.hasHeirKey ? 10 : 0) + (b.isExternal ? 5 : 0) - (b.isSystem ? 5 : 0);
+        return scoreB - scoreA;
+      });
+
+      return { success: true, drives, platform: process.platform };
     } catch (err) {
       return { success: false, error: err.message, drives: [] };
+    }
+  });
+
+  // 1.1 应用配置与主题偏好持久化 (跨重启保留最后一次修改)
+  ipcMain.handle('app:get-settings', async () => {
+    try {
+      const p = getSettingsFilePath();
+      if (fs.existsSync(p)) {
+        const data = JSON.parse(fs.readFileSync(p, 'utf8'));
+        return { success: true, settings: data };
+      }
+    } catch (_) {}
+    return { success: true, settings: {} };
+  });
+
+  ipcMain.handle('app:save-settings', async (_, newSettings) => {
+    try {
+      const p = getSettingsFilePath();
+      let current = {};
+      if (fs.existsSync(p)) {
+        try {
+          current = JSON.parse(fs.readFileSync(p, 'utf8'));
+        } catch (_) {}
+      }
+      const updated = { ...current, ...newSettings, lastUpdated: Date.now() };
+      fs.writeFileSync(p, JSON.stringify(updated, null, 2), 'utf8');
+      return { success: true };
+    } catch (e) {
+      return { success: false, error: e.message };
     }
   });
 

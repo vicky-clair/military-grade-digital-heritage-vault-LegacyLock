@@ -14,7 +14,6 @@ import {
   Wifi,
   Mail,
   Award,
-  HardDrive,
   ArrowDownUp,
   Settings,
 } from 'lucide-react';
@@ -26,8 +25,8 @@ interface SidebarProps {
   onSelectNav: (nav: NavCategoryType) => void;
   categoryCounts: Record<string, number>;
   totalCount: number;
-  detectedDrivesCount: number;
-  onAddNew: () => void;
+  detectedDrivesCount?: number;
+  onAddNew?: () => void;
   theme?: ThemeDefinition;
 }
 
@@ -36,7 +35,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSelectNav,
   categoryCounts,
   totalCount,
-  detectedDrivesCount,
   theme,
 }) => {
   // 准确计算与添加内容完全一致的各分类总计数据
@@ -271,24 +269,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </button>
         </div>
 
-        {/* 分组 3: 擴充系統 (外接式硬碟 / U盘介质) */}
-        <div className="sidebar-section">
-          <div className="sidebar-section-title">擴充系統</div>
-          <button
-            onClick={() => onSelectNav('external_drive')}
-            className={`sidebar-nav-item ${selectedNav === 'external_drive' ? 'active' : ''}`}
-          >
-            <div className="nav-item-left">
-              <HardDrive className="nav-item-icon" style={{ color: selectedNav === 'external_drive' ? '#00D4FF' : undefined }} />
-              <span>外接式硬碟</span>
-            </div>
-            <span className="sidebar-nav-badge">
-              {detectedDrivesCount > 0 ? detectedDrivesCount : '--'}
-            </span>
-          </button>
-        </div>
-
-        {/* 分组 4: 存储与备份 (用户要求新增的左侧导入导出模块) */}
+        {/* 存储与备份 (左侧加密导入导出模块) */}
         <div className="sidebar-section">
           <div className="sidebar-section-title">存储与备份</div>
           <button
@@ -316,14 +297,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
       </div>
 
-      {/* 底部设置入口 */}
+      {/* 底部系统设置按钮 (原添加新资产/密钥位置) */}
       <div className="sidebar-footer">
         <button
           onClick={() => onSelectNav('settings')}
-          className={`btn-add-asset-sidebar settings-btn ${selectedNav === 'settings' ? 'active' : ''}`}
+          className={`sidebar-settings-btn ${selectedNav === 'settings' ? 'active' : ''}`}
+          title="打开系统设置、应用说明、安全警示与自检中心"
         >
-          <Settings style={{ width: 16, height: 16 }} />
-          <span>设置</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+            <Settings className="settings-btn-icon" style={{ width: 17, height: 17 }} />
+            <span style={{ fontWeight: 600, fontSize: 13 }}>系统设置</span>
+          </div>
+          <span className="settings-version-tag">v2.5.0</span>
         </button>
       </div>
     </aside>
