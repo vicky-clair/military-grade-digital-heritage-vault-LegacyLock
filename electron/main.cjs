@@ -93,12 +93,13 @@ function startEmbeddedServer(port = 5173) {
         const contentType = mimes[ext] || 'application/octet-stream';
         const content = fs.readFileSync(filePath);
         
-        // 限制 CORS 仅允许本机应用环境，防御外部网页跨域探测
+        // 限制 CORS 与 CSP 仅允许本机应用环境，防御外部网页跨域探测与外连
         res.writeHead(200, {
           'Content-Type': contentType,
           'Access-Control-Allow-Origin': `http://127.0.0.1:${port}`,
           'X-Content-Type-Options': 'nosniff',
           'X-Frame-Options': 'DENY',
+          'Content-Security-Policy': "default-src 'self' 'unsafe-inline' data:; connect-src 'self' http://127.0.0.1:* ws://127.0.0.1:*; img-src 'self' data: blob:; font-src 'self' data:; frame-src 'none'; object-src 'none';",
         });
         res.end(content);
       } catch (e) {
