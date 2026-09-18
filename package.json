@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "description": "LegacyLock - Military-grade Digital Heritage Vault (Dual-USB)",
+  "author": "LegacyLock Core Architecture <support@legacylock.vault>",
   "main": "electron/main.cjs",
   "scripts": {
     "dev": "vite",
@@ -11,7 +12,10 @@
     "electron": "electron .",
     "electron:dev": "vite --port 5173",
     "rust:build": "cd crypt && cargo build --release",
-    "rust:test": "cd crypt && cargo test"
+    "rust:test": "cd crypt && cargo test",
+    "dist:win": "npm run build && electron-builder --win",
+    "dist:linux": "npm run build && electron-builder --linux",
+    "dist:all": "npm run build && electron-builder --win --linux"
   },
   "dependencies": {
     "clsx": "^2.1.1",
@@ -25,7 +29,46 @@
     "@types/react-dom": "^19.0.4",
     "@vitejs/plugin-react": "^4.3.4",
     "electron": "^32.3.3",
+    "electron-builder": "^26.15.3",
     "typescript": "^5.7.3",
     "vite": "^6.1.0"
+  },
+  "build": {
+    "appId": "com.legacylock.vault",
+    "productName": "LegacyLock",
+    "copyright": "Copyright © 2026 LegacyLock Core Architecture",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "LegacyLock 遗产保险锁"
+    },
+    "portable": {
+      "artifactName": "${productName}-v${version}-Windows-Portable.${ext}"
+    },
+    "linux": {
+      "target": [
+        "tar.gz"
+      ],
+      "maintainer": "LegacyLock Core Architecture <support@legacylock.vault>",
+      "category": "Utility",
+      "description": "LegacyLock - Military-Grade Digital Heritage Vault",
+      "artifactName": "${productName}-v${version}-Linux-${arch}.${ext}"
+    }
   }
 }

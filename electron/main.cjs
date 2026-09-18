@@ -150,9 +150,15 @@ async function createWindow() {
     console.log('[Electron Main] WebContents did-finish-load successfully!');
   });
 
-  const url = await startEmbeddedServer();
-  console.log('[Electron Main] Loading URL:', url);
-  mainWindow.loadURL(url);
+  const distPath = path.join(__dirname, '..', 'dist', 'index.html');
+  if (app.isPackaged && fs.existsSync(distPath)) {
+    console.log('[Electron Main] Loading packaged production file:', distPath);
+    mainWindow.loadFile(distPath);
+  } else {
+    const url = await startEmbeddedServer();
+    console.log('[Electron Main] Loading URL:', url);
+    mainWindow.loadURL(url);
+  }
 }
 
 // 注册 IPC 通信

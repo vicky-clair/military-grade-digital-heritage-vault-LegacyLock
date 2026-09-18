@@ -8,6 +8,7 @@ target/
 dist/
 build/
 out/
+release/
 *.tsbuildinfo
 
 # Environment files
