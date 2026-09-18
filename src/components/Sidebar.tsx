@@ -1,319 +1,329 @@
 import React from 'react';
 import {
-  Layers,
+  LayoutGrid,
   KeyRound,
   FileText,
+  UserCheck,
   CreditCard,
-  Award,
-  Gamepad2,
-  Clock,
-  Usb,
-  ShieldCheck,
-  ChevronDown,
   Lock,
-  Unlock,
-  Plus,
+  FileCode,
+  Terminal,
+  Code2,
+  Wallet,
+  Server,
+  Wifi,
+  Mail,
+  Award,
+  HardDrive,
+  ArrowDownUp,
+  Settings,
 } from 'lucide-react';
-import { VaultCategory } from '../types';
+import { NavCategoryType } from '../types';
+import { ThemeDefinition } from '../services/themes';
 
 interface SidebarProps {
-  selectedNav: 'all' | VaultCategory | 'plan' | 'unlock';
-  onSelectNav: (nav: 'all' | VaultCategory | 'plan' | 'unlock') => void;
-  itemCounts: {
-    all: number;
-    login: number;
-    note: number;
-    card: number;
-    license: number;
-    game: number;
-  };
-  isUnlocked: boolean;
+  selectedNav: NavCategoryType;
+  onSelectNav: (nav: NavCategoryType) => void;
+  categoryCounts: Record<string, number>;
+  totalCount: number;
+  detectedDrivesCount: number;
   onAddNew: () => void;
-  onToggleLock: () => void;
+  theme?: ThemeDefinition;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
   selectedNav,
   onSelectNav,
-  itemCounts,
-  isUnlocked,
-  onAddNew,
-  onToggleLock,
+  categoryCounts,
+  totalCount,
+  detectedDrivesCount,
+  theme,
 }) => {
+  // 准确计算与添加内容完全一致的各分类总计数据
+  const loginCount = categoryCounts['login'] || 0;
+  const noteCount = categoryCounts['note'] || 0;
+  const identityCount =
+    (categoryCounts['identity'] || 0) +
+    (categoryCounts['passport'] || 0) +
+    (categoryCounts['driverLicense'] || 0) +
+    (categoryCounts['ssn'] || 0);
+  const cardCount = (categoryCounts['card'] || 0) + (categoryCounts['bankAccount'] || 0);
+  const passwordCount = categoryCounts['password'] || 0;
+  const documentCount =
+    (categoryCounts['document'] || 0) +
+    (categoryCounts['softwareLicense'] || 0) +
+    (categoryCounts['outdoorLicense'] || 0);
+
+  const sshCount = categoryCounts['sshKey'] || 0;
+  const apiCount = categoryCounts['apiCredential'] || 0;
+  const cryptoCount = categoryCounts['cryptoWallet'] || 0;
+  const serverCount = (categoryCounts['server'] || 0) + (categoryCounts['database'] || 0);
+  const wifiCount = categoryCounts['router'] || 0;
+  const mailCount = categoryCounts['email'] || 0;
+  const membershipCount =
+    (categoryCounts['membership'] || 0) +
+    (categoryCounts['game'] || 0) +
+    (categoryCounts['reward'] || 0) +
+    (categoryCounts['medical'] || 0);
+
+  const formatBadge = (num: number) => (num > 0 ? num : '--');
+
   return (
-    <aside className="w-64 bg-[#0A0F1D] border-r border-white/5 flex flex-col h-full flex-shrink-0 select-none">
-      {/* 顶部 1Password 风格保险库选择器 */}
-      <div className="p-3.5 border-b border-white/5 flex items-center justify-between">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#0572EC] to-[#00D4FF] p-0.5 shadow-md flex items-center justify-center flex-shrink-0">
-            <div className="w-full h-full bg-[#0E1525] rounded-[6px] flex items-center justify-center">
-              <ShieldCheck className="w-4 h-4 text-[#00D4FF]" />
-            </div>
-          </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-1">
-              <span className="text-xs font-semibold text-white truncate font-mono">
-                LegacyLock
-              </span>
-              <ChevronDown className="w-3 h-3 text-slate-400 flex-shrink-0" />
-            </div>
-            <p className="text-[10px] text-slate-400 truncate">
-              {isUnlocked ? '已认证 (双U盘就绪)' : '离线军规密文库'}
-            </p>
+    <aside
+      className="app-sidebar"
+      style={{
+        background: theme?.sidebarStyle.background,
+        borderColor: theme?.sidebarStyle.borderColor,
+      }}
+    >
+      {/* 顶部 Logo 与应用名称 */}
+      <div className="sidebar-header">
+        <div className="sidebar-logo-icon">
+          <div className="sidebar-logo-inner">
+            <KeyRound style={{ width: 16, height: 16, color: '#00D4FF' }} />
           </div>
         </div>
-
-        <button
-          onClick={onAddNew}
-          className="p-1.5 rounded-lg bg-[#0572EC] hover:bg-[#1882FB] text-white transition-colors shadow-sm"
-          title="新建项目 (Ctrl+N)"
-        >
-          <Plus className="w-4 h-4" />
-        </button>
-      </div>
-
-      {/* 资产分类列表 */}
-      <div className="flex-1 overflow-y-auto px-2 py-3 space-y-5">
-        <div>
-          <div className="px-2.5 mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-            保险库分类
-          </div>
-
-          <nav className="space-y-0.5">
-            <button
-              onClick={() => onSelectNav('all')}
-              className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                selectedNav === 'all'
-                  ? 'bg-[#0572EC] text-white shadow-sm'
-                  : 'text-slate-300 hover:bg-white/5'
-              }`}
-            >
-              <div className="flex items-center gap-2.5">
-                <div
-                  className={`w-6 h-6 rounded-md flex items-center justify-center ${
-                    selectedNav === 'all' ? 'bg-white/20' : 'bg-slate-800'
-                  }`}
-                >
-                  <Layers className="w-3.5 h-3.5 text-blue-400" />
-                </div>
-                <span>全部项目</span>
-              </div>
-              <span
-                className={`text-[11px] font-mono ${
-                  selectedNav === 'all' ? 'text-white/80' : 'text-slate-400'
-                }`}
-              >
-                {itemCounts.all}
-              </span>
-            </button>
-
-            <button
-              onClick={() => onSelectNav('login')}
-              className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                selectedNav === 'login'
-                  ? 'bg-[#0572EC] text-white shadow-sm'
-                  : 'text-slate-300 hover:bg-white/5'
-              }`}
-            >
-              <div className="flex items-center gap-2.5">
-                <div
-                  className={`w-6 h-6 rounded-md flex items-center justify-center ${
-                    selectedNav === 'login' ? 'bg-white/20' : 'bg-slate-800'
-                  }`}
-                >
-                  <KeyRound className="w-3.5 h-3.5 text-cyan-400" />
-                </div>
-                <span>登录信息</span>
-              </div>
-              <span
-                className={`text-[11px] font-mono ${
-                  selectedNav === 'login' ? 'text-white/80' : 'text-slate-400'
-                }`}
-              >
-                {itemCounts.login}
-              </span>
-            </button>
-
-            <button
-              onClick={() => onSelectNav('game')}
-              className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                selectedNav === 'game'
-                  ? 'bg-[#0572EC] text-white shadow-sm'
-                  : 'text-slate-300 hover:bg-white/5'
-              }`}
-            >
-              <div className="flex items-center gap-2.5">
-                <div
-                  className={`w-6 h-6 rounded-md flex items-center justify-center ${
-                    selectedNav === 'game' ? 'bg-white/20' : 'bg-slate-800'
-                  }`}
-                >
-                  <Gamepad2 className="w-3.5 h-3.5 text-purple-400" />
-                </div>
-                <span>游戏数字遗产</span>
-              </div>
-              <span
-                className={`text-[11px] font-mono ${
-                  selectedNav === 'game' ? 'text-white/80' : 'text-slate-400'
-                }`}
-              >
-                {itemCounts.game}
-              </span>
-            </button>
-
-            <button
-              onClick={() => onSelectNav('note')}
-              className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                selectedNav === 'note'
-                  ? 'bg-[#0572EC] text-white shadow-sm'
-                  : 'text-slate-300 hover:bg-white/5'
-              }`}
-            >
-              <div className="flex items-center gap-2.5">
-                <div
-                  className={`w-6 h-6 rounded-md flex items-center justify-center ${
-                    selectedNav === 'note' ? 'bg-white/20' : 'bg-slate-800'
-                  }`}
-                >
-                  <FileText className="w-3.5 h-3.5 text-emerald-400" />
-                </div>
-                <span>安全便签 / 遗嘱</span>
-              </div>
-              <span
-                className={`text-[11px] font-mono ${
-                  selectedNav === 'note' ? 'text-white/80' : 'text-slate-400'
-                }`}
-              >
-                {itemCounts.note}
-              </span>
-            </button>
-
-            <button
-              onClick={() => onSelectNav('card')}
-              className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                selectedNav === 'card'
-                  ? 'bg-[#0572EC] text-white shadow-sm'
-                  : 'text-slate-300 hover:bg-white/5'
-              }`}
-            >
-              <div className="flex items-center gap-2.5">
-                <div
-                  className={`w-6 h-6 rounded-md flex items-center justify-center ${
-                    selectedNav === 'card' ? 'bg-white/20' : 'bg-slate-800'
-                  }`}
-                >
-                  <CreditCard className="w-3.5 h-3.5 text-amber-400" />
-                </div>
-                <span>信用卡与离岸财务</span>
-              </div>
-              <span
-                className={`text-[11px] font-mono ${
-                  selectedNav === 'card' ? 'text-white/80' : 'text-slate-400'
-                }`}
-              >
-                {itemCounts.card}
-              </span>
-            </button>
-
-            <button
-              onClick={() => onSelectNav('license')}
-              className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                selectedNav === 'license'
-                  ? 'bg-[#0572EC] text-white shadow-sm'
-                  : 'text-slate-300 hover:bg-white/5'
-              }`}
-            >
-              <div className="flex items-center gap-2.5">
-                <div
-                  className={`w-6 h-6 rounded-md flex items-center justify-center ${
-                    selectedNav === 'license' ? 'bg-white/20' : 'bg-slate-800'
-                  }`}
-                >
-                  <Award className="w-3.5 h-3.5 text-rose-400" />
-                </div>
-                <span>软件授权与产品密钥</span>
-              </div>
-              <span
-                className={`text-[11px] font-mono ${
-                  selectedNav === 'license' ? 'text-white/80' : 'text-slate-400'
-                }`}
-              >
-                {itemCounts.license}
-              </span>
-            </button>
-          </nav>
-        </div>
-
-        {/* 军规继承与硬件中心 */}
-        <div>
-          <div className="px-2.5 mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-            数字遗产与硬件中心
-          </div>
-
-          <nav className="space-y-0.5">
-            <button
-              onClick={() => onSelectNav('unlock')}
-              className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                selectedNav === 'unlock'
-                  ? 'bg-[#0572EC] text-white shadow-sm'
-                  : 'text-slate-300 hover:bg-white/5'
-              }`}
-            >
-              <div className="flex items-center gap-2.5">
-                <div
-                  className={`w-6 h-6 rounded-md flex items-center justify-center ${
-                    selectedNav === 'unlock' ? 'bg-white/20' : 'bg-slate-800'
-                  }`}
-                >
-                  <Usb className="w-3.5 h-3.5 text-[#00D4FF]" />
-                </div>
-                <span>双U盘联合解锁</span>
-              </div>
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            </button>
-
-            <button
-              onClick={() => onSelectNav('plan')}
-              className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                selectedNav === 'plan'
-                  ? 'bg-[#0572EC] text-white shadow-sm'
-                  : 'text-slate-300 hover:bg-white/5'
-              }`}
-            >
-              <div className="flex items-center gap-2.5">
-                <div
-                  className={`w-6 h-6 rounded-md flex items-center justify-center ${
-                    selectedNav === 'plan' ? 'bg-white/20' : 'bg-slate-800'
-                  }`}
-                >
-                  <Clock className="w-3.5 h-3.5 text-amber-400" />
-                </div>
-                <span>继承计划与U盘配置</span>
-              </div>
-            </button>
-          </nav>
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <h1 className="sidebar-brand-title" title="LegacyLock 军规遗产密钥库">LegacyLock 军规遗产密钥库</h1>
+          <p className="sidebar-brand-sub" title="军规级双U盘数字遗产保险箱">军规级双U盘数字遗产保险箱</p>
         </div>
       </div>
 
-      {/* 底部保险箱状态与锁定按钮 */}
-      <div className="p-3 border-t border-white/5 bg-[#080D1A]">
-        <button
-          onClick={onToggleLock}
-          className="w-full flex items-center justify-between p-2 rounded-lg bg-white/5 hover:bg-white/10 text-xs transition-colors"
-        >
-          <div className="flex items-center gap-2">
-            {isUnlocked ? (
-              <Unlock className="w-4 h-4 text-emerald-400" />
-            ) : (
-              <Lock className="w-4 h-4 text-amber-400" />
-            )}
-            <span className="font-medium text-slate-200">
-              {isUnlocked ? '双U盘模式：已激活' : '密码库状态：已锁定'}
+      {/* 导航列表区：分类名称与添加的内容 100% 保持一致，并动态显示真实总计数据 */}
+      <div className="sidebar-nav-scroll">
+        {/* 分组 1: 核心数字资产 */}
+        <div className="sidebar-section">
+          <div className="sidebar-section-title">核心数字资产</div>
+
+          {/* 所有密匙 (总计) */}
+          <button
+            onClick={() => onSelectNav('all')}
+            className={`sidebar-nav-item ${selectedNav === 'all' ? 'active' : ''}`}
+          >
+            <div className="nav-item-left">
+              <LayoutGrid className="nav-item-icon" />
+              <span>所有密鑰</span>
+            </div>
+            <span className="sidebar-nav-badge">
+              {totalCount}
             </span>
-          </div>
-          <span className="text-[10px] text-slate-400 font-mono">
-            {isUnlocked ? '重新加锁' : '解锁'}
-          </span>
+          </button>
+
+          {/* 登录信息 */}
+          <button
+            onClick={() => onSelectNav('login')}
+            className={`sidebar-nav-item ${selectedNav === 'login' ? 'active' : ''}`}
+          >
+            <div className="nav-item-left">
+              <KeyRound className="nav-item-icon" />
+              <span>登录信息</span>
+            </div>
+            <span className="sidebar-nav-badge">{formatBadge(loginCount)}</span>
+          </button>
+
+          {/* 安全备注 */}
+          <button
+            onClick={() => onSelectNav('note')}
+            className={`sidebar-nav-item ${selectedNav === 'note' ? 'active' : ''}`}
+          >
+            <div className="nav-item-left">
+              <FileText className="nav-item-icon" />
+              <span>安全备注</span>
+            </div>
+            <span className="sidebar-nav-badge">{formatBadge(noteCount)}</span>
+          </button>
+
+          {/* 身份标识 */}
+          <button
+            onClick={() => onSelectNav('identity')}
+            className={`sidebar-nav-item ${selectedNav === 'identity' ? 'active' : ''}`}
+          >
+            <div className="nav-item-left">
+              <UserCheck className="nav-item-icon" />
+              <span>身份标识</span>
+            </div>
+            <span className="sidebar-nav-badge">{formatBadge(identityCount)}</span>
+          </button>
+
+          {/* 信用卡与银行 */}
+          <button
+            onClick={() => onSelectNav('card')}
+            className={`sidebar-nav-item ${selectedNav === 'card' ? 'active' : ''}`}
+          >
+            <div className="nav-item-left">
+              <CreditCard className="nav-item-icon" />
+              <span>信用卡</span>
+            </div>
+            <span className="sidebar-nav-badge">{formatBadge(cardCount)}</span>
+          </button>
+
+          {/* 密码 */}
+          <button
+            onClick={() => onSelectNav('password')}
+            className={`sidebar-nav-item ${selectedNav === 'password' ? 'active' : ''}`}
+          >
+            <div className="nav-item-left">
+              <Lock className="nav-item-icon" />
+              <span>独立密码</span>
+            </div>
+            <span className="sidebar-nav-badge">{formatBadge(passwordCount)}</span>
+          </button>
+
+          {/* 文档 */}
+          <button
+            onClick={() => onSelectNav('document')}
+            className={`sidebar-nav-item ${selectedNav === 'document' ? 'active' : ''}`}
+          >
+            <div className="nav-item-left">
+              <FileCode className="nav-item-icon" />
+              <span>加密文档</span>
+            </div>
+            <span className="sidebar-nav-badge">{formatBadge(documentCount)}</span>
+          </button>
+        </div>
+
+        {/* 分组 2: 凭据与网络开发 */}
+        <div className="sidebar-section">
+          <div className="sidebar-section-title">凭据与网络</div>
+
+          {/* SSH 密钥 */}
+          <button
+            onClick={() => onSelectNav('sshKey')}
+            className={`sidebar-nav-item ${selectedNav === 'sshKey' ? 'active' : ''}`}
+          >
+            <div className="nav-item-left">
+              <Terminal className="nav-item-icon" />
+              <span>SSH 密钥</span>
+            </div>
+            <span className="sidebar-nav-badge">{formatBadge(sshCount)}</span>
+          </button>
+
+          {/* API 凭据 */}
+          <button
+            onClick={() => onSelectNav('apiCredential')}
+            className={`sidebar-nav-item ${selectedNav === 'apiCredential' ? 'active' : ''}`}
+          >
+            <div className="nav-item-left">
+              <Code2 className="nav-item-icon" />
+              <span>API 凭据</span>
+            </div>
+            <span className="sidebar-nav-badge">{formatBadge(apiCount)}</span>
+          </button>
+
+          {/* 加密钱包 */}
+          <button
+            onClick={() => onSelectNav('cryptoWallet')}
+            className={`sidebar-nav-item ${selectedNav === 'cryptoWallet' ? 'active' : ''}`}
+          >
+            <div className="nav-item-left">
+              <Wallet className="nav-item-icon" />
+              <span>加密钱包</span>
+            </div>
+            <span className="sidebar-nav-badge">{formatBadge(cryptoCount)}</span>
+          </button>
+
+          {/* 服务器与数据库 */}
+          <button
+            onClick={() => onSelectNav('server')}
+            className={`sidebar-nav-item ${selectedNav === 'server' ? 'active' : ''}`}
+          >
+            <div className="nav-item-left">
+              <Server className="nav-item-icon" />
+              <span>服务器与数据库</span>
+            </div>
+            <span className="sidebar-nav-badge">{formatBadge(serverCount)}</span>
+          </button>
+
+          {/* 无线网络 */}
+          <button
+            onClick={() => onSelectNav('router')}
+            className={`sidebar-nav-item ${selectedNav === 'router' ? 'active' : ''}`}
+          >
+            <div className="nav-item-left">
+              <Wifi className="nav-item-icon" />
+              <span>无线路由器</span>
+            </div>
+            <span className="sidebar-nav-badge">{formatBadge(wifiCount)}</span>
+          </button>
+
+          {/* 电子邮件 */}
+          <button
+            onClick={() => onSelectNav('email')}
+            className={`sidebar-nav-item ${selectedNav === 'email' ? 'active' : ''}`}
+          >
+            <div className="nav-item-left">
+              <Mail className="nav-item-icon" />
+              <span>电子邮件</span>
+            </div>
+            <span className="sidebar-nav-badge">{formatBadge(mailCount)}</span>
+          </button>
+
+          {/* 会员与数字资产 */}
+          <button
+            onClick={() => onSelectNav('membership')}
+            className={`sidebar-nav-item ${selectedNav === 'membership' ? 'active' : ''}`}
+          >
+            <div className="nav-item-left">
+              <Award className="nav-item-icon" />
+              <span>会员与资产</span>
+            </div>
+            <span className="sidebar-nav-badge">{formatBadge(membershipCount)}</span>
+          </button>
+        </div>
+
+        {/* 分组 3: 擴充系統 (外接式硬碟 / U盘介质) */}
+        <div className="sidebar-section">
+          <div className="sidebar-section-title">擴充系統</div>
+          <button
+            onClick={() => onSelectNav('external_drive')}
+            className={`sidebar-nav-item ${selectedNav === 'external_drive' ? 'active' : ''}`}
+          >
+            <div className="nav-item-left">
+              <HardDrive className="nav-item-icon" style={{ color: selectedNav === 'external_drive' ? '#00D4FF' : undefined }} />
+              <span>外接式硬碟</span>
+            </div>
+            <span className="sidebar-nav-badge">
+              {detectedDrivesCount > 0 ? detectedDrivesCount : '--'}
+            </span>
+          </button>
+        </div>
+
+        {/* 分组 4: 存储与备份 (用户要求新增的左侧导入导出模块) */}
+        <div className="sidebar-section">
+          <div className="sidebar-section-title">存储与备份</div>
+          <button
+            onClick={() => onSelectNav('import_export')}
+            className={`sidebar-nav-item ${selectedNav === 'import_export' ? 'active' : ''}`}
+          >
+            <div className="nav-item-left">
+              <ArrowDownUp
+                className="nav-item-icon"
+                style={{ color: selectedNav === 'import_export' ? '#00D4FF' : '#38BDF8' }}
+              />
+              <span>加密导入导出</span>
+            </div>
+            <span
+              className="sidebar-nav-badge"
+              style={{
+                background: selectedNav === 'import_export' ? '#00D4FF' : 'rgba(0, 212, 255, 0.15)',
+                color: selectedNav === 'import_export' ? '#040B1C' : '#38E1FF',
+                fontWeight: 700,
+              }}
+            >
+              AES
+            </span>
+          </button>
+        </div>
+      </div>
+
+      {/* 底部设置入口 */}
+      <div className="sidebar-footer">
+        <button
+          onClick={() => onSelectNav('settings')}
+          className={`btn-add-asset-sidebar settings-btn ${selectedNav === 'settings' ? 'active' : ''}`}
+        >
+          <Settings style={{ width: 16, height: 16 }} />
+          <span>设置</span>
         </button>
       </div>
     </aside>

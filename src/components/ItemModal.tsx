@@ -6,21 +6,20 @@ import {
   Eye,
   EyeOff,
   RefreshCw,
-  KeyRound,
-  FileText,
-  CreditCard,
-  Award,
-  Gamepad2,
-  Shield,
-  Sliders,
+  Sparkles,
+  ShieldCheck,
+  ChevronDown,
+  Compass,
 } from 'lucide-react';
 import { VaultCategory, VaultField, VaultItem } from '../types';
+import { CATEGORIES, getCategoryDef } from '../services/categories';
 
 interface ItemModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (item: VaultItem) => void;
   initialItem?: VaultItem | null;
+  defaultCategory?: VaultCategory;
 }
 
 export const ItemModal: React.FC<ItemModalProps> = ({
@@ -28,13 +27,15 @@ export const ItemModal: React.FC<ItemModalProps> = ({
   onClose,
   onSave,
   initialItem,
+  defaultCategory = 'login',
 }) => {
   const [title, setTitle] = useState('');
-  const [category, setCategory] = useState<VaultCategory>('login');
+  const [category, setCategory] = useState<VaultCategory>(defaultCategory);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [url, setUrl] = useState('');
   const [notes, setNotes] = useState('');
+  const [inheritanceInstructions, setInheritanceInstructions] = useState('');
   const [customFields, setCustomFields] = useState<VaultField[]>([]);
   const [showPassword, setShowPassword] = useState(false);
   const [showGenerator, setShowGenerator] = useState(false);
@@ -49,19 +50,38 @@ export const ItemModal: React.FC<ItemModalProps> = ({
       setPassword(initialItem.password || '');
       setUrl(initialItem.url || '');
       setNotes(initialItem.notes || '');
+      setInheritanceInstructions(initialItem.inheritanceInstructions || '');
       setCustomFields(initialItem.customFields || []);
     } else {
+      const cat = defaultCategory || 'login';
+      const def = getCategoryDef(cat);
+      setCategory(cat);
       setTitle('');
-      setCategory('login');
       setUsername('');
       setPassword('');
       setUrl('');
       setNotes('');
-      setCustomFields([]);
+      setInheritanceInstructions('');
+
+      if (def.defaultFields && def.defaultFields.length > 0) {
+        setCustomFields(
+          def.defaultFields.map((f, idx) => ({
+            id: `field-preset-${idx}-${Date.now()}`,
+            name: f.name,
+            value: f.defaultValue || '',
+            isSecret: f.isSecret,
+          }))
+        );
+      } else {
+        setCustomFields([]);
+      }
     }
-  }, [initialItem, isOpen]);
+  }, [initialItem, defaultCategory, isOpen]);
 
   if (!isOpen) return null;
+
+  const currentCategoryDef = getCategoryDef(category);
+  const CategoryIcon = currentCategoryDef.icon;
 
   const generatePassword = (length = genLength, symbols = includeSymbols) => {
     const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
@@ -111,305 +131,402 @@ export const ItemModal: React.FC<ItemModalProps> = ({
       password: password || undefined,
       url: url || undefined,
       notes: notes || undefined,
+      inheritanceInstructions: inheritanceInstructions || undefined,
       customFields: customFields.filter((f) => f.name.trim() !== ''),
       createdAt: initialItem?.createdAt || Date.now(),
       updatedAt: Date.now(),
+      revision: (initialItem?.revision || 0) + 1,
     };
 
     onSave(item);
     onClose();
   };
 
-  const getCategoryIcon = (cat: VaultCategory) => {
-    switch (cat) {
-      case 'game':
-        return <Gamepad2 className="w-4 h-4 text-purple-400" />;
-      case 'login':
-        return <KeyRound className="w-4 h-4 text-cyan-400" />;
-      case 'note':
-        return <FileText className="w-4 h-4 text-emerald-400" />;
-      case 'card':
-        return <CreditCard className="w-4 h-4 text-amber-400" />;
-      case 'license':
-        return <Award className="w-4 h-4 text-rose-400" />;
-      default:
-        return <Shield className="w-4 h-4 text-blue-400" />;
-    }
-  };
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fadeIn">
-      <div className="bg-[#121A2B] border border-white/10 rounded-2xl w-full max-w-xl max-h-[92vh] overflow-y-auto shadow-2xl flex flex-col">
-        {/* 1Password 风格头部 */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-white/5 bg-[#0E1525]">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-[#1C283F] border border-white/10 flex items-center justify-center">
-              {getCategoryIcon(category)}
+    <div className="modal-backdrop" onClick={onClose}>
+      <div
+        className="modal-window-dialog"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* 顶部独立窗口标题栏 */}
+        <div className="modal-window-header">
+          <div className="modal-window-title">
+            <div
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 10,
+                background: currentCategoryDef.bgColor,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.35)',
+                flexShrink: 0,
+              }}
+            >
+              <CategoryIcon className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h2 className="text-sm font-bold text-white">
-                {initialItem ? '编辑数字遗产项目' : '新建数字遗产项目'}
-              </h2>
-              <p className="text-[11px] text-slate-400 font-mono">
-                数据以军规级 AES-256-GCM 离线加密存储
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 16, fontWeight: 700, color: '#FFFFFF' }}>
+                  {initialItem ? '编辑资产项目' : `新建 · ${currentCategoryDef.name}`}
+                </span>
+                <span className="modal-badge-cat">
+                  {currentCategoryDef.englishName}
+                </span>
+              </div>
+              <p style={{ fontSize: 11, color: '#8EA4D4', marginTop: 2 }}>
+                {currentCategoryDef.description}
               </p>
             </div>
           </div>
 
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
-          >
-            <X className="w-5 h-5" />
+          <button onClick={onClose} className="modal-window-close" title="关闭窗口">
+            <X style={{ width: 16, height: 16 }} />
           </button>
         </div>
 
-        {/* 表单内容 */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-5 flex-1">
-          {/* 分类与标题 */}
-          <div className="space-y-3">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div>
-                <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
-                  分类
-                </label>
-                <select
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value as VaultCategory)}
-                  className="op-input font-medium"
-                >
-                  <option value="login">登录凭据 (Logins)</option>
-                  <option value="game">游戏遗产 (Steam/Epic)</option>
-                  <option value="note">安全便签 (Secure Notes)</option>
-                  <option value="card">财务卡片 (Credit Cards)</option>
-                  <option value="license">软件许可 (Licenses)</option>
-                </select>
-              </div>
+        {/* 独立窗口表单正文 */}
+        <form onSubmit={handleSubmit} className="modal-window-body">
+          {/* 卡片 1: 基本标识 (项目标题与所属分类) */}
+          <div className="form-card">
+            <div className="form-card-title">
+              <span>基本信息 (Basic Info)</span>
+              <span style={{ fontSize: 10, color: '#00D4FF', textTransform: 'none' }}>* 必填项</span>
+            </div>
 
-              <div className="sm:col-span-2">
-                <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
-                  项目标题 *
-                </label>
+            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 12 }}>
+              <div className="framed-input-container">
+                <label className="framed-label">项目标题 *</label>
                 <input
                   type="text"
                   required
+                  autoFocus
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  placeholder="例如: Steam 游戏库 / 瑞士信贷银行"
-                  className="op-input font-medium"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* 登录详情分组 */}
-          <div className="space-y-1.5">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 block px-1">
-              登录信息 (LOGIN)
-            </span>
-
-            <div className="op-field-group">
-              <div className="p-3 border-b border-white/5">
-                <label className="block text-[10px] font-mono text-slate-400 mb-1">
-                  用户名 / 账号凭证
-                </label>
-                <input
-                  type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder="用户名、邮箱或账号识别码"
-                  className="op-input font-mono text-xs"
+                  placeholder={`例如: ${currentCategoryDef.name}名称 / 标识`}
+                  className="framed-input"
                 />
               </div>
 
-              <div className="p-3 border-b border-white/5 space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="block text-[10px] font-mono text-slate-400">
-                    密码 (PASSWORD)
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => setShowGenerator(!showGenerator)}
-                    className="text-[11px] text-[#0572EC] hover:text-[#00D4FF] flex items-center gap-1 font-medium"
+              <div className="framed-input-container">
+                <label className="framed-label">所属分类</label>
+                <div style={{ position: 'relative' }}>
+                  <select
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value as VaultCategory)}
+                    className="framed-select"
                   >
-                    <Sliders className="w-3 h-3" />
-                    <span>{showGenerator ? '收起生成器' : '密码生成器'}</span>
-                  </button>
-                </div>
-
-                <div className="relative">
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="输入密码或点击右侧生成"
-                    className="op-input pr-10 font-mono text-xs"
+                    {CATEGORIES.map((c) => (
+                      <option key={c.id} value={c.id} style={{ background: '#12173B', color: '#FFFFFF' }}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown
+                    style={{
+                      width: 14,
+                      height: 14,
+                      color: '#8EA4D4',
+                      position: 'absolute',
+                      right: 12,
+                      top: 13,
+                      pointerEvents: 'none',
+                    }}
                   />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-2.5 top-2 text-slate-400 hover:text-white"
-                  >
-                    {showPassword ? (
-                      <EyeOff className="w-4 h-4" />
-                    ) : (
-                      <Eye className="w-4 h-4" />
-                    )}
-                  </button>
                 </div>
-
-                {/* 1Password 内置密码生成器展开面板 */}
-                {showGenerator && (
-                  <div className="p-3 rounded-lg bg-[#0E1525] border border-white/10 space-y-2.5 text-xs">
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-400 font-mono">
-                        长度: {genLength} 位字符
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => generatePassword()}
-                        className="op-btn-secondary text-[11px] py-1 px-2.5"
-                      >
-                        <RefreshCw className="w-3 h-3 text-[#00D4FF]" />
-                        <span>重新生成</span>
-                      </button>
-                    </div>
-
-                    <input
-                      type="range"
-                      min={12}
-                      max={36}
-                      value={genLength}
-                      onChange={(e) => {
-                        const len = Number(e.target.value);
-                        setGenLength(len);
-                        generatePassword(len);
-                      }}
-                      className="w-full accent-[#0572EC] cursor-pointer"
-                    />
-
-                    <div className="flex items-center justify-between text-[11px] text-slate-300 pt-1">
-                      <label className="flex items-center gap-1.5 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={includeSymbols}
-                          onChange={(e) => {
-                            setIncludeSymbols(e.target.checked);
-                            generatePassword(genLength, e.target.checked);
-                          }}
-                        />
-                        <span>包含特殊符号 (!@#$...)</span>
-                      </label>
-                      <span className="text-emerald-400 font-mono">
-                        军规强度
-                      </span>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="p-3">
-                <label className="block text-[10px] font-mono text-slate-400 mb-1">
-                  服务网址 (URL)
-                </label>
-                <input
-                  type="text"
-                  value={url}
-                  onChange={(e) => setUrl(e.target.value)}
-                  placeholder="https://example.com"
-                  className="op-input font-mono text-xs"
-                />
               </div>
             </div>
           </div>
 
-          {/* 继承人遗嘱与嘱托备忘录 */}
-          <div className="space-y-1.5">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-amber-400 block px-1">
-              继承人离世后指示 (HERITAGE WILL)
-            </span>
-            <div className="op-field-group p-3">
-              <textarea
-                rows={3}
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="详细说明此资产在双U盘解锁后的操作指示，例如：2FA备用恢复码位置、银行保管箱钥匙所在等..."
-                className="op-input resize-none text-xs leading-relaxed"
+          {/* 卡片 2: 核心凭证 (Credentials) */}
+          <div className="form-card">
+            <div className="form-card-title">
+              <span>核心凭证 (Credentials)</span>
+            </div>
+
+            {/* 用户名 / 账号 */}
+            <div className="framed-input-container">
+              <label className="framed-label">用户名 / 主识别账号</label>
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="用户名、邮箱、卡号或主要账户标识"
+                className="framed-input"
+              />
+            </div>
+
+            {/* 密码 / 核心加密口令 */}
+            <div className="framed-input-container">
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <label className="framed-label">密码 / 核心加密口令</label>
+                <button
+                  type="button"
+                  onClick={() => setShowGenerator(!showGenerator)}
+                  className="btn-framed-cyan"
+                >
+                  <Sparkles style={{ width: 12, height: 12 }} />
+                  <span>生成高强度密码</span>
+                </button>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="输入或生成高安全密钥口令"
+                  className="framed-input font-mono"
+                  style={{ flex: 1 }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="btn-framed-icon"
+                  title={showPassword ? '隐藏明文' : '显示明文'}
+                >
+                  {showPassword ? <EyeOff style={{ width: 15, height: 15 }} /> : <Eye style={{ width: 15, height: 15 }} />}
+                </button>
+              </div>
+
+              {/* 展开的密码生成器 (带框美化) */}
+              {showGenerator && (
+                <div
+                  style={{
+                    marginTop: 8,
+                    padding: 14,
+                    borderRadius: 10,
+                    background: 'rgba(12, 16, 46, 0.95)',
+                    border: '1px solid rgba(0, 212, 255, 0.3)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 10,
+                    boxShadow: '0 4px 14px rgba(0,0,0,0.4)',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12 }}>
+                    <span style={{ color: '#D3E0FA', fontWeight: 600 }}>密码长度: {genLength} 位</span>
+                    <button
+                      type="button"
+                      onClick={() => generatePassword()}
+                      className="btn-framed-cyan"
+                    >
+                      <RefreshCw style={{ width: 12, height: 12 }} />
+                      <span>重新生成</span>
+                    </button>
+                  </div>
+
+                  <input
+                    type="range"
+                    min="12"
+                    max="48"
+                    value={genLength}
+                    onChange={(e) => {
+                      const len = parseInt(e.target.value);
+                      setGenLength(len);
+                      generatePassword(len);
+                    }}
+                    style={{ accentColor: '#00D4FF', width: '100%', cursor: 'pointer' }}
+                  />
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#A4B8E4' }}>
+                    <input
+                      type="checkbox"
+                      id="gen-symbols"
+                      checked={includeSymbols}
+                      onChange={(e) => {
+                        setIncludeSymbols(e.target.checked);
+                        generatePassword(genLength, e.target.checked);
+                      }}
+                      style={{ accentColor: '#0572EC', cursor: 'pointer' }}
+                    />
+                    <label htmlFor="gen-symbols" style={{ cursor: 'pointer' }}>
+                      包含特殊符号 (!@#$%^&*)
+                    </label>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* 关联网址 */}
+            <div className="framed-input-container">
+              <label className="framed-label">关联网址 / 节点服务器地址 (可选)</label>
+              <input
+                type="text"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                placeholder="https://example.com 或 192.168.1.1"
+                className="framed-input font-mono"
               />
             </div>
           </div>
 
-          {/* 自定义敏感字段 */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between px-1">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-                自定义附加字段
-              </span>
+          {/* 卡片 3: 属性与详细数据 (Attributes) */}
+          <div className="form-card">
+            <div className="form-card-title">
+              <span>属性与详细数据 ({customFields.length})</span>
               <button
                 type="button"
                 onClick={handleAddField}
-                className="text-xs text-[#0572EC] hover:text-[#00D4FF] flex items-center gap-1 font-medium"
+                className="btn-framed-blue"
               >
-                <Plus className="w-3.5 h-3.5" />
-                <span>添加字段</span>
+                <Plus style={{ width: 12, height: 12 }} />
+                <span>添加自定义字段</span>
               </button>
             </div>
 
-            {customFields.map((field) => (
-              <div key={field.id} className="flex items-center gap-2">
-                <input
-                  type="text"
-                  value={field.name}
-                  onChange={(e) =>
-                    handleFieldChange(field.id, 'name', e.target.value)
-                  }
-                  placeholder="字段名称"
-                  className="op-input flex-1 text-xs"
-                />
-                <input
-                  type="text"
-                  value={field.value}
-                  onChange={(e) =>
-                    handleFieldChange(field.id, 'value', e.target.value)
-                  }
-                  placeholder="字段内容"
-                  className="op-input flex-1 font-mono text-xs"
-                />
-                <label className="flex items-center gap-1 text-[10px] text-slate-400 whitespace-nowrap cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={field.isSecret}
-                    onChange={(e) =>
-                      handleFieldChange(field.id, 'isSecret', e.target.checked)
-                    }
-                  />
-                  <span>隐藏</span>
-                </label>
-                <button
-                  type="button"
-                  onClick={() => handleRemoveField(field.id)}
-                  className="p-1.5 text-red-400 hover:text-red-300"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+            {customFields.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {customFields.map((field) => (
+                  <div
+                    key={field.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      padding: '8px 10px',
+                      background: 'rgba(12, 16, 44, 0.65)',
+                      border: '1px solid rgba(255, 255, 255, 0.08)',
+                      borderRadius: 9,
+                    }}
+                  >
+                    <input
+                      type="text"
+                      value={field.name}
+                      onChange={(e) => handleFieldChange(field.id, 'name', e.target.value)}
+                      placeholder="字段名称"
+                      className="framed-input"
+                      style={{ width: '35%', height: 34, fontSize: 12 }}
+                    />
+
+                    <input
+                      type={field.isSecret ? 'password' : 'text'}
+                      value={field.value}
+                      onChange={(e) => handleFieldChange(field.id, 'value', e.target.value)}
+                      placeholder="值 / 数据内容"
+                      className="framed-input font-mono"
+                      style={{ flex: 1, height: 34, fontSize: 12 }}
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() => handleFieldChange(field.id, 'isSecret', !field.isSecret)}
+                      className="btn-framed-icon"
+                      style={{ width: 34, height: 34 }}
+                      title={field.isSecret ? '设为明文' : '设为隐藏密文'}
+                    >
+                      {field.isSecret ? <EyeOff style={{ width: 14, height: 14 }} /> : <Eye style={{ width: 14, height: 14 }} />}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveField(field.id)}
+                      className="btn-framed-icon danger"
+                      style={{ width: 34, height: 34 }}
+                      title="删除此字段"
+                    >
+                      <Trash2 style={{ width: 14, height: 14 }} />
+                    </button>
+                  </div>
+                ))}
               </div>
-            ))}
+            ) : (
+              <div
+                style={{
+                  padding: 16,
+                  borderRadius: 10,
+                  border: '1px dashed rgba(255, 255, 255, 0.12)',
+                  textAlign: 'center',
+                  fontSize: 12,
+                  color: '#7E92C4',
+                }}
+              >
+                暂无自定义属性，可点击右上角添加
+              </div>
+            )}
           </div>
 
-          {/* 底部操作条 */}
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-white/5">
+          {/* 卡片 4: 常规安全备注 (General Notes) */}
+          <div className="form-card">
+            <div className="form-card-title">
+              <span>常规安全备注 (General Notes)</span>
+            </div>
+            <textarea
+              rows={2}
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="记录此资产的背景、口令提示或日常安全备忘..."
+              className="framed-textarea"
+            />
+          </div>
+
+          {/* 卡片 5: 副卡接管向导指示 (Takeover Guide) */}
+          <div
+            className="form-card"
+            style={{
+              borderColor: 'rgba(0, 212, 255, 0.35)',
+              background: 'linear-gradient(180deg, rgba(14, 25, 65, 0.8) 0%, rgba(18, 18, 55, 0.8) 100%)',
+            }}
+          >
+            <div className="form-card-title">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#00D4FF' }}>
+                <Compass style={{ width: 16, height: 16 }} />
+                <span>副卡接管向导指示 (Asset Takeover Guide)</span>
+              </div>
+              <span
+                style={{
+                  fontSize: 10,
+                  fontFamily: 'JetBrains Mono',
+                  padding: '2px 8px',
+                  borderRadius: 6,
+                  background: 'rgba(0, 212, 255, 0.15)',
+                  color: '#00D4FF',
+                  border: '1px solid rgba(0, 212, 255, 0.3)',
+                  textTransform: 'none',
+                }}
+              >
+                继承人专用
+              </span>
+            </div>
+            <p style={{ fontSize: 11.5, color: '#A4B8E4', lineHeight: 1.5 }}>
+              当继承人在副介质（副卡/副U盘）上解锁此资产时，该指引将以最高优先级展示于「接管向导」中。
+            </p>
+            <textarea
+              rows={3}
+              value={inheritanceInstructions}
+              onChange={(e) => setInheritanceInstructions(e.target.value)}
+              placeholder="例：接管步骤1: 登录云控制台重置绑定手机；步骤2: 进入服务器终端轮换SSH私钥；步骤3: 检查自动续费扣款银行卡..."
+              className="framed-textarea font-mono"
+              style={{ fontSize: 12 }}
+            />
+          </div>
+        </form>
+
+        {/* 底部独立按钮栏 (加框美化) */}
+        <div className="modal-window-footer">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#8EA4D4' }}>
+            <ShieldCheck style={{ width: 16, height: 16, color: '#34D399' }} />
+            <span>军规加密：保存后自动以 AES-256-GCM 封装写入</span>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <button
               type="button"
               onClick={onClose}
-              className="op-btn-secondary text-xs"
+              className="btn-action-cancel"
             >
               取消
             </button>
-            <button type="submit" className="op-btn-primary text-xs px-5">
-              保存到遗产库
+            <button
+              type="button"
+              onClick={handleSubmit}
+              className="btn-action-submit"
+            >
+              {initialItem ? '保存修改' : '创建项目'}
             </button>
           </div>
-        </form>
+        </div>
       </div>
     </div>
   );
