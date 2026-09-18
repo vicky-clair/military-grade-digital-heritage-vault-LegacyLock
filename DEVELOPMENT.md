@@ -223,6 +223,8 @@ xr-LegacyLock/
 │   ├── types/               # 全局 TypeScript 接口模型与介质规范
 │   ├── App.tsx              # 应用顶层状态编排、空闲锁屏监听与密文解密恢复
 │   └── index.css            # 完整设计系统、中文字体栈与组件样式
+├── USER_MANUAL.md           # 所有者日常管理与安全配置手册
+├── HEIR_MANUAL.md           # 法定继承人身后接管与解密指南
 ├── DEVELOPMENT.md           # 本开发技术手册与军规安全审计报告
 ├── README.md                # 项目开源主文档
 ├── package.json

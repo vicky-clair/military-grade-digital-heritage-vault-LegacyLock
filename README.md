@@ -15,7 +15,7 @@
 
 *两个硬件介质（U盘 / 移动硬盘）同时接入设备方可解密，让数字遗产离世后永不丢失，生前绝对安全。*
 
-[📖 完整开发手册与审计报告 (DEVELOPMENT.md)](./DEVELOPMENT.md) · [❓ 继承流程与敏感安全 FAQ](./DEVELOPMENT.md#九-数据保存继承流程与敏感安全威胁深度问答-inheritance-flow--security-faq) · [🚀 快速开始](#-快速上手运行) · [🔐 密码学规范](#-军规密码学与安全架构) · [🛡️ 安全审计加固](#-军规级安全审计与加固-audit--hardening)
+[📖 完整开发手册 (DEVELOPMENT.md)](./DEVELOPMENT.md) · [👤 所有者使用手册 (USER_MANUAL.md)](./USER_MANUAL.md) · [🗝️ 继承人接管手册 (HEIR_MANUAL.md)](./HEIR_MANUAL.md) · [❓ 敏感安全 FAQ](./DEVELOPMENT.md#九-数据保存继承流程与敏感安全威胁深度问答-inheritance-flow--security-faq) · [🚀 快速开始](#-快速上手运行)
 
 </div>
 
@@ -218,6 +218,8 @@ xr-LegacyLock/
 │   ├── types/               # 接口规范与 LVCF 2.0 数据结构
 │   ├── App.tsx              # 应用状态编排、空闲锁屏监听与密文解密恢复
 │   └── index.css            # 现代军规设计系统、中文字体栈与样式
+├── USER_MANUAL.md           # 所有者日常管理与安全配置手册
+├── HEIR_MANUAL.md           # 法定继承人身后接管与解密指南
 ├── DEVELOPMENT.md           # 详细技术架构与军规安全审计报告
 ├── README.md                # 本文档
 └── 启动LegacyLock.bat       # Windows 桌面一键启动脚本
