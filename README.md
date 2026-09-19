@@ -8,6 +8,7 @@
 ![Encryption](https://img.shields.io/badge/Cipher-AES--256--GCM_+_PBKDF2_100k-8B5CF6?style=for-the-badge)
 ![Zero Cloud](https://img.shields.io/badge/Network-100%25_Offline_Air--Gapped-F59E0B?style=for-the-badge)
 ![Cross Platform](https://img.shields.io/badge/Platform-Windows_%7C_macOS_%7C_Linux-6366F1?style=for-the-badge)
+![Clean Exit](https://img.shields.io/badge/Process_Exit-Zero_Zombie_Guarantee-brightgreen?style=for-the-badge)
 
 <br/>
 
@@ -114,12 +115,23 @@ npm run electron
 
 # Windows one-click batch launcher:
 .\启动LegacyLock.bat
+
+# 5. Out-of-the-box Windows Binaries (Zero npm/Node prerequisite):
+# - Standalone Portable EXE: release/LegacyLock-v1.0.0-Windows-Portable.exe
+# - Unpacked Directory: release/win-unpacked/LegacyLock.exe
+# - NSIS Installer: release/LegacyLock Setup 1.0.0.exe
 ```
 
-#### Production Build
+#### Production Packaging
 ```bash
-# Type check and build distribution bundle
+# Build frontend web production bundle:
 npm run build
+
+# Package Windows installer & portable binaries:
+npm run dist:win
+
+# Package Linux tarball:
+npm run dist:linux
 ```
 
 ---

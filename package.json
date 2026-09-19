@@ -45,6 +45,12 @@
       "electron/**/*",
       "package.json"
     ],
+    "extraResources": [
+      {
+        "from": "crypt/target/release/vault-cli.exe",
+        "to": "bin/vault-cli.exe"
+      }
+    ],
     "win": {
       "target": [
         "nsis",

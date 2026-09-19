@@ -1,3 +1,17 @@
+/**
+ * ============================================================================
+ * LegacyLock 军规遗产密钥库 — 密库 6 项密码学与完整性自检弹窗 (HealthCheckModal)
+ * ============================================================================
+ * 
+ * 军规 6 项自检指标：
+ * 1. LVCF 2.0 容器头魔数验证 (Header Verification)
+ * 2. 所有者非对称数字签名验签 (Ed25519 Signature Verification)
+ * 3. 对象数据 SHA-256 哈希与 AEAD 认证 (Object Hash Verification)
+ * 4. 防回滚单调序列号验证 (Anti-Rollback Sequence Monotonicity)
+ * 5. 主/副物理双钥匙槽位映射有效性 (Key Slot Verification)
+ * 6. 30年离线救援自救单页存续性 (Offline Rescue Sheet Presence)
+ */
+
 import React from 'react';
 import {
   ShieldCheck,
@@ -9,11 +23,19 @@ import {
 } from 'lucide-react';
 import { VaultHealthReport } from '../types';
 
+/**
+ * 密库健康自检弹窗属性接口
+ */
 interface HealthCheckModalProps {
+  /** 弹窗是否可见 */
   isOpen: boolean;
+  /** 关闭弹窗回调 */
   onClose: () => void;
+  /** 密库健康自检评估报告数据 */
   report: VaultHealthReport | null;
+  /** 重新执行自检回调 */
   onRecheck: () => void;
+  /** 是否正在执行自检计算中 */
   isChecking: boolean;
 }
 

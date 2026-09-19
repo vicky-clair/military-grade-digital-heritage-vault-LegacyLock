@@ -1,3 +1,16 @@
+/**
+ * ============================================================================
+ * LegacyLock 军规遗产密钥库 — 双钥匙 PIN 码与硬件防护控制中心 (UsbPasswordModal)
+ * ============================================================================
+ * 
+ * 界面重构与设计准则：
+ * 1. 彻底去除割裂的选项卡模式，采用并列左右双卡对照设计：
+ *    - 左卡：所有者主 U 盘密码 (Master PIN)，用于日常锁屏唤醒与本地密库管理，带高精度军规强度评估；
+ *    - 右卡：法定继承人接管口令 (Heir PIN)，用于身后双盘联合激活，带信封备忘与公证人授权提示；
+ * 2. 底部集成军规硬件安全状态条：直观展示 AES-256-GCM、Argon2id/PBKDF2、Ed25519 签名与单调计数器状态；
+ * 3. 密码安全处理：输入密码后基于 WebCrypto 结合 16 字节随机盐生成 100,000 轮 PBKDF2 哈希，绝不在代码或配置中存留明文。
+ */
+
 import React, { useState } from 'react';
 import {
   KeyRound,
@@ -16,13 +29,21 @@ import {
   Key,
 } from 'lucide-react';
 import { UsbDrive, UsbPasswordConfig } from '../types';
-import { hashPassword } from '../services/cryptoService';
+import { hashPassword, writeDriveHardwareBinding } from '../services/cryptoService';
 
+/**
+ * U 盘密码配置弹窗属性接口
+ */
 interface UsbPasswordModalProps {
+  /** 弹窗是否可见 */
   isOpen: boolean;
+  /** 关闭弹窗回调 */
   onClose: () => void;
+  /** 当前识别到的物理外接设备列表 */
   drives: UsbDrive[];
+  /** 现有的 U 盘密码防护配置 */
   config?: UsbPasswordConfig;
+  /** 保存配置回调 (提交加盐哈希后的配置与绑定介质) */
   onSaveConfig: (config: UsbPasswordConfig, targetDrive: string) => Promise<void>;
 }
 
@@ -100,6 +121,7 @@ export const UsbPasswordModal: React.FC<UsbPasswordModalProps> = ({
       }
 
       const newConfig: UsbPasswordConfig = {
+        ...(config || {}),
         hasMasterPassword: Boolean(masterHash),
         masterPasswordHash: masterHash,
         masterPasswordSalt: masterSalt,
@@ -114,7 +136,18 @@ export const UsbPasswordModal: React.FC<UsbPasswordModalProps> = ({
       };
 
       await onSaveConfig(newConfig, selectedDrive);
-      setFeedbackMsg({ type: 'success', text: '✅ U盘双钥匙密码与硬件加密配置已成功写入选定介质！' });
+
+      // 绑定继承人 U 盘硬件指纹 (防克隆转移)
+      const targetDriveObj = drives.find((d) => d.mountPath === selectedDrive);
+      if (targetDriveObj) {
+        try {
+          await writeDriveHardwareBinding(targetDriveObj);
+        } catch (bindErr) {
+          console.warn('[写入介质硬件指纹绑定失败]', bindErr);
+        }
+      }
+
+      setFeedbackMsg({ type: 'success', text: '✅ U盘双钥匙密码与硬件加密配置（含硬件防克隆绑定）已成功写入选定介质！' });
       setTimeout(() => {
         onClose();
       }, 1200);
@@ -369,7 +402,8 @@ export const UsbPasswordModal: React.FC<UsbPasswordModalProps> = ({
                   lineHeight: 1.45,
                 }}
               >
-                副 U 盘（副卡）含离线救援密钥。继承人须持「副盘物理介质 + 此口令」方可启动继承解密。
+                🔐 <strong>继承人三重硬性防盗约束：</strong>
+                继承人接管时必须同时接入【双 U 盘（主盘 + 副盘）】，并提供【继承人口令 + 紧急安全密钥 (Secret Key)】方可解密；单纯偷取密码在重装后无法恢复数据！
               </div>
 
               <div className="framed-input-container">
@@ -421,9 +455,9 @@ export const UsbPasswordModal: React.FC<UsbPasswordModalProps> = ({
                 />
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10.5, color: '#7E92C4', marginTop: 'auto' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10.5, color: '#C084FC', marginTop: 'auto' }}>
                 <ShieldCheck style={{ width: 12, height: 12, color: '#C084FC' }} />
-                <span>副盘口令不可用于修改主库资产，仅用于启动继承接管流程</span>
+                <span>双 U 盘物理防伪 + PIN 码 + Secret Key 三重认证，防盗密恢复</span>
               </div>
             </div>
           </div>

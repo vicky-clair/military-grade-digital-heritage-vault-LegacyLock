@@ -1,3 +1,14 @@
+/**
+ * ============================================================================
+ * LegacyLock 军规遗产密钥库 — 介质无损迁移与升级向导弹窗 (MediaMigrationModal)
+ * ============================================================================
+ * 
+ * 硬件安全背景：
+ * 消费级闪存（NAND Flash）基于浮栅晶体管保存电荷，断电存放 5~10 年存在自然电荷衰减（Bit-Rot）。
+ * 本向导协助用户将遗产密库与主钥匙完整克隆迁移至新高速移动固态（USB SSD）或机械移动硬盘（HDD），
+ * 重新写入刷新物理存储单元，保障 30 年跨世代无损长存。
+ */
+
 import React, { useState } from 'react';
 import {
   HardDrive,
@@ -9,10 +20,17 @@ import {
 } from 'lucide-react';
 import { MediaType, UsbDrive } from '../types';
 
+/**
+ * 介质迁移向导弹窗属性接口
+ */
 interface MediaMigrationModalProps {
+  /** 弹窗是否可见 */
   isOpen: boolean;
+  /** 关闭弹窗回调 */
   onClose: () => void;
+  /** 探测到的可用物理驱动器列表 */
   drives: UsbDrive[];
+  /** 迁移成功后的回调 */
   onMigrateSuccess: (targetDrive: string) => void;
 }
 

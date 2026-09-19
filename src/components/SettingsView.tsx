@@ -1,3 +1,19 @@
+/**
+ * ============================================================================
+ * LegacyLock 军规遗产密钥库 — 系统设置与军规安全控制中心组件 (SettingsView)
+ * ============================================================================
+ * 
+ * 模块功能体系：
+ * 1. 外部硬件驱动器识别中心：实时监控外接 USB 闪存盘、USB 移动机械硬盘 (HDD) 与移动固态 (SSD)；
+ * 2. 密码学技术规格说明：声明 LVCF 2.0 容器规范、LLCS-1 密码套件与 100% 离线零遥测架构背书；
+ * 3. 核心灾难防范与重要安全警示：强调双 U 盘物理丢失不可恢复、双钥匙异地容灾与闪存寿命巡检；
+ * 4. 实用安全偏好控制：无操作自动锁屏间隔设置、剪贴板 30 秒自毁开关、密码默认掩码隐藏；
+ * 5. 纸质应急救援密封留档单 (Paper Key Sheet)：生成 A4 纸质凭证，支持一键打印密封封存；
+ * 6. 介质平滑升级迁移：无损克隆旧 U 盘至新硬件，刷新浮栅晶体管防电荷衰减；
+ * 7. 渐变主题配色切换：提供 5 款深色渐变方案，联动操作系统本地配置持久化；
+ * 8. 危险区域：全盘数据零覆写紧急擦除指令 (ERASE-ALL)。
+ */
+
 import React, { useState, useEffect } from 'react';
 import {
   Info,
@@ -23,24 +39,61 @@ import {
   X,
   FileCheck,
   Palette,
+  Crown,
+  Download,
+  Eye,
+  EyeOff,
+  Sparkles,
 } from 'lucide-react';
 import { THEMES, ThemeDefinition } from '../services/themes';
-import { UsbDrive } from '../types';
+import { UsbDrive, UsbPasswordConfig } from '../types';
+import { generateEmergencyKitContent } from '../services/cryptoService';
+import {
+  getSubscriptionState,
+  getTrialDaysRemaining,
+  isTrialActive,
+  SubscriptionState,
+} from '../services/subscriptionService';
 
+/**
+ * 系统设置视图属性接口
+ */
 interface SettingsViewProps {
+  /** 资产库当前收录总条数 */
   totalItems: number;
+  /** 探测到的外部设备数量 */
   drivesCount: number;
+  /** 探测到的外部驱动器详情列表 */
   drives?: UsbDrive[];
+  /** 重新扫描硬件驱动器回调 */
   onRescanDrives?: () => void;
+  /** 是否正在执行硬件扫描 */
   isScanningDrives?: boolean;
+  /** 当前视觉主题 */
   currentTheme?: ThemeDefinition;
+  /** 切换视觉主题回调 */
   onSelectTheme?: (themeId: string) => void;
+  /** 唤起密库健康体检弹窗回调 */
   onOpenHealthCheck?: () => void;
+  /** 唤起介质迁移升级向导回调 */
   onOpenMigration?: () => void;
+  /** 唤起 U 盘双钥匙密码配置弹窗回调 */
   onOpenUsbPassword?: () => void;
+  /** 唤起修改/设置锁屏密码弹窗回调 */
+  onOpenChangePassword?: () => void;
+  /** 介质密码配置模型 */
+  usbPasswordConfig?: UsbPasswordConfig;
+  /** 触发紧急覆写清空回调 */
   onEmergencyWipe?: () => void;
+  /** 触发重新载入官方示例数据回调 */
+  onReloadMockData?: () => void;
+  /** 唤起商业订阅/试用管理弹窗回调 */
+  onOpenSubscription?: () => void;
 }
 
+/**
+ * 字节格式化辅助函数 (B -> KB -> MB -> GB -> TB)
+ */
 function formatBytes(bytes?: number): string {
   if (!bytes || bytes <= 0) return '未知';
   if (bytes >= 1024 * 1024 * 1024 * 1024) {
@@ -63,9 +116,26 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   onOpenHealthCheck,
   onOpenMigration,
   onOpenUsbPassword,
+  onOpenChangePassword,
+  usbPasswordConfig,
   onEmergencyWipe,
+  onReloadMockData,
+  onOpenSubscription,
 }) => {
   const [expandedSection, setExpandedSection] = useState<string | null>('drives');
+
+  // 订阅与试用状态
+  const [subState, setSubState] = useState<SubscriptionState>(() => getSubscriptionState());
+  const trialDaysRemaining = getTrialDaysRemaining();
+  const trialActive = isTrialActive();
+
+  useEffect(() => {
+    const handleSubChange = () => {
+      setSubState(getSubscriptionState());
+    };
+    window.addEventListener('legacylock:subscription-changed', handleSubChange);
+    return () => window.removeEventListener('legacylock:subscription-changed', handleSubChange);
+  }, []);
 
   // 本地偏好设置状态
   const [autoLockMinutes, setAutoLockMinutes] = useState<number>(() => {
@@ -77,6 +147,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [defaultMaskPassword, setDefaultMaskPassword] = useState<boolean>(() => {
     return localStorage.getItem('legacylock_mask_pwd') !== 'false';
   });
+  const [closeAction, setCloseAction] = useState<'ask' | 'minimize_to_tray' | 'quit'>(() => {
+    return (localStorage.getItem('legacylock_close_action') as any) || 'ask';
+  });
+  const [lockOnTray, setLockOnTray] = useState<boolean>(() => {
+    return localStorage.getItem('legacylock_lock_on_tray') !== 'false';
+  });
 
   // 紧急销毁安全验证输入
   const [wipeConfirmText, setWipeConfirmText] = useState('');
@@ -85,6 +161,35 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   // 纸质应急备用单弹窗
   const [isEmergencySheetOpen, setIsEmergencySheetOpen] = useState(false);
   const [copiedSheet, setCopiedSheet] = useState(false);
+
+  // 军规级紧急安全密钥 (Secret Key) 弹窗与展示
+  const [isSecretKeyModalOpen, setIsSecretKeyModalOpen] = useState(false);
+  const [showSecretKeyInModal, setShowSecretKeyInModal] = useState(false);
+  const [copiedSecretKey, setCopiedSecretKey] = useState(false);
+
+  // 下载 A4 离线紧急救援卡 (Emergency Kit)
+  const handleDownloadEmergencyKit = () => {
+    if (!usbPasswordConfig?.secretKey) return;
+    const kitText = generateEmergencyKitContent({
+      secretKey: usbPasswordConfig.secretKey,
+      masterPasswordHint: usbPasswordConfig.masterPasswordHint,
+    });
+    const blob = new Blob([new TextEncoder().encode(kitText)], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `LegacyLock_Emergency_Kit_${new Date().toISOString().slice(0, 10)}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // 复制安全密钥
+  const handleCopySecretKey = () => {
+    if (!usbPasswordConfig?.secretKey) return;
+    navigator.clipboard.writeText(usbPasswordConfig.secretKey);
+    setCopiedSecretKey(true);
+    setTimeout(() => setCopiedSecretKey(false), 2000);
+  };
 
   useEffect(() => {
     localStorage.setItem('legacylock_autolock', String(autoLockMinutes));
@@ -97,6 +202,20 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   useEffect(() => {
     localStorage.setItem('legacylock_mask_pwd', String(defaultMaskPassword));
   }, [defaultMaskPassword]);
+
+  useEffect(() => {
+    localStorage.setItem('legacylock_close_action', closeAction);
+    if (typeof window !== 'undefined' && window.legacyLockAPI?.saveAppSettings) {
+      window.legacyLockAPI.saveAppSettings({ closeAction }).catch(() => {});
+    }
+  }, [closeAction]);
+
+  useEffect(() => {
+    localStorage.setItem('legacylock_lock_on_tray', String(lockOnTray));
+    if (typeof window !== 'undefined' && window.legacyLockAPI?.saveAppSettings) {
+      window.legacyLockAPI.saveAppSettings({ lockOnTray }).catch(() => {});
+    }
+  }, [lockOnTray]);
 
   const toggleSection = (section: string) => {
     setExpandedSection(expandedSection === section ? null : section);
@@ -140,8 +259,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     if (onEmergencyWipe) {
       onEmergencyWipe();
     } else {
+      localStorage.removeItem('legacylock_items_enc');
       localStorage.removeItem('legacylock_items');
       localStorage.removeItem('legacylock_plan');
+      localStorage.removeItem('legacylock_seeded');
       window.location.reload();
     }
     setIsWipeModalOpen(false);
@@ -166,6 +287,91 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           <span className="badge-pill cyan">离线冷存储</span>
           <span className="badge-pill green">AES-256-GCM</span>
           <span className="badge-pill purple">LVCF 2.0</span>
+        </div>
+      </div>
+
+      {/* ====== 订阅与 3 个月试用期权益管理卡片 ====== */}
+      <div
+        className="settings-card"
+        style={{
+          border: subState.isSubscribed
+            ? '1px solid rgba(245, 158, 11, 0.4)'
+            : trialActive
+            ? '1px solid rgba(16, 185, 129, 0.4)'
+            : '1px solid rgba(239, 68, 68, 0.4)',
+          background: 'linear-gradient(135deg, rgba(20, 24, 33, 0.85) 0%, rgba(15, 18, 26, 0.95) 100%)'
+        }}
+      >
+        <div className="settings-card-header" style={{ cursor: 'default' }}>
+          <div
+            className="settings-card-icon-wrapper"
+            style={{
+              background: subState.isSubscribed
+                ? 'rgba(245, 158, 11, 0.15)'
+                : trialActive
+                ? 'rgba(16, 185, 129, 0.15)'
+                : 'rgba(239, 68, 68, 0.15)'
+            }}
+          >
+            <Crown
+              style={{
+                width: 18,
+                height: 18,
+                color: subState.isSubscribed ? '#F59E0B' : trialActive ? '#10B981' : '#EF4444'
+              }}
+            />
+          </div>
+          <div className="settings-card-title-area">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <h3 className="settings-card-title">软件订阅与 3 个月试用权益</h3>
+              <span
+                className="settings-inline-tag"
+                style={{
+                  background: subState.isSubscribed
+                    ? 'rgba(245, 158, 11, 0.2)'
+                    : trialActive
+                    ? 'rgba(16, 185, 129, 0.2)'
+                    : 'rgba(239, 68, 68, 0.2)',
+                  color: subState.isSubscribed ? '#FBBF24' : trialActive ? '#34D399' : '#F87171'
+                }}
+              >
+                {subState.isSubscribed
+                  ? `👑 尊享会员 (${subState.tier === 'yearly' ? '年度订阅' : subState.tier === 'quarterly' ? '季度订阅' : '月度订阅'})`
+                  : trialActive
+                  ? `🎁 免费试用中 (剩余 ${trialDaysRemaining} 天)`
+                  : '⚠️ 试用已到期 (只读保护模式)'}
+              </span>
+            </div>
+            <p className="settings-card-desc">
+              {subState.isSubscribed
+                ? `您的订阅有效期至 ${subState.subscriptionExpiresAt ? new Date(subState.subscriptionExpiresAt).toLocaleDateString('zh-CN') : '长期有效'}，享全功能无限次读写、安全密库更新与专家支持。`
+                : trialActive
+                ? `首次使用提供 90 天 (3个月) 免费全功能试用。试用期结束后历史数据永久可查看与解密导出，但无法添加或修改数据。`
+                : `免费试用期已结束，密库已自动开启【只读保护模式】。您录入的历史数据安全无虞，如需新增或编辑资产，请开通订阅。`}
+            </p>
+          </div>
+          {onOpenSubscription && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenSubscription();
+              }}
+              className="btn btn-primary"
+              style={{
+                padding: '7px 16px',
+                fontSize: 13,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                flexShrink: 0,
+                background: subState.isSubscribed ? 'linear-gradient(135deg, #F59E0B, #D97706)' : undefined,
+                color: '#fff'
+              }}
+            >
+              <Crown style={{ width: 14, height: 14 }} />
+              {subState.isSubscribed ? '管理订阅' : '升级尊享订阅'}
+            </button>
+          )}
         </div>
       </div>
 
@@ -548,6 +754,94 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   <span>启动介质迁移</span>
                 </button>
               </div>
+
+              {/* 锁屏主密码管理 */}
+              <div className="settings-control-box">
+                <div className="control-box-header">
+                  <Lock style={{ width: 18, height: 18, color: '#A855F7' }} />
+                  <div>
+                    <div className="control-box-title">防暂离锁屏主密码</div>
+                    <div className="control-box-desc">
+                      {usbPasswordConfig?.hasMasterPassword && usbPasswordConfig?.masterPasswordHash
+                        ? '已设置 · PBKDF2 100,000 轮加盐保护'
+                        : '未设置 · 离开电脑锁屏时需认证口令'}
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={onOpenChangePassword}
+                  className="btn-feature-action purple"
+                  title="修改或设置防暂离锁屏主密码"
+                >
+                  <Key style={{ width: 14, height: 14 }} />
+                  <span>{usbPasswordConfig?.hasMasterPassword ? '修改锁屏密码' : '设置锁屏密码'}</span>
+                </button>
+              </div>
+
+              {/* 军规级紧急安全密钥 (Secret Key) */}
+              <div
+                className="settings-control-box"
+                style={{
+                  borderColor: usbPasswordConfig?.secretKey ? 'rgba(0, 212, 255, 0.35)' : 'rgba(255, 255, 255, 0.1)',
+                  background: usbPasswordConfig?.secretKey ? 'rgba(0, 212, 255, 0.04)' : undefined,
+                }}
+              >
+                <div className="control-box-header">
+                  <Key style={{ width: 18, height: 18, color: '#00D4FF' }} />
+                  <div>
+                    <div className="control-box-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span>紧急安全密钥 (Secret Key)</span>
+                      <span
+                        style={{
+                          fontSize: 10,
+                          padding: '1px 5px',
+                          borderRadius: 4,
+                          background: usbPasswordConfig?.secretKey ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+                          color: usbPasswordConfig?.secretKey ? '#34D399' : '#F87171',
+                          fontWeight: 600,
+                        }}
+                      >
+                        {usbPasswordConfig?.secretKey ? '已绑定' : '未生成'}
+                      </span>
+                    </div>
+                    <div className="control-box-desc">
+                      {usbPasswordConfig?.secretKey
+                        ? '128 位真随机熵 · 重装恢复与继承双因子必须凭证'
+                        : '重装/异机恢复必须凭证，防范密码泄露被盗'}
+                    </div>
+                  </div>
+                </div>
+                {usbPasswordConfig?.secretKey ? (
+                  <div style={{ display: 'flex', gap: 8, width: '100%' }}>
+                    <button
+                      onClick={() => setIsSecretKeyModalOpen(true)}
+                      className="btn-feature-action cyan"
+                      style={{ flex: 1 }}
+                      title="查看与导出军规级安全密钥与救援卡"
+                    >
+                      <Eye style={{ width: 14, height: 14 }} />
+                      <span>查看/备份密钥</span>
+                    </button>
+                    <button
+                      onClick={handleDownloadEmergencyKit}
+                      className="btn-feature-action"
+                      style={{ width: 38, padding: 0, justifyContent: 'center' }}
+                      title="快速下载救援卡 (Emergency Kit)"
+                    >
+                      <Download style={{ width: 14, height: 14 }} />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={onOpenChangePassword}
+                    className="btn-feature-action cyan"
+                    title="设置锁屏主密码以自动生成安全密钥"
+                  >
+                    <Sparkles style={{ width: 14, height: 14 }} />
+                    <span>初始化安全密钥</span>
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* 偏好开关列表 */}
@@ -571,6 +865,54 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   <option value={60}>60 分钟</option>
                   <option value={0}>从不自动锁定</option>
                 </select>
+              </div>
+
+              {/* 关闭主窗口时的行为 */}
+              <div className="settings-toggle-row">
+                <div>
+                  <div className="toggle-label">关闭主窗口时的行为</div>
+                  <div className="toggle-sub">选择点击右上角关闭按钮 (X) 时的系统响应动作</div>
+                </div>
+                <select
+                  value={closeAction}
+                  onChange={(e) => setCloseAction(e.target.value as any)}
+                  className="settings-select-input"
+                >
+                  <option value="ask">每次询问 (默认)</option>
+                  <option value="minimize_to_tray">最小化到系统托盘 (推荐)</option>
+                  <option value="quit">直接退出应用</option>
+                </select>
+              </div>
+
+              {/* 最小化在托盘时自动锁定 (可修改不自动锁定) */}
+              <div className="settings-toggle-row">
+                <div>
+                  <div className="toggle-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span>最小化在托盘时自动锁定</span>
+                    <span
+                      style={{
+                        fontSize: 10.5,
+                        padding: '1px 6px',
+                        borderRadius: 4,
+                        background: lockOnTray ? 'rgba(0, 212, 255, 0.15)' : 'rgba(255, 255, 255, 0.08)',
+                        color: lockOnTray ? '#00D4FF' : '#7E92C4',
+                        fontWeight: 600,
+                      }}
+                    >
+                      {lockOnTray ? '已开启' : '不自动锁定'}
+                    </span>
+                  </div>
+                  <div className="toggle-sub">
+                    应用最小化或隐藏到系统托盘时自动锁定密库，再次打开时须验证密码，离开电脑更安全
+                  </div>
+                </div>
+                <button
+                  onClick={() => setLockOnTray(!lockOnTray)}
+                  className={`settings-switch ${lockOnTray ? 'active' : ''}`}
+                  title={lockOnTray ? '点击关闭自动锁定 (修改为不自动锁定)' : '点击开启最小化自动锁定'}
+                >
+                  <div className="switch-knob" />
+                </button>
               </div>
 
               {/* 剪贴板自动清空 */}
@@ -717,6 +1059,50 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 <div className="stat-label">密库协议规范</div>
               </div>
             </div>
+
+            {/* 重新载入官方演示示例入口 */}
+            {onReloadMockData && (
+              <div
+                style={{
+                  marginTop: 16,
+                  padding: '14px 16px',
+                  borderRadius: 10,
+                  background: 'rgba(255, 255, 255, 0.03)',
+                  border: '1px solid rgba(255, 255, 255, 0.08)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 16,
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#FFFFFF', marginBottom: 2 }}>
+                    重新导入开箱演示示例资产
+                  </div>
+                  <div style={{ fontSize: 11.5, color: '#8EA4D4' }}>
+                    若您此前已删除官方示例，但在体验测试中希望再次参考示例资产的字段配置，可在此按需手动重新导入。已录入的真实资产不受影响。
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={onReloadMockData}
+                  className="btn-secondary"
+                  style={{
+                    padding: '8px 16px',
+                    fontSize: 12,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    whiteSpace: 'nowrap',
+                    cursor: 'pointer',
+                  }}
+                  title="点击手动重新导入官方示例资产"
+                >
+                  <RotateCw style={{ width: 13, height: 13 }} />
+                  <span>载入示例</span>
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -898,6 +1284,144 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 className="btn-danger-confirm"
               >
                 确认立即销毁
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ====== 军规级紧急安全密钥详情弹窗 ====== */}
+      {isSecretKeyModalOpen && usbPasswordConfig?.secretKey && (
+        <div className="modal-backdrop" onClick={() => setIsSecretKeyModalOpen(false)}>
+          <div
+            className="modal-box"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: 560, background: '#0F172A', border: '1px solid rgba(0, 212, 255, 0.3)' }}
+          >
+            <div className="modal-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <Key style={{ width: 20, height: 20, color: '#00D4FF' }} />
+                <h3 className="modal-title">军规级紧急安全密钥 (Secret Key)</h3>
+              </div>
+              <button className="modal-close-btn" onClick={() => setIsSecretKeyModalOpen(false)}>
+                <X style={{ width: 16, height: 16 }} />
+              </button>
+            </div>
+
+            <div style={{ padding: '18px 22px', fontSize: 13, color: '#E2E8F0', lineHeight: 1.6 }}>
+              {/* 安全提示 */}
+              <div
+                style={{
+                  padding: '12px 14px',
+                  borderRadius: 8,
+                  background: 'rgba(0, 212, 255, 0.08)',
+                  border: '1px solid rgba(0, 212, 255, 0.25)',
+                  color: '#BAE6FD',
+                  fontSize: 12,
+                  marginBottom: 16,
+                  lineHeight: 1.5,
+                }}
+              >
+                🛡️ <strong>军规级双重身份认证因子：</strong>
+                本安全密钥由密码学真随机数生成（128 位熵）。在任何设备上重装系统或导入数据时，【必须同时输入密码与此安全密钥】方可解密恢复。继承人单凭偷取密码绝对无法盗取恢复您的数据！
+              </div>
+
+              {/* 密钥展示区 */}
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#94A3B8' }}>
+                    您的唯一安全密钥 (Secret Key)
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setShowSecretKeyInModal(!showSecretKeyInModal)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#38BDF8',
+                      fontSize: 11,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 4,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {showSecretKeyInModal ? <EyeOff style={{ width: 13, height: 13 }} /> : <Eye style={{ width: 13, height: 13 }} />}
+                    <span>{showSecretKeyInModal ? '掩码隐藏' : '显示明文'}</span>
+                  </button>
+                </div>
+
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    padding: '10px 14px',
+                    borderRadius: 8,
+                    background: 'rgba(0, 0, 0, 0.4)',
+                    border: '1px solid rgba(0, 212, 255, 0.2)',
+                  }}
+                >
+                  <span
+                    style={{
+                      flex: 1,
+                      fontFamily: 'monospace',
+                      fontSize: 14,
+                      fontWeight: 700,
+                      color: '#38E1FF',
+                      letterSpacing: '0.06em',
+                      wordBreak: 'break-all',
+                    }}
+                  >
+                    {showSecretKeyInModal
+                      ? usbPasswordConfig.secretKey
+                      : usbPasswordConfig.secretKey.replace(/[^-]/g, '•')}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleCopySecretKey}
+                    className="btn-mini-copy"
+                    style={{ padding: '6px 10px', height: 'auto' }}
+                    title="复制安全密钥"
+                  >
+                    {copiedSecretKey ? <Check style={{ width: 14, height: 14, color: '#10B981' }} /> : <Copy style={{ width: 14, height: 14 }} />}
+                    <span style={{ fontSize: 11 }}>{copiedSecretKey ? '已复制' : '复制'}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* 解密规则提示 */}
+              <div
+                style={{
+                  padding: '12px 14px',
+                  borderRadius: 8,
+                  background: 'rgba(245, 158, 11, 0.08)',
+                  border: '1px solid rgba(245, 158, 11, 0.25)',
+                  fontSize: 12,
+                  color: '#FDE68A',
+                  lineHeight: 1.5,
+                }}
+              >
+                <strong>⚠️ 继承者解锁与恢复必须规则：</strong>
+                <ol style={{ margin: '6px 0 0 0', paddingLeft: 18, fontSize: 11, color: '#FCD34D' }}>
+                  <li>继承人取得副 U 盘与主 U 盘（物理双 U 盘缺一不可）；</li>
+                  <li>必须提供继承人 PIN 码 + 上方这串【紧急安全密钥】；</li>
+                  <li>单纯知道所有者密码无法在重装应用后恢复密库。</li>
+                </ol>
+              </div>
+            </div>
+
+            <div className="modal-footer" style={{ justifyContent: 'space-between' }}>
+              <button
+                onClick={handleDownloadEmergencyKit}
+                className="btn-primary"
+                style={{ gap: 6, background: 'linear-gradient(135deg, #00D4FF 0%, #0572EC 100%)' }}
+              >
+                <Download style={{ width: 14, height: 14 }} />
+                <span>下载/打印紧急救援卡 (Emergency Kit)</span>
+              </button>
+              <button onClick={() => setIsSecretKeyModalOpen(false)} className="btn-secondary">
+                完成关闭
               </button>
             </div>
           </div>

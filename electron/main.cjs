@@ -1,22 +1,179 @@
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+/**
+ * ============================================================================
+ * LegacyLock 军规遗产密钥库 — Electron 原生主进程核心 (Main Process)
+ * ============================================================================
+ * 
+ * 架构核心职责：
+ * 1. 进程生命周期与五级退出治理：实现 cleanUpAndExit() 保证窗口关闭时 0 孤儿进程残留；
+ * 2. 跨平台物理硬件探查引擎：
+ *    - Windows：异步执行 PowerShell 批量获取 USB 磁盘/分区与驱动器映射，A~Z 盘符全量兜底；
+ *    - macOS：扫描 /Volumes，结合 statfs 过滤系统卷读取物理参数；
+ *    - Linux：解析 lsblk JSON 输出，智能检测 USB 挂载与可移动介质；
+ * 3. 嵌入式静态 Web 服务与路径穿越防御：
+ *    - 仅绑定 127.0.0.1 本机回环接口；
+ *    - 强制校验 normalizedRel.startsWith(absDistDir) 彻底杜绝 ../ 目录穿越攻击；
+ * 4. Rust 密码学 CLI 管道调用与临时明文生命周期：
+ *    - 密码学真随机命名临时文件并在 finally 块中执行 Buffer.alloc(sz, 0) 内存置零擦除；
+ * 5. 跨重启配置与主题持久化 (legacylock_settings.json)。
+ */
+
+const { app, BrowserWindow, ipcMain, dialog, Tray, Menu, nativeImage } = require('electron');
 const path = require('path');
 const fs = require('fs');
-const { spawn, execSync } = require('child_process');
+const { spawn, exec, execSync } = require('child_process');
+
+// ============================================================================
+// 单实例锁定机制：严禁程序多开 / 双开 (Single Instance Lock)
+// ============================================================================
+const gotTheLock = app.requestSingleInstanceLock();
+
+if (!gotTheLock) {
+  console.warn('[Electron Main] 侦测到已有运行中的 LegacyLock 实例，禁止多开，当前进程立即安全退出。');
+  app.quit();
+  process.exit(0);
+}
+
+app.on('second-instance', (_event, _commandLine, _workingDirectory) => {
+  console.log('[Electron Main] 拦截到重复启动请求，正在唤醒并聚焦已存在的运行实例窗口...');
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    if (!mainWindow.isVisible()) mainWindow.show();
+    mainWindow.focus();
+  }
+});
 
 let mainWindow = null;
+let tray = null;
+const activeChildProcesses = new Set();
+
+function createOrUpdateTray() {
+  if (tray && !tray.isDestroyed()) return;
+
+  const iconPath = path.join(__dirname, 'tray-icon.png');
+  let icon;
+  try {
+    if (fs.existsSync(iconPath)) {
+      icon = nativeImage.createFromPath(iconPath);
+    } else {
+      icon = nativeImage.createEmpty();
+    }
+  } catch (_) {
+    icon = nativeImage.createEmpty();
+  }
+
+  tray = new Tray(icon);
+  tray.setToolTip('LegacyLock 军规遗产密钥库 (安全驻留中)');
+
+  const contextMenu = Menu.buildFromTemplate([
+    {
+      label: '打开 LegacyLock 主界面',
+      click: () => {
+        if (mainWindow) {
+          if (mainWindow.isMinimized()) mainWindow.restore();
+          mainWindow.show();
+          mainWindow.focus();
+        }
+      },
+    },
+    {
+      label: '立即锁定密库',
+      click: () => {
+        if (mainWindow) {
+          if (mainWindow.isMinimized()) mainWindow.restore();
+          mainWindow.show();
+          mainWindow.focus();
+          mainWindow.webContents.send('app:lock-vault');
+        }
+      },
+    },
+    { type: 'separator' },
+    {
+      label: '彻底退出应用',
+      click: () => {
+        isQuitting = true;
+        cleanUpAndExit();
+      },
+    },
+  ]);
+
+  tray.setContextMenu(contextMenu);
+
+  tray.on('double-click', () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  });
+
+  tray.on('click', () => {
+    if (mainWindow) {
+      if (!mainWindow.isVisible() || mainWindow.isMinimized()) {
+        mainWindow.restore();
+        mainWindow.show();
+        mainWindow.focus();
+      } else {
+        mainWindow.focus();
+      }
+    }
+  });
+}
+
+function registerChildProcess(proc) {
+  if (!proc) return;
+  activeChildProcesses.add(proc);
+  const cleanup = () => activeChildProcesses.delete(proc);
+  proc.on('close', cleanup);
+  proc.on('exit', cleanup);
+  proc.on('error', cleanup);
+}
+
+function killAllChildProcesses() {
+  for (const proc of activeChildProcesses) {
+    try {
+      proc.kill();
+    } catch (_) {}
+  }
+  activeChildProcesses.clear();
+}
 
 function getVaultCliPath() {
-  const releasePath = path.join(__dirname, '..', 'crypt', 'target', 'release', 'vault-cli.exe');
-  const debugPath = path.join(__dirname, '..', 'crypt', 'target', 'debug', 'vault-cli.exe');
+  const binaryName = process.platform === 'win32' ? 'vault-cli.exe' : 'vault-cli';
+
+  // 1. 打包生产模式下 resourcesPath 目录 (extraResources 释放路径)
+  if (process.resourcesPath) {
+    const resBin = path.join(process.resourcesPath, 'bin', binaryName);
+    if (fs.existsSync(resBin)) return resBin;
+    const resDirect = path.join(process.resourcesPath, binaryName);
+    if (fs.existsSync(resDirect)) return resDirect;
+  }
+
+  // 2. 本地开发环境源码路径
+  const releasePath = path.join(__dirname, '..', 'crypt', 'target', 'release', binaryName);
+  const debugPath = path.join(__dirname, '..', 'crypt', 'target', 'debug', binaryName);
   if (fs.existsSync(releasePath)) return releasePath;
   if (fs.existsSync(debugPath)) return debugPath;
-  return 'vault-cli';
+
+  return binaryName;
 }
 
 function runVaultCli(args) {
   return new Promise((resolve, reject) => {
     const cliPath = getVaultCliPath();
-    const proc = spawn(cliPath, args, { cwd: path.join(__dirname, '..') });
+    if (path.isAbsolute(cliPath) && !fs.existsSync(cliPath)) {
+      return reject(new Error(`未找到密码学核心引擎: ${cliPath}`));
+    }
+
+    let safeCwd;
+    try {
+      safeCwd = app.getPath('userData');
+      if (!fs.existsSync(safeCwd)) fs.mkdirSync(safeCwd, { recursive: true });
+    } catch (_) {
+      safeCwd = process.cwd();
+    }
+
+    const proc = spawn(cliPath, args, { cwd: safeCwd });
+    registerChildProcess(proc);
     
     let stdout = '';
     let stderr = '';
@@ -50,7 +207,69 @@ function runVaultCli(args) {
 
 const http = require('http');
 
+let embeddedServer = null;
 let embeddedServerUrl = 'http://127.0.0.1:5173';
+const activeSockets = new Set();
+let isQuitting = false;
+let isExiting = false;
+
+function stopEmbeddedServer() {
+  if (embeddedServer) {
+    try {
+      if (typeof embeddedServer.closeAllConnections === 'function') {
+        embeddedServer.closeAllConnections();
+      }
+      for (const socket of activeSockets) {
+        try { socket.destroy(); } catch (_) {}
+      }
+      activeSockets.clear();
+      embeddedServer.close();
+    } catch (_) {}
+    embeddedServer = null;
+  }
+}
+
+function cleanUpAndExit() {
+  if (isExiting) return;
+  isExiting = true;
+  isQuitting = true;
+  console.log('[Electron Main] cleanUpAndExit initiated...');
+
+  // 1. 关闭嵌入式 HTTP 服务及现有客户端长连接
+  stopEmbeddedServer();
+
+  // 2. 终止所有活跃的子进程 (PowerShell / vault-cli)
+  killAllChildProcesses();
+
+  // 3. 销毁主窗口与系统托盘
+  if (tray && !tray.isDestroyed()) {
+    try {
+      tray.destroy();
+    } catch (_) {}
+    tray = null;
+  }
+
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    try {
+      mainWindow.destroy();
+    } catch (_) {}
+    mainWindow = null;
+  }
+
+  // 4. 正常通知 Electron 退出
+  try {
+    app.quit();
+  } catch (_) {}
+
+  // 5. 300ms 兜底强制销毁进程，确保彻底杀死 Chromium 辅助进程与避免后台残留
+  setTimeout(() => {
+    try {
+      app.exit(0);
+    } catch (_) {
+      process.exit(0);
+    }
+  }, 300).unref();
+}
 
 function startEmbeddedServer(port = 5173) {
   return new Promise((resolve) => {
@@ -108,6 +327,13 @@ function startEmbeddedServer(port = 5173) {
       }
     });
 
+    embeddedServer = server;
+
+    server.on('connection', (socket) => {
+      activeSockets.add(socket);
+      socket.on('close', () => activeSockets.delete(socket));
+    });
+
     server.on('error', () => {
       // 端口已被占用时（例如已运行 vite），直接复用
       resolve(`http://127.0.0.1:${port}`);
@@ -142,6 +368,22 @@ async function createWindow() {
   mainWindow.show();
   mainWindow.focus();
 
+  // 主窗口关闭时拦截并转入托盘询问流程
+  mainWindow.on('close', (e) => {
+    if (isQuitting) return;
+    e.preventDefault();
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('app:request-close');
+    }
+  });
+
+  mainWindow.on('closed', () => {
+    mainWindow = null;
+    if (isQuitting) {
+      cleanUpAndExit();
+    }
+  });
+
   mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
     console.error('[Electron Main] Failed to load URL:', validatedURL, 'Error:', errorCode, errorDescription);
   });
@@ -151,8 +393,8 @@ async function createWindow() {
   });
 
   const distPath = path.join(__dirname, '..', 'dist', 'index.html');
-  if (app.isPackaged && fs.existsSync(distPath)) {
-    console.log('[Electron Main] Loading packaged production file:', distPath);
+  if (fs.existsSync(distPath)) {
+    console.log('[Electron Main] Loading production file directly:', distPath);
     mainWindow.loadFile(distPath);
   } else {
     const url = await startEmbeddedServer();
@@ -161,140 +403,163 @@ async function createWindow() {
   }
 }
 
-// ====== 跨平台驱动器识别引擎 (Windows, macOS, Linux) ======
 function scanWindowsDrives() {
-  const drives = [];
-  const systemDrive = (process.env.SystemDrive || 'C:').toUpperCase();
-  const seenPaths = new Set();
+  return new Promise((resolve) => {
+    const drives = [];
+    const systemDrive = (process.env.SystemDrive || 'C:').toUpperCase();
+    const seenPaths = new Set();
 
-  try {
-    let usbDiskNumbers = new Set();
-    try {
-      const diskCmd = `Get-Disk | Where-Object { $_.BusType -eq 'USB' } | Select-Object -ExpandProperty Number | ConvertTo-Json`;
-      const diskOut = execSync(`powershell -NoProfile -Command "${diskCmd}"`, { encoding: 'utf8', timeout: 3500 });
-      const parsedDisks = JSON.parse(diskOut.trim());
-      const diskList = Array.isArray(parsedDisks) ? parsedDisks : (parsedDisks !== '' && parsedDisks !== null ? [parsedDisks] : []);
-      for (const n of diskList) usbDiskNumbers.add(Number(n));
-    } catch (_) {}
+    // 聚合单行 PowerShell 脚本，一次性批量提取 USB 磁盘、分区关联及逻辑驱动器
+    const psScript = `
+      $disks = @(Get-Disk | Where-Object { $_.BusType -eq 'USB' } | Select-Object -ExpandProperty Number);
+      $parts = @(Get-Partition | Where-Object DriveLetter | Select-Object DiskNumber, DriveLetter);
+      $drives = @(Get-CimInstance Win32_LogicalDisk | Select-Object DeviceID, VolumeName, VolumeSerialNumber, DriveType, Size, FreeSpace, FileSystem);
+      [PSCustomObject]@{ Disks = $disks; Parts = $parts; Drives = $drives } | ConvertTo-Json -Depth 3 -Compress
+    `.replace(/\r?\n\s*/g, ' ').trim();
 
-    const driveUsbMap = new Map();
-    try {
-      const partCmd = `Get-Partition | Where-Object DriveLetter | Select-Object DiskNumber, DriveLetter | ConvertTo-Json`;
-      const partOut = execSync(`powershell -NoProfile -Command "${partCmd}"`, { encoding: 'utf8', timeout: 3500 });
-      const parsedParts = JSON.parse(partOut.trim());
-      const partList = Array.isArray(parsedParts) ? parsedParts : [parsedParts];
-      for (const p of partList) {
-        if (p && p.DriveLetter) {
-          const letter = `${p.DriveLetter}:`.toUpperCase();
-          if (usbDiskNumbers.has(Number(p.DiskNumber))) {
-            driveUsbMap.set(letter, true);
+    let resolved = false;
+    const finish = () => {
+      if (resolved) return;
+      resolved = true;
+
+      // 兜底轮询 A~Z 盘符（跳过系统盘），确保 100% 检测到 D: 及其他所有外接盘符
+      const allLetters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+      for (const letter of allLetters) {
+        const devId = `${letter}:`;
+        if (seenPaths.has(devId)) continue;
+        const root = `${devId}\\`;
+        try {
+          if (fs.existsSync(root)) {
+            const isSystem = devId === systemDrive;
+            let hasUserKey = false;
+            let hasHeirKey = false;
+            let hasConfig = false;
+            try {
+              hasUserKey = fs.existsSync(path.join(root, 'user-key.bin'));
+              hasHeirKey = fs.existsSync(path.join(root, 'heir-key.bin'));
+              hasConfig = fs.existsSync(path.join(root, 'config.bin'));
+            } catch (_) {}
+
+            drives.push({
+              mountPath: root,
+              name: `${isSystem ? '系统本地磁盘' : '外部存储设备'} (${devId})`,
+              volumeLabel: '',
+              driveLetter: devId,
+              size: 0,
+              freeSpace: 0,
+              fileSystem: 'NTFS',
+              isRemovable: !isSystem,
+              isExternal: !isSystem,
+              isSystem,
+              mediaType: 'UsbHDD',
+              hasUserKey,
+              hasHeirKey,
+              hasConfig,
+            });
           }
+        } catch (_) {}
+      }
+
+      resolve(drives);
+    };
+
+    try {
+      const proc = exec(
+        `powershell -NoProfile -NonInteractive -Command "${psScript}"`,
+        { encoding: 'utf8', timeout: 4500 },
+        (err, stdout) => {
+          if (!err && stdout) {
+            try {
+              const data = JSON.parse(stdout.trim());
+              const rawDisks = Array.isArray(data.Disks) ? data.Disks : (data.Disks ? [data.Disks] : []);
+              const usbDiskNumbers = new Set(rawDisks.map(Number));
+
+              const driveUsbMap = new Map();
+              const partList = Array.isArray(data.Parts) ? data.Parts : (data.Parts ? [data.Parts] : []);
+              for (const p of partList) {
+                if (p && p.DriveLetter) {
+                  const letter = `${p.DriveLetter}:`.toUpperCase();
+                  if (usbDiskNumbers.has(Number(p.DiskNumber))) {
+                    driveUsbMap.set(letter, true);
+                  }
+                }
+              }
+
+              const driveList = Array.isArray(data.Drives) ? data.Drives : (data.Drives ? [data.Drives] : []);
+              for (const d of driveList) {
+                if (!d || !d.DeviceID) continue;
+                const letter = d.DeviceID.toUpperCase();
+                if (d.DriveType === 5) continue; // 忽略光驱
+
+                const isSystem = letter === systemDrive;
+                const root = `${letter}\\`;
+                const sizeBytes = Number(d.Size) || 0;
+                const freeBytes = Number(d.FreeSpace) || 0;
+                const label = d.VolumeName ? d.VolumeName.trim() : '';
+                const isUsbBus = driveUsbMap.get(letter) === true;
+                const isRemovable = d.DriveType === 2;
+                const isExternal = isUsbBus || isRemovable || (!isSystem && d.DriveType === 3);
+
+                let mediaType = 'UsbFlash';
+                if (sizeBytes > 256 * 1024 * 1024 * 1024) {
+                  mediaType = 'UsbHDD';
+                } else if (sizeBytes > 64 * 1024 * 1024 * 1024) {
+                  mediaType = 'UsbSSD';
+                }
+
+                let typeTag = 'U盘';
+                if (mediaType === 'UsbHDD') typeTag = '移动硬盘';
+                else if (mediaType === 'UsbSSD') typeTag = '移动SSD';
+
+                const displayName = label
+                  ? `${label} (${letter}) - ${typeTag}`
+                  : `${isSystem ? '本地系统盘' : '外部存储'} (${letter}) - ${typeTag}`;
+
+                let hasUserKey = false;
+                let hasHeirKey = false;
+                let hasConfig = false;
+                try {
+                  hasUserKey = fs.existsSync(path.join(root, 'user-key.bin'));
+                  hasHeirKey = fs.existsSync(path.join(root, 'heir-key.bin'));
+                  hasConfig = fs.existsSync(path.join(root, 'config.bin'));
+                } catch (_) {}
+
+                seenPaths.add(letter);
+                const volumeSerial = d.VolumeSerialNumber ? String(d.VolumeSerialNumber).trim() : '';
+                const deviceFingerprint = volumeSerial || `DEV_${letter}_${sizeBytes}`;
+
+                drives.push({
+                  mountPath: root,
+                  name: displayName,
+                  volumeLabel: label,
+                  driveLetter: letter,
+                  size: sizeBytes,
+                  freeSpace: freeBytes,
+                  fileSystem: d.FileSystem || 'NTFS',
+                  isRemovable,
+                  isExternal,
+                  isSystem,
+                  mediaType,
+                  volumeSerialNumber: volumeSerial,
+                  deviceFingerprint,
+                  hasUserKey,
+                  hasHeirKey,
+                  hasConfig,
+                });
+              }
+            } catch (parseErr) {
+              console.error('[Windows PowerShell Scan Parse Error]', parseErr.message);
+            }
+          }
+          finish();
         }
-      }
-    } catch (_) {}
+      );
 
-    const psCmd = `Get-CimInstance Win32_LogicalDisk | Select-Object DeviceID, VolumeName, DriveType, Size, FreeSpace, FileSystem | ConvertTo-Json`;
-    const out = execSync(`powershell -NoProfile -Command "${psCmd}"`, { encoding: 'utf8', timeout: 4000 });
-    const parsed = JSON.parse(out.trim());
-    const list = Array.isArray(parsed) ? parsed : [parsed];
-
-    for (const d of list) {
-      if (!d || !d.DeviceID) continue;
-      const letter = d.DeviceID.toUpperCase();
-      if (d.DriveType === 5) continue; // 忽略光驱
-
-      const isSystem = letter === systemDrive;
-      const root = `${letter}\\`;
-      const sizeBytes = Number(d.Size) || 0;
-      const freeBytes = Number(d.FreeSpace) || 0;
-      const label = d.VolumeName ? d.VolumeName.trim() : '';
-      const isUsbBus = driveUsbMap.get(letter) === true;
-      const isRemovable = d.DriveType === 2;
-      const isExternal = isUsbBus || isRemovable || (!isSystem && d.DriveType === 3);
-
-      let mediaType = 'UsbFlash';
-      if (sizeBytes > 256 * 1024 * 1024 * 1024) {
-        mediaType = 'UsbHDD';
-      } else if (sizeBytes > 64 * 1024 * 1024 * 1024) {
-        mediaType = 'UsbSSD';
-      }
-
-      let typeTag = 'U盘';
-      if (mediaType === 'UsbHDD') typeTag = '移动硬盘';
-      else if (mediaType === 'UsbSSD') typeTag = '移动SSD';
-
-      const displayName = label
-        ? `${label} (${letter}) - ${typeTag}`
-        : `${isSystem ? '本地系统盘' : '外部存储'} (${letter}) - ${typeTag}`;
-
-      let hasUserKey = false;
-      let hasHeirKey = false;
-      let hasConfig = false;
-      try {
-        hasUserKey = fs.existsSync(path.join(root, 'user-key.bin'));
-        hasHeirKey = fs.existsSync(path.join(root, 'heir-key.bin'));
-        hasConfig = fs.existsSync(path.join(root, 'config.bin'));
-      } catch (_) {}
-
-      seenPaths.add(letter);
-      drives.push({
-        mountPath: root,
-        name: displayName,
-        volumeLabel: label,
-        driveLetter: letter,
-        size: sizeBytes,
-        freeSpace: freeBytes,
-        fileSystem: d.FileSystem || 'NTFS',
-        isRemovable,
-        isExternal,
-        isSystem,
-        mediaType,
-        hasUserKey,
-        hasHeirKey,
-        hasConfig,
-      });
+      registerChildProcess(proc);
+    } catch (_) {
+      finish();
     }
-  } catch (err) {
-    console.error('[Windows PowerShell Scan Error, using fallback]', err.message);
-  }
-
-  // 兜底轮询 A~Z 盘符（跳过系统盘），确保 100% 检测到 D: 及其他所有外接盘符
-  const allLetters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
-  for (const letter of allLetters) {
-    const devId = `${letter}:`;
-    if (seenPaths.has(devId)) continue;
-    const root = `${devId}\\`;
-    if (fs.existsSync(root)) {
-      const isSystem = devId === systemDrive;
-      let hasUserKey = false;
-      let hasHeirKey = false;
-      let hasConfig = false;
-      try {
-        hasUserKey = fs.existsSync(path.join(root, 'user-key.bin'));
-        hasHeirKey = fs.existsSync(path.join(root, 'heir-key.bin'));
-        hasConfig = fs.existsSync(path.join(root, 'config.bin'));
-      } catch (_) {}
-
-      drives.push({
-        mountPath: root,
-        name: `${isSystem ? '系统本地磁盘' : '外部存储设备'} (${devId})`,
-        volumeLabel: '',
-        driveLetter: devId,
-        size: 0,
-        freeSpace: 0,
-        fileSystem: 'NTFS',
-        isRemovable: !isSystem,
-        isExternal: !isSystem,
-        isSystem,
-        mediaType: 'UsbHDD',
-        hasUserKey,
-        hasHeirKey,
-        hasConfig,
-      });
-    }
-  }
-
-  return drives;
+  });
 }
 
 function scanMacDrives() {
@@ -339,6 +604,7 @@ function scanMacDrives() {
           isExternal: true,
           isSystem: false,
           mediaType: isHdd ? 'UsbHDD' : 'UsbFlash',
+          deviceFingerprint: `MAC_${name}_${size}`,
           hasUserKey,
           hasHeirKey,
           hasConfig,
@@ -392,6 +658,8 @@ function scanLinuxDrives() {
               isExternal: true,
               isSystem: false,
               mediaType: isHdd ? 'UsbHDD' : 'UsbFlash',
+              volumeSerialNumber: dev.serial || dev.uuid || '',
+              deviceFingerprint: dev.uuid || dev.serial || `LNX_${dev.name}_${size}`,
               hasUserKey,
               hasHeirKey,
               hasConfig,
@@ -458,7 +726,7 @@ function registerIpcHandlers() {
     try {
       let drives = [];
       if (process.platform === 'win32') {
-        drives = scanWindowsDrives();
+        drives = await scanWindowsDrives();
       } else if (process.platform === 'darwin') {
         drives = scanMacDrives();
       } else {
@@ -562,12 +830,15 @@ function registerIpcHandlers() {
 
   // 4. 保存二进制文件
   ipcMain.handle('vault:save-binary-file', async (_, defaultName, dataBase64) => {
+    const sanitizedName = path.basename(defaultName || 'key.bin');
     const res = await dialog.showSaveDialog(mainWindow, {
-      defaultPath: defaultName,
-      filters: [{ name: 'Binary File (*.bin)', extensions: ['bin'] }],
+      defaultPath: sanitizedName,
+      filters: [{ name: 'Binary File (*.bin)', extensions: ['bin'] }, { name: 'All Files (*.*)', extensions: ['*'] }],
     });
     if (!res.canceled && res.filePath) {
       const buffer = Buffer.from(dataBase64, 'base64');
+      const dir = path.dirname(res.filePath);
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
       fs.writeFileSync(res.filePath, buffer);
       return { success: true, path: res.filePath };
     }
@@ -597,13 +868,16 @@ function registerIpcHandlers() {
 
   // 6. 加密资产库
   ipcMain.handle('vault:encrypt', async (_, options) => {
+    const { userKey, heirKey, config, inputData, outputPath } = options;
+    const randHex = require('crypto').randomBytes(16).toString('hex');
+    const tempInput = path.join(app.getPath('temp'), `vault-in-${randHex}.json`);
     try {
-      const { userKey, heirKey, config, inputData, outputPath } = options;
-      // 临时明文文件
-      const tempInput = path.join(app.getPath('temp'), `vault-in-${Date.now()}.json`);
       fs.writeFileSync(tempInput, JSON.stringify(inputData, null, 2), 'utf8');
 
       const out = outputPath || path.join(__dirname, '..', 'vault.locked');
+      const outDir = path.dirname(out);
+      if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
+
       const res = await runVaultCli([
         'encrypt',
         '--user-key', userKey,
@@ -613,7 +887,11 @@ function registerIpcHandlers() {
         '--output', out,
       ]);
 
-      // 军规级零填充覆写并安全销毁明文临时文件
+      return { success: true, data: res };
+    } catch (err) {
+      return { success: false, error: err.message };
+    } finally {
+      // 军规级零填充覆写并安全销毁明文临时文件，确保任何异常下明文都不留存磁盘
       try {
         if (fs.existsSync(tempInput)) {
           const sz = fs.statSync(tempInput).size;
@@ -621,9 +899,6 @@ function registerIpcHandlers() {
           fs.unlinkSync(tempInput);
         }
       } catch (_) {}
-      return { success: true, data: res };
-    } catch (err) {
-      return { success: false, error: err.message };
     }
   });
 
@@ -663,7 +938,9 @@ function registerIpcHandlers() {
 
   function getVaultContainerPath() {
     try {
-      const userPath = path.join(app.getPath('userData'), 'vault.locked');
+      const userDir = app.getPath('userData');
+      if (!fs.existsSync(userDir)) fs.mkdirSync(userDir, { recursive: true });
+      const userPath = path.join(userDir, 'vault.locked');
       if (fs.existsSync(userPath)) return userPath;
       const projectPath = path.join(__dirname, '..', 'vault.locked');
       if (fs.existsSync(projectPath)) return projectPath;
@@ -687,24 +964,148 @@ function registerIpcHandlers() {
     return { exists: false };
   });
 
-  // 10. 保存容器
+  // 10. 保存容器 (支持保存到本地系统目录或外部指定驱动器/手动指定路径)
   ipcMain.handle('vault:save-container', async (_, data) => {
-    const vaultPath = getVaultContainerPath();
     try {
+      if (data && data.encryptedPackage) {
+        const destFolder = data.targetPath || data.targetDrive;
+        if (destFolder) {
+          if (!fs.existsSync(destFolder)) fs.mkdirSync(destFolder, { recursive: true });
+          const filename = `LegacyLock_Vault_Backup_${Date.now()}.legacylock`;
+          const filePath = path.join(destFolder, filename);
+          fs.writeFileSync(filePath, data.encryptedPackage, 'utf8');
+          return { success: true, path: filePath };
+        }
+      }
+
+      const vaultPath = getVaultContainerPath();
+      const dir = path.dirname(vaultPath);
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
       fs.writeFileSync(vaultPath, JSON.stringify(data, null, 2), 'utf8');
       return { success: true, path: vaultPath };
     } catch (e) {
       // 降级保存到项目根目录
-      const fallbackPath = path.join(__dirname, '..', 'vault.locked');
-      fs.writeFileSync(fallbackPath, JSON.stringify(data, null, 2), 'utf8');
-      return { success: true, path: fallbackPath };
+      try {
+        const fallbackPath = path.join(__dirname, '..', 'vault.locked');
+        const fbDir = path.dirname(fallbackPath);
+        if (!fs.existsSync(fbDir)) fs.mkdirSync(fbDir, { recursive: true });
+        fs.writeFileSync(fallbackPath, JSON.stringify(data, null, 2), 'utf8');
+        return { success: true, path: fallbackPath };
+      } catch (err2) {
+        return { success: false, error: err2.message };
+      }
     }
+  });
+
+  // 10.1 写入 U 盘物理介质硬件防克隆绑定凭据
+  ipcMain.handle('vault:write-drive-binding', async (_, options) => {
+    try {
+      const { drivePath, fingerprint, signature } = options || {};
+      if (!drivePath || !fingerprint) {
+        return { success: false, error: '缺少驱动器路径或硬件指纹' };
+      }
+      const bindingFile = path.join(drivePath, '.legacylock-device.sig');
+      const payload = {
+        version: 1,
+        fingerprint,
+        signature: signature || '',
+        boundAt: Date.now(),
+        warning: 'LegacyLock 军规介质硬件防克隆绑定凭据：数据与原始物理介质强绑定，若强制复制到其它介质将无法解密。',
+      };
+      fs.writeFileSync(bindingFile, JSON.stringify(payload, null, 2), 'utf8');
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  });
+
+  // 10.2 校验 U 盘物理介质硬件防克隆绑定
+  ipcMain.handle('vault:verify-drive-binding', async (_, options) => {
+    try {
+      const { drivePath, currentFingerprint } = options || {};
+      if (!drivePath) {
+        return { success: false, error: '缺少驱动器路径' };
+      }
+      const bindingFile = path.join(drivePath, '.legacylock-device.sig');
+      if (!fs.existsSync(bindingFile)) {
+        // 未检测到绑定签名文件（可能为旧版本未绑定或手动导入）
+        return { success: true, isBound: false, matched: true };
+      }
+      const content = fs.readFileSync(bindingFile, 'utf8');
+      const parsed = JSON.parse(content);
+      if (parsed.fingerprint && currentFingerprint && parsed.fingerprint !== currentFingerprint) {
+        return {
+          success: true,
+          isBound: true,
+          matched: false,
+          error: `⚠️ 介质硬件绑定校验失败：检测到解锁数据已被强制转移至未授权的外部介质！\n原始绑定指纹: ${parsed.fingerprint}\n当前介质指纹: ${currentFingerprint}\n为防止克隆失窃，禁止跨介质使用。`,
+        };
+      }
+      return { success: true, isBound: true, matched: true };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  });
+
+  // 11. 窗口与系统托盘原生控制
+  ipcMain.handle('window:minimize', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.minimize();
+    }
+    return { success: true };
+  });
+
+  ipcMain.handle('window:maximize', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      if (mainWindow.isMaximized()) {
+        mainWindow.unmaximize();
+      } else {
+        mainWindow.maximize();
+      }
+    }
+    return { success: true };
+  });
+
+  ipcMain.handle('window:close', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.close();
+    }
+    return { success: true };
+  });
+
+  ipcMain.handle('app:minimize-to-tray', () => {
+    createOrUpdateTray();
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.hide();
+      // 检查是否开启了最小化到托盘自动锁定密库
+      try {
+        const p = getSettingsFilePath();
+        let shouldLock = true;
+        if (fs.existsSync(p)) {
+          const cfg = JSON.parse(fs.readFileSync(p, 'utf8'));
+          if (cfg.lockOnTray === false) {
+            shouldLock = false;
+          }
+        }
+        if (shouldLock) {
+          mainWindow.webContents.send('app:lock-vault');
+        }
+      } catch (_) {}
+    }
+    return { success: true };
+  });
+
+  ipcMain.handle('app:quit', () => {
+    isQuitting = true;
+    cleanUpAndExit();
+    return { success: true };
   });
 }
 
 app.whenReady().then(() => {
   console.log('[Electron Main] app.whenReady fired!');
   registerIpcHandlers();
+  createOrUpdateTray();
   createWindow();
 
   app.on('activate', () => {
@@ -712,6 +1113,15 @@ app.whenReady().then(() => {
   });
 });
 
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit();
+app.on('before-quit', () => {
+  cleanUpAndExit();
 });
+
+app.on('will-quit', () => {
+  cleanUpAndExit();
+});
+
+app.on('window-all-closed', () => {
+  cleanUpAndExit();
+});
+

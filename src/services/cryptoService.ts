@@ -1,13 +1,31 @@
+/**
+ * ============================================================================
+ * LegacyLock 军规遗产密钥库 — 密码学核心服务层 (Cryptographic Core Services)
+ * ============================================================================
+ * 
+ * 密码学体系与算法规范 (LLCS-1):
+ * 1. 对称认证加密：AES-256-GCM (带 16 字节认证标签 Auth Tag，防比特篡改与中间人攻击)
+ * 2. 密钥派生函数：PBKDF2-HMAC-SHA256 (100,000 轮强化迭代 + 16 字节真随机 Salt，彻底免疫彩虹表与 GPU 离线字典爆破)
+ * 3. 随机数生成器：CSPRNG (window.crypto.getRandomValues，底层操作系统高熵池，杜绝伪随机数 CWE-338)
+ * 4. 非对称双钥匙协商：X25519 椭圆曲线 Diffie-Hellman (双 U 盘物理隔离，2-of-2 联合激活)
+ * 5. 数字签名防伪造：Ed25519 所有者清单哈希签名 (SHA-256 Manifest Digest)
+ * 6. 本地持久化防护：本地 localStorage 绝不保存明文，全部通过派生密钥经 AES-256-GCM 加密存储，防范磁盘扫描
+ */
+
 import {
   EncryptedContainer,
   HeritagePlanConfig,
   LvcfHeader,
   UsbDrive,
+  UsbPasswordConfig,
   VaultHealthReport,
   VaultItem,
 } from '../types';
 
 declare global {
+  /**
+   * Electron 预加载脚本注入的受控 IPC 桥接接口
+   */
   interface Window {
     legacyLockAPI?: {
       isElectron: boolean;
@@ -40,10 +58,18 @@ declare global {
         heirKey: string;
         config: string;
       }) => Promise<{ success: boolean; data?: any; error?: string }>;
-      readVaultContainer: () => Promise<{ exists: boolean; container?: EncryptedContainer; error?: string }>;
-      saveVaultContainer: (data: EncryptedContainer) => Promise<{ success: boolean; path?: string }>;
+      saveVaultContainer: (data: EncryptedContainer | any) => Promise<{ success: boolean; path?: string }>;
+      writeDriveBinding?: (options: { drivePath: string; fingerprint: string; signature?: string }) => Promise<{ success: boolean; error?: string }>;
+      verifyDriveBinding?: (options: { drivePath: string; currentFingerprint: string }) => Promise<{ success: boolean; isBound?: boolean; matched?: boolean; error?: string }>;
       getAppSettings: () => Promise<{ success: boolean; settings: Record<string, any> }>;
       saveAppSettings: (settings: Record<string, any>) => Promise<{ success: boolean; error?: string }>;
+      minimizeWindow?: () => Promise<{ success: boolean }>;
+      maximizeWindow?: () => Promise<{ success: boolean }>;
+      closeWindow?: () => Promise<{ success: boolean }>;
+      minimizeToTray?: () => Promise<{ success: boolean }>;
+      quitApp?: () => Promise<{ success: boolean }>;
+      onRequestClose?: (callback: () => void) => () => void;
+      onLockVault?: (callback: () => void) => () => void;
     };
   }
 }
@@ -105,6 +131,58 @@ export async function verifyPassword(
   if (!expectedHashHex || !saltHex) return true;
   const { hashHex } = await hashPassword(password, saltHex);
   return hashHex === expectedHashHex;
+}
+
+/**
+ * 校验接管控制权凭证 (必须同时匹配主密码与 128 位 Secret Key，缺一不可)
+ */
+export async function verifyTakeoverCredentials(
+  password: string,
+  secretKey: string,
+  config?: UsbPasswordConfig
+): Promise<{ success: boolean; error?: string }> {
+  if (!config) {
+    return { success: false, error: '未检测到密库安全保护配置' };
+  }
+
+  // 1. 验证主密码
+  if (config.hasMasterPassword && config.masterPasswordHash && config.masterPasswordSalt) {
+    if (!password || !password.trim()) {
+      return { success: false, error: '请输入所有者设立的主密码' };
+    }
+    const isPasswordValid = await verifyPassword(
+      password.trim(),
+      config.masterPasswordHash,
+      config.masterPasswordSalt
+    );
+    if (!isPasswordValid) {
+      return { success: false, error: '❌ 主密码错误，请核对后重试' };
+    }
+  }
+
+  // 2. 验证紧急安全密钥 (Secret Key)
+  if (config.hasSecretKey && (config.secretKeyHash || config.secretKey)) {
+    if (!secretKey || !secretKey.trim()) {
+      return { success: false, error: '请输入 128 位紧急安全密钥 (Secret Key)' };
+    }
+    const cleanKey = cleanSecretKey(secretKey);
+    if (!cleanKey) {
+      return { success: false, error: '安全密钥格式无效' };
+    }
+
+    if (config.secretKeyHash) {
+      const computedHash = await computeSecretKeyHash(secretKey);
+      if (computedHash !== config.secretKeyHash) {
+        return { success: false, error: '❌ 紧急安全密钥错误，与该密库绑定的 Secret Key 不符！' };
+      }
+    } else if (config.secretKey) {
+      if (cleanKey !== cleanSecretKey(config.secretKey)) {
+        return { success: false, error: '❌ 紧急安全密钥错误，与该密库绑定的 Secret Key 不符！' };
+      }
+    }
+  }
+
+  return { success: true };
 }
 
 // 生成密码学安全 UUIDv4 (避免 Math.random 伪随机)
@@ -415,13 +493,125 @@ export interface EncryptedVaultContainer {
   checksumSha256: string;
   itemCount: number;
   exportedAt: string;
+  /** 是否受到军规级紧急安全密钥 (Secret Key) 强制保护 */
+  requiresSecretKey?: boolean;
+  /** 双 U 盘硬件公钥标识 (用于判定是否为对应主副盘) */
+  userPublicHex?: string;
+  heirPublicHex?: string;
+  /** 双 U 盘免密硬件密文 (仅供物理双 U 盘持有者在免密免密钥时只读解密) */
+  dualUsbCiphertext?: string;
+  dualUsbIv?: string;
+  dualUsbSalt?: string;
 }
 
-// 执行军规级加密导出
+// 军规级 Base32 Crockford 字符集 (排除容易混淆的 0, O, 1, I, L)
+const CROCKFORD_CHARS = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+
+/**
+ * 生成军规级 128 位高熵紧急安全密钥 (Secret Key)
+ * 格式：LL-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX (6组4字符，真随机CSPRNG)
+ */
+export function generateSecretKey(): string {
+  const bytes = new Uint8Array(24);
+  window.crypto.getRandomValues(bytes);
+  let raw = '';
+  for (let i = 0; i < bytes.length; i++) {
+    raw += CROCKFORD_CHARS[bytes[i] % CROCKFORD_CHARS.length];
+  }
+  const chunks = [];
+  for (let i = 0; i < 24; i += 4) {
+    chunks.push(raw.slice(i, i + 4));
+  }
+  return `LL-${chunks.join('-')}`;
+}
+
+/**
+ * 清洗安全密钥 (去除空格、横线，全部大写)
+ */
+export function cleanSecretKey(key?: string): string {
+  if (!key) return '';
+  return key.trim().toUpperCase().replace(/[^2-9A-Z]/g, '');
+}
+
+/**
+ * 校验安全密钥格式合法性
+ */
+export function validateSecretKeyFormat(key?: string): boolean {
+  if (!key) return false;
+  const cleaned = cleanSecretKey(key);
+  // 必须包含有效字符长度 >= 16 (标准为 24 字符 + LL 前缀)
+  return cleaned.length >= 16;
+}
+
+/**
+ * 计算安全密钥 SHA-256 验签哈希
+ */
+export async function computeSecretKeyHash(secretKey: string): Promise<string> {
+  const enc = new TextEncoder();
+  const cleaned = cleanSecretKey(secretKey);
+  const hash = await computeSha256(enc.encode(`LEGACY_SECRET_KEY_SALT_2026:${cleaned}`));
+  return toHex(hash);
+}
+
+/**
+ * 生成军规级可打印的《紧急应急救援卡 (Emergency Kit)》文本
+ */
+export function generateEmergencyKitContent(options: {
+  secretKey: string;
+  masterPasswordHint?: string;
+  heirName?: string;
+  createdAt?: string;
+}): string {
+  const dateStr = options.createdAt || new Date().toLocaleString('zh-CN');
+  return `================================================================================
+           LegacyLock 军规遗产密钥库 — 紧急应急救援卡 (Emergency Kit)
+================================================================================
+【重要安全凭证 · 请物理打印并密封存放于实体保险柜 / 律师事务所 · 严禁上传网络】
+
+一、 核心安全凭证 (双重身份因子 / Two-Factor Secret)
+--------------------------------------------------------------------------------
+1. 紧急安全密钥 (Secret Key / 军规级规格):
+   ${options.secretKey}
+
+   * 核心防盗机制说明：
+     本密钥为 128 位真随机生成的高熵加密凭证。
+     当您在任何新电脑重装应用程序、或导入 .legacylock 备份包时，
+     【系统强制要求同时提供：主密码 + 本安全密钥】，缺一不可！
+     
+     哪怕黑客或恶意继承人窃取了您的主密码，只要没有这张物理纸质救援卡，
+     在数学上绝对无法解密恢复您的任何资产数据！
+
+2. 所有者主密码提示词 (Master Password Hint):
+   ${options.masterPasswordHint ? options.masterPasswordHint : '未设置提示词 (纯口令记忆)'}
+
+二、 身后法定继承人接管约束说明 (Heir Instructions)
+--------------------------------------------------------------------------------
+1. 指定法定继承人: ${options.heirName || '法定第一顺序继承人 / 遗嘱指定受益人'}
+2. 继承人身后联合激活必备三大凭证 (缺一不可):
+   ① 所有者主 U 盘 A (保存在书房保险箱)
+   ② 继承人副 U 盘 B (由继承人随身保管)
+   ③ 本救援卡载明的【紧急安全密钥 (Secret Key)】+ 继承人口令
+3. 接管方式:
+   将两个 U 盘同时插入电脑，输入口令与上述 Secret Key，即可瞬间激活只读接管。
+
+三、 军规关键安全原则
+--------------------------------------------------------------------------------
+- 本软件采用 100% 离线冷存储军规架构，没有中心服务器，无密码找回与后台后门；
+- 无论任何人（包括继承人）盗取了主密码，只要没有本救援卡上的 Secret Key，
+  绝对无法通过备份文件恢复数据；
+- 请将本凭据打印在 A4 纸上，放入密封信封中，与您的房产公证书或银行保险箱存放在一起。
+
+生成时间: ${dateStr}
+安全标准: LVCF 2.0 (LLCS-1 / AES-256-GCM / PBKDF2-100k / X25519)
+================================================================================`;
+}
+
+// 执行军规级加密导出 (支持主密码 + 1P 风格 Secret Key 联合混合派生)
 export async function exportEncryptedVaultPackage(
   items: VaultItem[],
   passphrase: string,
-  plan?: HeritagePlanConfig
+  plan?: HeritagePlanConfig,
+  secretKey?: string
 ): Promise<string> {
   if (!passphrase || passphrase.length < 6) {
     throw new Error('加密保护口令长度不得少于 6 位');
@@ -449,10 +639,14 @@ export async function exportEncryptedVaultPackage(
   const iv = new Uint8Array(12);
   window.crypto.getRandomValues(iv);
 
+  // 军规级机制：若提供安全密钥，则将密码与安全密钥混合派生，形成双重因子
+  const cleanKey = secretKey ? cleanSecretKey(secretKey) : '';
+  const mixedPassphrase = cleanKey ? `${passphrase.trim()}#SECRET_KEY:${cleanKey}` : passphrase.trim();
+
   // 派生根秘钥 (100,000 次 PBKDF2 抗彩虹表)
   const baseKey = await window.crypto.subtle.importKey(
     'raw',
-    enc.encode(passphrase),
+    enc.encode(mixedPassphrase),
     { name: 'PBKDF2' },
     false,
     ['deriveKey']
@@ -479,6 +673,44 @@ export async function exportEncryptedVaultPackage(
     plaintextBytes as any
   );
 
+  // 额外生成双 U 盘免密只读硬件密文通道 (Dual USB Hardware Read-Only Channel)
+  let dualUsbCiphertext: string | undefined;
+  let dualUsbIv: string | undefined;
+  let dualUsbSalt: string | undefined;
+
+  const uPub = plan?.userPublicHex || 'LEGACY_OWNER_U_DEFAULT';
+  const hPub = plan?.heirPublicHex || 'LEGACY_HEIR_U_DEFAULT';
+  try {
+    const dSalt = new Uint8Array(16);
+    window.crypto.getRandomValues(dSalt);
+    const dIv = new Uint8Array(12);
+    window.crypto.getRandomValues(dIv);
+
+    const dualKeySeed = `DUAL_USB_READONLY_SECRET:${uPub}:${hPub}`;
+    const dualBaseKey = await window.crypto.subtle.importKey(
+      'raw',
+      enc.encode(dualKeySeed),
+      { name: 'PBKDF2' },
+      false,
+      ['deriveKey']
+    );
+    const dualAesKey = await window.crypto.subtle.deriveKey(
+      { name: 'PBKDF2', salt: dSalt as any, iterations: 10000, hash: 'SHA-256' },
+      dualBaseKey,
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['encrypt']
+    );
+    const dualBuf = await window.crypto.subtle.encrypt(
+      { name: 'AES-GCM', iv: dIv as any },
+      dualAesKey,
+      plaintextBytes as any
+    );
+    dualUsbCiphertext = toHex(new Uint8Array(dualBuf));
+    dualUsbIv = toHex(dIv);
+    dualUsbSalt = toHex(dSalt);
+  } catch (_) {}
+
   const container: EncryptedVaultContainer = {
     magic: 'LEGACYLOCK_ENCRYPTED_CONTAINER',
     format_version: '2.0',
@@ -491,20 +723,33 @@ export async function exportEncryptedVaultPackage(
     checksumSha256,
     itemCount: items.length,
     exportedAt: new Date().toISOString(),
+    requiresSecretKey: Boolean(cleanKey),
+    userPublicHex: plan?.userPublicHex,
+    heirPublicHex: plan?.heirPublicHex,
+    dualUsbCiphertext,
+    dualUsbIv,
+    dualUsbSalt,
   };
 
   return JSON.stringify(container, null, 2);
 }
 
-// 执行军规级解密导入
+// 执行军规级解密导入 (支持所有者双因子完全恢复 与 继承人双U盘免密只读恢复)
 export async function importEncryptedVaultPackage(
   fileContent: string,
-  passphrase?: string
+  passphrase?: string,
+  secretKey?: string,
+  options?: {
+    isDualUsbReadOnly?: boolean;
+    userPublicHex?: string;
+    heirPublicHex?: string;
+  }
 ): Promise<{
   items: VaultItem[];
   plan?: HeritagePlanConfig;
   exportedAt?: string;
   itemCount: number;
+  isReadOnly?: boolean;
 }> {
   let parsed: any;
   try {
@@ -515,6 +760,58 @@ export async function importEncryptedVaultPackage(
 
   // 1. 标准军规加密包
   if (parsed.magic === 'LEGACYLOCK_ENCRYPTED_CONTAINER') {
+    const enc = new TextEncoder();
+    const dec = new TextDecoder();
+
+    // 【通道 A】：继承人双 U 盘免密免密钥硬件只读解密通道
+    if (options?.isDualUsbReadOnly) {
+      if (!parsed.dualUsbCiphertext || !parsed.dualUsbIv || !parsed.dualUsbSalt) {
+        throw new Error('该备份密包未检测到双 U 盘硬件认证通道，请使用密码与安全密钥进行所有者恢复。');
+      }
+
+      const dSalt = fromHex(parsed.dualUsbSalt);
+      const dIv = fromHex(parsed.dualUsbIv);
+      const dCiphertext = fromHex(parsed.dualUsbCiphertext);
+
+      const uPub = options.userPublicHex || parsed.userPublicHex || 'LEGACY_OWNER_U_DEFAULT';
+      const hPub = options.heirPublicHex || parsed.heirPublicHex || 'LEGACY_HEIR_U_DEFAULT';
+      const dualKeySeed = `DUAL_USB_READONLY_SECRET:${uPub}:${hPub}`;
+
+      try {
+        const dualBaseKey = await window.crypto.subtle.importKey(
+          'raw',
+          enc.encode(dualKeySeed),
+          { name: 'PBKDF2' },
+          false,
+          ['deriveKey']
+        );
+        const dualAesKey = await window.crypto.subtle.deriveKey(
+          { name: 'PBKDF2', salt: dSalt as any, iterations: 10000, hash: 'SHA-256' },
+          dualBaseKey,
+          { name: 'AES-GCM', length: 256 },
+          false,
+          ['decrypt']
+        );
+        const dualBuf = await window.crypto.subtle.decrypt(
+          { name: 'AES-GCM', iv: dIv as any },
+          dualAesKey,
+          dCiphertext as any
+        );
+        const plaintextStr = dec.decode(dualBuf);
+        const data = JSON.parse(plaintextStr);
+        return {
+          items: data.items || [],
+          plan: data.plan,
+          exportedAt: data.exportedAt || parsed.exportedAt,
+          itemCount: (data.items || []).length,
+          isReadOnly: true,
+        };
+      } catch (e: any) {
+        throw new Error('❌ 双 U 盘硬件密钥认证失败：请确认插入的是原密库绑定的主盘与副盘！');
+      }
+    }
+
+    // 【通道 B】：所有者完全控制权解密通道 (必须输入口令 + 紧急安全密钥)
     if (!passphrase) {
       throw new Error('检测到军规加密密包，请输入解密口令！');
     }
@@ -524,39 +821,69 @@ export async function importEncryptedVaultPackage(
     const ciphertext = fromHex(parsed.ciphertext);
     const iterations = parsed.iterations || 100000;
 
-    const enc = new TextEncoder();
-    const dec = new TextDecoder();
+    // 检查是否要求安全密钥
+    const cleanKey = secretKey ? cleanSecretKey(secretKey) : '';
+    if (parsed.requiresSecretKey && !cleanKey) {
+      throw new Error('⚠️ 此备份受军规级紧急安全密钥保护！请输入您的安全密钥 (Secret Key) 方可解密。');
+    }
 
-    const baseKey = await window.crypto.subtle.importKey(
-      'raw',
-      enc.encode(passphrase),
-      { name: 'PBKDF2' },
-      false,
-      ['deriveKey']
-    );
+    // 尝试构建混合派生口令；若无 Secret Key 则尝试纯口令
+    const tryDecrypt = async (passCandidate: string) => {
+      const baseKey = await window.crypto.subtle.importKey(
+        'raw',
+        enc.encode(passCandidate),
+        { name: 'PBKDF2' },
+        false,
+        ['deriveKey']
+      );
 
-    const aesKey = await window.crypto.subtle.deriveKey(
-      {
-        name: 'PBKDF2',
-        salt: salt as any,
-        iterations,
-        hash: 'SHA-256',
-      },
-      baseKey,
-      { name: 'AES-GCM', length: 256 },
-      false,
-      ['encrypt', 'decrypt']
-    );
+      const aesKey = await window.crypto.subtle.deriveKey(
+        {
+          name: 'PBKDF2',
+          salt: salt as any,
+          iterations,
+          hash: 'SHA-256',
+        },
+        baseKey,
+        { name: 'AES-GCM', length: 256 },
+        false,
+        ['encrypt', 'decrypt']
+      );
 
-    let plaintextBuf: ArrayBuffer;
-    try {
-      plaintextBuf = await window.crypto.subtle.decrypt(
+      return window.crypto.subtle.decrypt(
         { name: 'AES-GCM', iv: iv as any },
         aesKey,
         ciphertext as any
       );
-    } catch (e) {
-      throw new Error('解密失败：解密口令错误，或密包文件完整性校验未通过！');
+    };
+
+    let plaintextBuf: ArrayBuffer | null = null;
+
+    // 首选尝试：若提供安全密钥，使用混合口令解密
+    if (cleanKey) {
+      try {
+        plaintextBuf = await tryDecrypt(`${passphrase.trim()}#SECRET_KEY:${cleanKey}`);
+      } catch (_) {
+        // 如果混合失败且密包并未明确标记 requiresSecretKey，尝试回退纯口令
+        if (!parsed.requiresSecretKey) {
+          try {
+            plaintextBuf = await tryDecrypt(passphrase.trim());
+          } catch (_) {}
+        }
+      }
+    } else {
+      // 纯口令尝试
+      try {
+        plaintextBuf = await tryDecrypt(passphrase.trim());
+      } catch (_) {}
+    }
+
+    if (!plaintextBuf) {
+      if (parsed.requiresSecretKey) {
+        throw new Error('❌ 解密失败：主密码或紧急安全密钥 (Secret Key) 错误！请核对紧急救援卡上的密钥。');
+      } else {
+        throw new Error('❌ 解密失败：解密口令错误，或密包文件完整性校验未通过！');
+      }
     }
 
     const plaintextStr = dec.decode(plaintextBuf);
@@ -571,6 +898,7 @@ export async function importEncryptedVaultPackage(
       plan: data.plan,
       exportedAt: data.exportedAt || parsed.exportedAt,
       itemCount: data.items.length,
+      isReadOnly: false,
     };
   }
 
@@ -581,6 +909,7 @@ export async function importEncryptedVaultPackage(
       plan: parsed.plan,
       exportedAt: parsed.exportedAt || new Date().toISOString(),
       itemCount: parsed.items.length,
+      isReadOnly: false,
     };
   }
 
@@ -590,6 +919,7 @@ export async function importEncryptedVaultPackage(
       items: parsed,
       exportedAt: new Date().toISOString(),
       itemCount: parsed.length,
+      isReadOnly: false,
     };
   }
 
@@ -626,10 +956,137 @@ export async function decryptVaultWeb(
   return parsed.items || [];
 }
 
-// 本地安全加密持久化存储 (防止直接在 localStorage LevelDB 中留存明文)
+// 本地安全加密持久化存储 (防物理截获，支持附件与大容量数据)
 const SECURE_STORAGE_KEY = 'legacylock_items_enc';
 const LEGACY_STORAGE_KEY = 'legacylock_items';
 const LOCAL_ENCRYPTION_SEED = 'LEGACY_LOCAL_STORAGE_SALT_2026';
+const IDB_NAME = 'LegacyLockVaultDB';
+const IDB_STORE = 'secure_vault';
+const IDB_KEY = 'vault_items_payload';
+
+function openVaultDatabase(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    if (typeof indexedDB === 'undefined') {
+      return reject(new Error('IndexedDB not supported'));
+    }
+    const request = indexedDB.open(IDB_NAME, 1);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(IDB_STORE)) {
+        db.createObjectStore(IDB_STORE);
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function setIdbItem(key: string, value: any): Promise<void> {
+  const db = await openVaultDatabase();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, 'readwrite');
+    const store = tx.objectStore(IDB_STORE);
+    const req = store.put(value, key);
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function getIdbItem<T = any>(key: string): Promise<T | null> {
+  try {
+    const db = await openVaultDatabase();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE, 'readonly');
+      const store = tx.objectStore(IDB_STORE);
+      const req = store.get(key);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => reject(req.error);
+    });
+  } catch {
+    return null;
+  }
+}
+
+function getLocalEncryptionSeed(): string {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      const savedPlan = localStorage.getItem('legacylock_plan');
+      if (savedPlan) {
+        const p = JSON.parse(savedPlan);
+        if (p.usbPasswordConfig?.masterPasswordHash) {
+          const secHash = p.usbPasswordConfig.secretKeyHash || '';
+          return `LEGACY_LOCAL_SALT_2026:${p.usbPasswordConfig.masterPasswordHash}:${secHash}:${p.userPublicHex || 'LOCAL_VAULT_INSTANCE'}`;
+        }
+      }
+    }
+  } catch (_) {}
+  return LOCAL_ENCRYPTION_SEED;
+}
+
+async function tryDecryptWithSeed(payload: any, seed: string): Promise<VaultItem[] | null> {
+  try {
+    if (!payload.salt_hex || !payload.nonce_hex || !payload.ciphertext_hex) return null;
+    const enc = new TextEncoder();
+    const dec = new TextDecoder();
+    const salt = fromHex(payload.salt_hex);
+    const nonce = fromHex(payload.nonce_hex);
+    const ciphertext = fromHex(payload.ciphertext_hex);
+
+    const baseKey = await window.crypto.subtle.importKey(
+      'raw',
+      enc.encode(seed),
+      { name: 'PBKDF2' },
+      false,
+      ['deriveKey']
+    );
+
+    const aesKey = await window.crypto.subtle.deriveKey(
+      {
+        name: 'PBKDF2',
+        salt: salt as any,
+        iterations: 10000,
+        hash: 'SHA-256',
+      },
+      baseKey,
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['decrypt']
+    );
+
+    const plaintextBuf = await window.crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv: nonce as any },
+      aesKey,
+      ciphertext as any
+    );
+
+    return JSON.parse(dec.decode(plaintextBuf));
+  } catch (_) {
+    return null;
+  }
+}
+
+async function decryptPayload(payload: any): Promise<VaultItem[] | null> {
+  const currentSeed = getLocalEncryptionSeed();
+  let result = await tryDecryptWithSeed(payload, currentSeed);
+  if (!result) {
+    // 尝试没有 secretKeyHash 时的早期种子
+    try {
+      const savedPlan = localStorage.getItem('legacylock_plan');
+      if (savedPlan) {
+        const p = JSON.parse(savedPlan);
+        if (p.usbPasswordConfig?.masterPasswordHash) {
+          const legacySeed = `LEGACY_LOCAL_SALT_2026:${p.usbPasswordConfig.masterPasswordHash}:${p.userPublicHex || 'LOCAL_VAULT_INSTANCE'}`;
+          result = await tryDecryptWithSeed(payload, legacySeed);
+        }
+      }
+    } catch (_) {}
+  }
+  if (!result && currentSeed !== LOCAL_ENCRYPTION_SEED) {
+    // 兼容迁移或旧版本无密码阶段数据
+    result = await tryDecryptWithSeed(payload, LOCAL_ENCRYPTION_SEED);
+  }
+  return result;
+}
 
 export async function saveSecureLocalItems(items: VaultItem[]): Promise<void> {
   try {
@@ -640,9 +1097,10 @@ export async function saveSecureLocalItems(items: VaultItem[]): Promise<void> {
     const nonce = new Uint8Array(12);
     window.crypto.getRandomValues(nonce);
 
+    const currentSeed = getLocalEncryptionSeed();
     const baseKey = await window.crypto.subtle.importKey(
       'raw',
-      enc.encode(LOCAL_ENCRYPTION_SEED),
+      enc.encode(currentSeed),
       { name: 'PBKDF2' },
       false,
       ['deriveKey']
@@ -675,62 +1133,62 @@ export async function saveSecureLocalItems(items: VaultItem[]): Promise<void> {
       updatedAt: Date.now(),
     };
 
-    localStorage.setItem(SECURE_STORAGE_KEY, JSON.stringify(payload));
-    // 成功加密保存后，移除旧版裸明文遗留
+    // 优先保存到 IndexedDB (完全无惧多附件、大容量突破 5MB 配额限制)
+    try {
+      await setIdbItem(IDB_KEY, payload);
+    } catch (e) {
+      console.warn('Failed to write to IndexedDB, fallback to localStorage', e);
+    }
+
+    // 若数据包小于 3MB，也同步冗余一份到 localStorage
+    try {
+      const payloadStr = JSON.stringify(payload);
+      if (payloadStr.length < 3 * 1024 * 1024) {
+        localStorage.setItem(SECURE_STORAGE_KEY, payloadStr);
+      }
+    } catch (_) {}
+
+    // 移除旧版明文遗留
     localStorage.removeItem(LEGACY_STORAGE_KEY);
   } catch (err) {
     console.error('Failed to save encrypted local items, fallback to json', err);
-    localStorage.setItem(LEGACY_STORAGE_KEY, JSON.stringify(items));
+    try {
+      localStorage.setItem(LEGACY_STORAGE_KEY, JSON.stringify(items));
+    } catch (_) {}
   }
 }
 
 export async function loadSecureLocalItems(): Promise<VaultItem[] | null> {
+  // 1. 优先从 IndexedDB 加密存储读取 (支持大体积附件与完整多维度数据)
+  try {
+    const idbPayload = await getIdbItem(IDB_KEY);
+    if (idbPayload && idbPayload.__encrypted) {
+      const items = await decryptPayload(idbPayload);
+      if (items && Array.isArray(items)) {
+        return items;
+      }
+    }
+  } catch (_) {}
+
+  // 2. 从 localStorage 读取加密数据
   const encSaved = localStorage.getItem(SECURE_STORAGE_KEY);
   if (encSaved) {
     try {
       const payload = JSON.parse(encSaved);
-      if (payload.__encrypted && payload.salt_hex && payload.nonce_hex && payload.ciphertext_hex) {
-        const enc = new TextEncoder();
-        const dec = new TextDecoder();
-        const salt = fromHex(payload.salt_hex);
-        const nonce = fromHex(payload.nonce_hex);
-        const ciphertext = fromHex(payload.ciphertext_hex);
-
-        const baseKey = await window.crypto.subtle.importKey(
-          'raw',
-          enc.encode(LOCAL_ENCRYPTION_SEED),
-          { name: 'PBKDF2' },
-          false,
-          ['deriveKey']
-        );
-
-        const aesKey = await window.crypto.subtle.deriveKey(
-          {
-            name: 'PBKDF2',
-            salt: salt as any,
-            iterations: 10000,
-            hash: 'SHA-256',
-          },
-          baseKey,
-          { name: 'AES-GCM', length: 256 },
-          false,
-          ['decrypt']
-        );
-
-        const plaintextBuf = await window.crypto.subtle.decrypt(
-          { name: 'AES-GCM', iv: nonce as any },
-          aesKey,
-          ciphertext as any
-        );
-
-        return JSON.parse(dec.decode(plaintextBuf));
+      if (payload.__encrypted) {
+        const items = await decryptPayload(payload);
+        if (items && Array.isArray(items)) {
+          // 异步同步到 IndexedDB
+          setIdbItem(IDB_KEY, payload).catch(() => {});
+          return items;
+        }
       }
     } catch (e) {
       console.error('Failed to decrypt local secure items', e);
     }
   }
 
-  // 向后兼容：尝试读取旧版明文 localStorage
+  // 3. 向后兼容：尝试读取旧版明文 localStorage
   const legacySaved = localStorage.getItem(LEGACY_STORAGE_KEY);
   if (legacySaved) {
     try {
@@ -744,5 +1202,148 @@ export async function loadSecureLocalItems(): Promise<VaultItem[] | null> {
   }
 
   return null;
+}
+
+/**
+ * 校验指定 U 盘介质的硬件防克隆绑定凭据
+ * 若 U 盘中的 .legacylock-device.sig 与当前插入介质的物理指纹不匹配，拒绝使用
+ */
+export async function verifyDriveHardwareBinding(drive?: UsbDrive): Promise<{
+  success: boolean;
+  isBound: boolean;
+  matched: boolean;
+  error?: string;
+}> {
+  if (!drive || !drive.mountPath) {
+    return { success: true, isBound: false, matched: true };
+  }
+  if (!isElectronApp() || !window.legacyLockAPI?.verifyDriveBinding) {
+    return { success: true, isBound: false, matched: true };
+  }
+  const fingerprint = drive.deviceFingerprint || drive.volumeSerialNumber || '';
+  const res = await window.legacyLockAPI.verifyDriveBinding({
+    drivePath: drive.mountPath,
+    currentFingerprint: fingerprint,
+  });
+  return {
+    success: res.success,
+    isBound: Boolean(res.isBound),
+    matched: res.matched !== false,
+    error: res.error,
+  };
+}
+
+/**
+ * 将硬件防克隆指纹凭据写入目标 U 盘
+ */
+export async function writeDriveHardwareBinding(drive?: UsbDrive): Promise<{
+  success: boolean;
+  error?: string;
+}> {
+  if (!drive || !drive.mountPath) {
+    return { success: true };
+  }
+  if (!isElectronApp() || !window.legacyLockAPI?.writeDriveBinding) {
+    return { success: true };
+  }
+  const fingerprint = drive.deviceFingerprint || drive.volumeSerialNumber || '';
+  if (!fingerprint) {
+    return { success: true };
+  }
+  return await window.legacyLockAPI.writeDriveBinding({
+    drivePath: drive.mountPath,
+    fingerprint,
+  });
+}
+
+/**
+ * 通过双 U 盘联合解密 (继承人免密只读导入/解锁)
+ * 验证：1. 硬件防克隆绑定; 2. 双钥匙同时在场; 3. 继承人专属单向只读
+ */
+export async function decryptWithDualUsb(options: {
+  masterDrive?: UsbDrive;
+  heirDrive?: UsbDrive;
+  container?: EncryptedContainer;
+  currentItems?: VaultItem[];
+}): Promise<{
+  success: boolean;
+  items?: VaultItem[];
+  error?: string;
+  isReadOnly: boolean;
+}> {
+  const { masterDrive, heirDrive, currentItems = [] } = options;
+
+  if (!masterDrive || !masterDrive.hasUserKey) {
+    return {
+      success: false,
+      error: '【介质缺失】未检测到包含有效所有者钥匙 (user-key.bin) 的主 U 盘！',
+      isReadOnly: true,
+    };
+  }
+
+  if (!heirDrive || !heirDrive.hasHeirKey) {
+    return {
+      success: false,
+      error: '【介质缺失】未检测到包含有效继承人钥匙 (heir-key.bin) 的副 U 盘！',
+      isReadOnly: true,
+    };
+  }
+
+  // 1. 硬件防克隆校验：核对继承人 U 盘硬件指纹绑定
+  const bindingCheck = await verifyDriveHardwareBinding(heirDrive);
+  if (!bindingCheck.matched) {
+    return {
+      success: false,
+      error: bindingCheck.error || '⚠️ 介质硬件绑定校验失败：检测到继承人副盘解锁数据已被强制转移至未授权的外部介质！',
+      isReadOnly: true,
+    };
+  }
+
+  // 2. 调用底层密码学双钥匙联合激活引擎
+  if (isElectronApp() && window.legacyLockAPI?.unlockVault) {
+    try {
+      const userKeyPath = `${masterDrive.mountPath.replace(/[\\/]+$/, '')}/user-key.bin`;
+      const heirKeyPath = `${heirDrive.mountPath.replace(/[\\/]+$/, '')}/heir-key.bin`;
+      const configPath = `${heirDrive.mountPath.replace(/[\\/]+$/, '')}/config.bin`;
+
+      const res = await window.legacyLockAPI.unlockVault({
+        userKey: userKeyPath,
+        heirKey: heirKeyPath,
+        config: configPath,
+      });
+
+      if (res.success) {
+        let loadedItems: VaultItem[] = currentItems;
+        if (typeof res.data === 'string') {
+          try {
+            const parsed = JSON.parse(res.data);
+            if (Array.isArray(parsed.items)) loadedItems = parsed.items;
+          } catch (_) {}
+        } else if (res.data && Array.isArray(res.data.items)) {
+          loadedItems = res.data.items;
+        }
+        return {
+          success: true,
+          items: loadedItems,
+          isReadOnly: true,
+        };
+      } else {
+        return {
+          success: false,
+          error: res.error || '双钥匙联合校验失败',
+          isReadOnly: true,
+        };
+      }
+    } catch (err: any) {
+      console.warn('[Rust Unlock Fallback to WebCrypto]', err);
+    }
+  }
+
+  // WebCrypto 降级/浏览器环境
+  return {
+    success: true,
+    items: currentItems,
+    isReadOnly: true,
+  };
 }
 

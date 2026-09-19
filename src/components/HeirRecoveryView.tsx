@@ -1,3 +1,15 @@
+/**
+ * ============================================================================
+ * LegacyLock 军规遗产密钥库 — 继承人只读接管与交接视图组件 (HeirRecoveryView)
+ * ============================================================================
+ * 
+ * 核心设计准则：
+ * 1. 单向只读审计模式：继承人身后完成双 U 盘联合激活后进入该模式，严禁任何增、删、改操作，杜绝篡改遗产；
+ * 2. 结构化资产提取：允许查阅密码、助记词、银行账号，并提供 30 秒自毁的安全剪贴板复制；
+ * 3. 继承人专属嘱托置顶：高亮展示所有者生前为继承人撰写的特定交接指导留言；
+ * 4. XSS 与钓鱼防护：通过 getSafeUrl 严格过滤非 http/https 协议，阻断 javascript: 伪协议执行。
+ */
+
 import React, { useState } from 'react';
 import {
   ShieldAlert,
@@ -13,11 +25,17 @@ import {
   ExternalLink,
   BookOpen,
   Info,
+  Crown,
 } from 'lucide-react';
 import { VaultItem } from '../types';
 import { CATEGORIES, getCategoryDef } from '../services/categories';
 import { copyToClipboard } from '../services/clipboardService';
 
+/**
+ * 安全 URL 过滤与校验函数 (防御 XSS 与协议注入)
+ * @param rawUrl 原始用户输入的网址
+ * @returns {string | null} 仅返回协议合法的 http:// 或 https:// 网址
+ */
 function getSafeUrl(rawUrl?: string): string | null {
   if (!rawUrl) return null;
   const trimmed = rawUrl.trim();
@@ -26,11 +44,22 @@ function getSafeUrl(rawUrl?: string): string | null {
   return null;
 }
 
+/**
+ * 继承人只读视图属性接口
+ */
 interface HeirRecoveryViewProps {
+  /** 已解密恢复的资产列表 */
   items: VaultItem[];
+  /** 法定继承人姓名 */
   heirName: string;
+  /** 密库唯一标识 GUID */
   vaultId: string;
+  /** 退出继承接管视图回调 */
   onExitRecovery: () => void;
+  /** 是否允许修改 (已接管控制权时为 true) */
+  canModify?: boolean;
+  /** 请求接管控制权回调 (打开 TakeoverControlModal) */
+  onRequestTakeover?: () => void;
 }
 
 export const HeirRecoveryView: React.FC<HeirRecoveryViewProps> = ({
@@ -38,6 +67,8 @@ export const HeirRecoveryView: React.FC<HeirRecoveryViewProps> = ({
   heirName,
   vaultId,
   onExitRecovery,
+  canModify,
+  onRequestTakeover,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -125,6 +156,23 @@ export const HeirRecoveryView: React.FC<HeirRecoveryViewProps> = ({
 
         {/* 顶部操作按钮 */}
         <div className="flex items-center gap-2">
+          {/* 👑 接管控制权按钮 */}
+          {!canModify && onRequestTakeover && (
+            <button
+              onClick={onRequestTakeover}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-600/40 to-indigo-600/40 hover:from-amber-600/60 hover:to-indigo-600/60 border border-amber-400/40 text-xs font-bold text-amber-200 transition-all shadow-lg shadow-amber-500/10"
+            >
+              <Crown className="w-3.5 h-3.5" />
+              <span>接管控制权 (转为所有者)</span>
+            </button>
+          )}
+          {canModify && (
+            <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/20 border border-emerald-400/30 text-xs font-bold text-emerald-300">
+              <Crown className="w-3.5 h-3.5" />
+              已接管完全控制权 (读写模式)
+            </span>
+          )}
+
           <button
             onClick={handleExportDecryptedJson}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-600/30 hover:bg-purple-600/50 border border-purple-400/30 text-xs font-semibold text-white transition-all shadow-sm"

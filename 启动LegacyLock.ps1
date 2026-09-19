@@ -1,6 +1,6 @@
 Set-Location -Path $PSScriptRoot
 Write-Host "=========================================================" -ForegroundColor Cyan
-Write-Host "   LegacyLock 遗产保险锁 - 1Password 级数字遗产保险箱" -ForegroundColor Cyan
+Write-Host "   LegacyLock 遗产保险锁 - 军规级数字遗产保险箱" -ForegroundColor Cyan
 Write-Host "=========================================================" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "正在启动 LegacyLock 桌面应用与本地服务..." -ForegroundColor Green

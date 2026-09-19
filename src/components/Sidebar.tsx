@@ -1,3 +1,15 @@
+/**
+ * ============================================================================
+ * LegacyLock 军规遗产密钥库 — 左侧主导航侧边栏组件 (Sidebar Component)
+ * ============================================================================
+ * 
+ * 功能职责：
+ * 1. 密库资产分类树导航：支持按照 12 大维度分类实时过滤右侧资产列表；
+ * 2. 动态计数徽标：实时统计并展示每个分类下当前收录的有效凭据数量；
+ * 3. 硬件外部设备探查标识：显示当前检测到的外接 USB 驱动器总数；
+ * 4. 底部常驻入口：置顶常驻「系统设置与安全控制中心 (Settings)」与「军规导入导出」。
+ */
+
 import React from 'react';
 import {
   LayoutGrid,
@@ -20,13 +32,23 @@ import {
 import { NavCategoryType } from '../types';
 import { ThemeDefinition } from '../services/themes';
 
+/**
+ * 侧边栏属性接口
+ */
 interface SidebarProps {
+  /** 当前选中的左侧导航分类 ID */
   selectedNav: NavCategoryType;
+  /** 切换导航分类的回调函数 */
   onSelectNav: (nav: NavCategoryType) => void;
+  /** 各分类资产总数映射表 Record<category, count> */
   categoryCounts: Record<string, number>;
+  /** 资产库总数量 */
   totalCount: number;
+  /** 检测到的外部物理介质数量 */
   detectedDrivesCount?: number;
+  /** 触发新增资产的回调函数 */
   onAddNew?: () => void;
+  /** 当前启用的渐变主题配置 */
   theme?: ThemeDefinition;
 }
 
@@ -50,7 +72,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const documentCount =
     (categoryCounts['document'] || 0) +
     (categoryCounts['softwareLicense'] || 0) +
-    (categoryCounts['outdoorLicense'] || 0);
+    (categoryCounts['outdoorLicense'] || 0) +
+    (categoryCounts['license'] || 0);
 
   const sshCount = categoryCounts['sshKey'] || 0;
   const apiCount = categoryCounts['apiCredential'] || 0;

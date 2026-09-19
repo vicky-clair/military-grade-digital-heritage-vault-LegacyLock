@@ -1,13 +1,34 @@
+/**
+ * ============================================================================
+ * LegacyLock 军规遗产密钥库 — 视觉主题与渐变调色板规范 (Theme System)
+ * ============================================================================
+ * 
+ * 设计理念：
+ * 1. 采用高对比度、深色模式军规审美，提供 5 款深邃典雅的渐变色系；
+ * 2. 主题偏好支持联动操作系统本地配置文件与 localStorage，实现跨重启 100% 持久化；
+ * 3. 实时响应式注入 document.documentElement.style.background，避免页面重载闪白。
+ */
+
+/**
+ * 主题配置接口规范
+ */
 export interface ThemeDefinition {
+  /** 主题唯一键名 */
   id: string;
+  /** 中文展示名称 */
   name: string;
+  /** 英文标识名称 */
   englishName: string;
+  /** 预览气泡色阶渐变 CSS */
   previewGradient: string;
+  /** 主强调高亮色 (用于按钮、边框光晕、标签) */
   primaryAccent: string;
+  /** 侧边导航栏专属色彩配置 */
   sidebarStyle: {
     background: string;
     borderColor: string;
   };
+  /** 主内容区色彩配置 */
   mainStyle: {
     background: string;
     topbarBg: string;
@@ -17,6 +38,9 @@ export interface ThemeDefinition {
   };
 }
 
+/**
+ * 全局预设的 5 套军规渐变配色方案
+ */
 export const THEMES: ThemeDefinition[] = [
   {
     id: 'royal_violet',
@@ -110,8 +134,16 @@ export const THEMES: ThemeDefinition[] = [
   },
 ];
 
+/** 默认主题 ID */
 export const DEFAULT_THEME_ID = 'royal_violet';
 
+/**
+ * 根据主题 ID 查找匹配的主题定义对象
+ * 若未匹配到，则回退降级为第一套默认主题
+ * 
+ * @param id 主题标识符
+ * @returns {ThemeDefinition} 主题样式完整配置
+ */
 export function getTheme(id: string): ThemeDefinition {
   return THEMES.find((t) => t.id === id) || THEMES[0];
 }

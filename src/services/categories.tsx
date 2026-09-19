@@ -1,3 +1,14 @@
+/**
+ * ============================================================================
+ * LegacyLock 军规遗产密钥库 — 资产分类语义字典与图标映射 (Categories Registry)
+ * ============================================================================
+ * 
+ * 功能职责：
+ * 1. 完整定义 12+ 大资产维度的中文语义、英文标识、主题强调色、透光背景与 Lucide 图标；
+ * 2. 区分顶部常用大卡片 (Primary Cards) 与全部结构化分类，支持分类选择弹窗渲染；
+ * 3. 为每种资产分类预置专属的数据字段模板 (defaultFields)，极大简化用户输入流程。
+ */
+
 import React from 'react';
 import {
   KeyRound,
@@ -26,15 +37,27 @@ import {
 } from 'lucide-react';
 import { VaultCategory } from '../types';
 
+/**
+ * 资产分类定义接口
+ */
 export interface CategoryDefinition {
+  /** 分类唯一 ID */
   id: VaultCategory;
+  /** 中文标准显示名称 */
   name: string;
+  /** 英文对照名称 */
   englishName: string;
+  /** 分类详细用途说明 */
   description: string;
-  isPrimary: boolean; // 是否是顶部大卡片
+  /** 是否属于顶部置顶大卡片 (用于弹窗优先展示) */
+  isPrimary: boolean;
+  /** 分类代表高亮主题色 (Hex) */
   color: string;
+  /** 分类图标半透明背景色 (rgba) */
   bgColor: string;
+  /** 专属 Lucide 图标组件渲染函数 */
   icon: React.FC<{ className?: string }>;
+  /** 初始预设字段模板列表 (名称、是否保密掩码、默认取值) */
   defaultFields?: Array<{ name: string; isSecret: boolean; defaultValue?: string }>;
 }
 

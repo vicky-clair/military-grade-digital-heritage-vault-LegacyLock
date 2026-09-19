@@ -248,6 +248,9 @@ xr-LegacyLock/
 | **SEC-06** | 中危 (P2) | 剪贴板遗留风险 | 剪贴板 30 秒自动清空在设置中存在开关但无实际代码实现，用户复制私钥或密码后长久滞留在系统剪贴板。 | 研发统一的 `clipboardService.ts` 引擎，每次复制敏感内容自动挂载 30 秒倒计时，若用户未重新复制则自动擦除剪贴板并阻断跨进程窃听。 |
 | **SEC-07** | 中危 (P2) | 状态串扰与注入风险 | 密码查看状态（`revealedSecrets`）全局共享，切换资产时新资产密码直接明文暴露；网址字段直接通过 `window.open` 打开，缺乏协议白名单。 | 切换资产卡片或过滤条件时自动闭合所有显式密码；引入 `getSafeUrl` 函数，严格限制协议为 `http:` 或 `https:`，杜绝 `javascript:` 等恶意 XSS 伪协议注入。 |
 | **SEC-08** | 低危 (P3) | 代码坏味道与死代码 | 9 个历史重构遗留组件（如 `UnlockVault.tsx`、`VaultView.tsx`、`HeaderBar.tsx` 等）已脱离调用链但残留在项目中，引发认知混淆。 | 全面彻底物理删除这 9 个无用组件文件，保持项目工程代码极简、纯粹且 100% 可维护。 |
+| **SEC-09** | 严重 (P0) | 进程悬挂与后台残留 | 窗口关闭后由于 PowerShell 子进程阻塞、HTTP keep-alive 客户端长连接未中断，导致 `LegacyLock.exe` 残留在 Windows 任务管理器中无法自动终止。 | 实现 `cleanUpAndExit()` 机制：关闭嵌入式 HTTP 服务并销毁所有客户端 Socket，强制杀死所有活跃子进程，主动调用 `app.quit()`，并配置 300ms 兜底 `app.exit(0)`，自动化测试验证退出后 0 残留进程。 |
+| **SEC-10** | 高危 (P1) | 临时明文泄露风险 | 资产加密调用 CLI 时创建的临时明文文件 `vault-in-*.json` 在 CLI 抛出异常时跳过清理，且文件名基于时间戳易被穷举预测。 | 文件名改用密码学真随机 `crypto.randomBytes(16)` 命名；引入 `try ... finally` 强制执行机制，无论加密成功还是发生致命错误，均无条件对临时文件执行内存零填充（Zero-Fill Wipe）覆写并删除，杜绝任何磁盘明文滞留。 |
+| **SEC-11** | 中危 (P2) | 生产打包与路径穿越 | 生产打包产物缺少 `vault-cli.exe` 原生二进制，且二进制文件路径解析在 `app.asar` 内可能失效；保存二进制文件未清洗文件名。 | 在 `package.json` 配置 `extraResources` 自动打包二进制；主进程新增 `process.resourcesPath` 生产路径感知；对文件保存默认名实施 `path.basename` 强制清洗，杜绝目录穿越。 |
 
 ---
 
@@ -346,5 +349,152 @@ xr-LegacyLock/
 > 3. 建议装入不透光防静电铝箔袋中，采用防火防水密封袋二次封装，存入耐火保险柜或随公证遗嘱归档。
 
 ---
+
+## 十、 进程退出生命周期治理与自动化验证体系 (Process Exit Lifecycle & Verification)
+
+在桌面端密码管理器的安全准则中，“应用关闭必须彻底销毁进程”是一项至关重要的核心军规要求。如果主进程在窗口关闭后仍残留后台，不仅持续占用内存与系统句柄，更有可能导致未加密状态或驻留凭据遭受外部恶意进程的内存转储（Memory Dump）攻击。
+
+### 1. 进程常驻残留根因分析
+在早期版本中，窗口关闭后可能偶发出现 `LegacyLock.exe` 或 `electron.exe` 残留后台的现象，经深入排查定位为以下三点根因：
+1. **未断开的 HTTP keep-alive 长连接**：Chromium 渲染进程在连接嵌入式静态 HTTP 服务后，建立了长连接套接字（Socket），阻止 Node.js 运行时事件循环自然退出；
+2. **后台异步子进程未能级联终止**：系统启动或刷新时派生的 PowerShell 硬件扫描任务、Rust CLI 任务在主窗口关闭瞬间仍可能处于异步管道读取阶段；
+3. **Electron 单向退出钩子不完备**：仅监听 `window-all-closed` 无法完全涵盖用户通过任务栏右键关闭、窗口系统控制菜单关闭（`SC_CLOSE`）或父级 Shell 信号中断等复杂场景。
+
+### 2. 五级级联优雅与强制退出架构 (`cleanUpAndExit`)
+
+为了彻底杜绝任何后台僵尸残留，主进程实现了严格的五级级联销毁流水线：
+
+```text
+                  用户点击关闭 / WM_CLOSE / 任务栏退出
+                                   │
+                                   ▼
+                       【步骤 1: 幂等性守卫】
+                    isQuitting 标志位防重复重入
+                                   │
+                                   ▼
+                       【步骤 2: 关闭 HTTP 服务】
+              stopEmbeddedServer() 遍历销毁所有 Active Sockets
+                     调用 server.closeAllConnections()
+                                   │
+                                   ▼
+                       【步骤 3: 终止全部子进程】
+             killAllChildProcesses() 遍历终止 activeChildProcesses
+                         (PowerShell / vault-cli)
+                                   │
+                                   ▼
+                       【步骤 4: 销毁主窗口与退出】
+                  mainWindow.destroy() -> app.quit()
+                                   │
+                                   ▼
+                       【步骤 5: 300ms 兜底强杀】
+                    setTimeout(() => app.exit(0), 300)
+                     彻底强制终止，保证 0 进程残留！
+```
+
+### 3. 全自动化退出验证套件 (`scratch/verify_exit.ps1`)
+
+为了持续保证退出健壮性，工程团队构建了专用的 Windows 自动化退出测试套件，全面覆盖三大核心真实测试场景：
+- **场景一：生产打包执行文件标准关闭 (`release/win-unpacked/LegacyLock.exe`)**：启动打包成品并加载界面，通过 Win32 API `FindMainWindow` 定位窗口句柄，发送 `SC_CLOSE` 系统关闭消息，验证 2 秒后任务管理器中 `LegacyLock` 进程数为 0；
+- **场景二：直接开发模式退出 (`electron .`)**：测试开发调试环境下的直接关闭退出，验证 `electron.exe` 进程数降为 0；
+- **场景三：硬件扫描高负载中途极速强制关闭**：在应用启动仅 1.2 秒（正处于 PowerShell 磁盘扫描高负载状态）瞬间发送 `SC_CLOSE`，测试极端并发下的子进程清理与异常回收能力，验证退出后进程数严格为 0。
+
+测试执行指令：
+```powershell
+powershell -ExecutionPolicy Bypass -File scratch/verify_exit.ps1
+```
+测试结果：
+```text
+TEST 1: Packaged Executable Normal Close: PASSED (0 lingering)
+TEST 2: Direct Electron Mode Close:      PASSED (0 lingering)
+TEST 3: Rapid/Immediate Close during scan: PASSED (0 lingering)
+>>> ALL VERIFICATION TESTS PASSED SUCCESSFULLY! <<<
+```
+
+---
+
+## 十一、 核心安全实施规范与敏感问题开发红线 (Core Security & Sensitive Development Redlines)
+
+在对 LegacyLock 进行二次开发、功能拓展或定制部署时，开发人员与维护人员必须严格遵守以下**六大军规安全开发红线**，杜绝引入新的安全漏洞：
+
+### 1. 硬件介质操作的绝对非破坏性原则 (Non-Destructive Storage Operation)
+- **零破坏承诺**：系统在接入、扫描、挂载或写入外接移动介质（USB闪存盘、移动硬盘、SSD）时，**严禁执行任何破坏性底层指令**（如格式化、擦除分区表、修改 MBR/GPT、修改文件系统卷标等）；
+- **用户原有数据安全保护**：用户使用的 U 盘往往存有其他个人日常文件。系统在介质中仅写入必要的密钥文件（`user-key.bin`、`heir-key.bin`、`config.bin`）以及轻量硬件绑定校验文件（`.legacylock-device.sig`），严禁删除或重命名介质中的已有非密库文件；
+- **设备指纹只读采集**：在读取 Windows `VolumeSerialNumber`、macOS 卷宗 UUID 以及 Linux `lsblk` 序列号时，均采用非特权只读命令，防止因驱动器权限不足导致程序崩溃或介质锁定。
+
+### 2. 跨平台字符编码防乱码强制准则 (Strict UTF-8 & Zero BOM Standard)
+- **跨三大操作系统兼容**：LegacyLock 必须确保在 Windows（常见 GBK / CP936 区域编码环境）、macOS（UTF-8）与 Linux（UTF-8）之间无缝流转；
+- **禁止附加微软 UTF-8 BOM 头**：生成任何 JSON、密包头部或导出清单时，必须使用纯标准 UTF-8 字节流（`new TextEncoder().encode(...)`），**严禁写入微软特有的 BOM 头 (`\xEF\xBB\xBF`)**，防止 Linux 或 macOS 平台下解析器因前导字节产生语法解析异常；
+- **全链路解码规范**：读取外部文件或数据流时，必须显式指明字符集编码为 `'utf-8'`（如 `reader.readAsText(file, 'UTF-8')` 与 `new TextDecoder('utf-8')`），从源头上杜绝中文字符、多语言符号与 Emoji 出现乱码或转码截断。
+
+### 3. 继承人单向只读与提权防御代码准则 (Heir Read-Only & Privilege Escalation Defense)
+- **深度防御机制 (Defense-in-Depth)**：
+  - **视图层隔离**：双 U 盘解锁后，应用主视图强制渲染 `HeirRecoveryView`，界面上隐藏所有新增、编辑、删除、销毁入口；
+  - **模态窗状态感知**：当继承人打开资产详情查看时，`ItemModal` 自动检测到 `isHeirReadOnly`，禁用保存与删除按钮，并将主行动按钮替换为提权引导；
+  - **状态与逻辑层底层阻断**：在 `App.tsx` 的所有数据修改函数（`handleAddNew`、`handleSelectCategoryFromPicker`、`handleDeleteItem`、`handleSaveItem`、`handleEmergencyWipe`）第一行必须前置检查 `if (!heirCanModify)`，直接阻断任何绕过界面发起的变异操作；
+- **退出接管模式强制锁屏**：继承人在只读接管界面点击“退出接管模式”时，**必须强制调用 `setIsLocked(true)` 回归全屏锁屏状态**，严禁未经验证直接切换至所有者可编辑主界面；
+- **法定提权门槛**：继承人如需转为完全所有者，必须在 `TakeoverControlModal` 中同时提供**所有者主密码 + 128 位紧急安全密钥 (Secret Key)**，经本地密码学验签成功后方可提权。
+
+### 4. 极端破坏性操作的双重确认与内存置零 (Dual Confirmation & Memory Zeroization)
+- **彻底杜绝单次误触即毁**：严禁在 UI 上放置任何“单次点击即触发数据擦除”的危险按钮；
+- **两级确认流 (Two-Step Workflow)**：
+  - **第一级**：高等级风险警示弹窗，明确告知数据一旦抹除不可逆；
+  - **第二级**：强制要求用户在文本框内逐字手动输入大写确认指令 `DESTROY`，匹配成功后销毁按钮方才解除禁用；
+  - **只读模式绝对豁免**：在继承人只读模式下，数据自毁操作被完全封锁，提示“继承人只读接管模式下无权执行数据销毁”。
+
+### 5. 内存敏感凭证生命周期与日志零泄漏 (Zero-Leak Logging & Memory Scrubbing)
+- **控制台与日志严禁输出敏感数据**：
+  - 严禁在任何 `console.log`、`console.error`、审计日志或异常抛出中输出明文密码（Password）、私钥（Private Key）、助记词（Seed Phrase）或紧急安全密钥（Secret Key）；
+- **临时文件强制置零覆写**：
+  - 调用底层 Rust CLI 进行批量加解密时，所生成的临时文件必须放置于受保护的系统隔离目录，并在 `finally` 代码块中执行 `buffer.fill(0)` 内存零填充覆写后方可执行 `fs.unlinkSync`，防止通过物理磁盘未分配扇区恢复残留明文；
+- **剪贴板 30 秒安全衰减**：
+  - 用户或继承人复制密码或助记词后，必须通过 `clipboardService.ts` 注册 30 秒定时清除任务，到期后自动将剪贴板覆写为空，防止被第三方后台常驻监听程序嗅探。
+
+### 6. 100% 离线与网络零遥测 (Air-Gapped CSP & Zero Telemetry)
+- 整个工程代码中**严禁引入任何带有网络上报性质的第三方 SDK**（如 Sentry、Google Analytics、百度统计等）；
+- 严禁从外部 CDN 加载动态脚本或外部网络字体，所有样式、字体、图标库（Lucide Icons）必须 100% 本地内嵌打包；
+- Electron 主进程强制实施 CSP 安全策略，默认阻断所有外部协议通信。
+
+---
+
+## 十二、 Git 代码托管与开源发布防泄漏审查清单 (Git Release & Leak Prevention Checklist)
+
+在将项目代码推送或发布至 GitHub 等公网代码托管平台前，必须对照本清单逐项自检：
+
+### 1. 忽略文件配置验证 (`.gitignore` 审查)
+确保以下敏感资产与构建产物已被严格加入 `.gitignore`，绝不提交至远程仓库：
+- `release/` 与 `dist/`：包含本地打包的大体积二进制文件与安装包；
+- `*.bin`：包含开发测试期间产生的真实或模拟 `user-key.bin`、`heir-key.bin`、`config.bin`；
+- `.env`、`*.local`、`*.pem`、`*.key`：包含本地签名证书与环境变量；
+- `scratch/`：包含开发过程中的临时验证脚本与测试用例输出；
+- `target/`：包含 Rust 密码学核心的中间构建文件。
+
+### 2. 代码提交前敏感信息排查命令
+在执行 `git commit` 前，执行以下命令进行全文安全筛查：
+```bash
+# 1. 检查是否存在未脱敏的测试私钥或 128 位安全密钥
+git diff --staged | grep -iE "(secret_key|private_key|seed_phrase|mnemonic)"
+
+# 2. 检查项目中是否存在遗留的 "1Password" 关键字 (项目规范已全面净化为“军规级”)
+git grep -i "1password"
+
+# 3. 检查暂存区是否有不慎加入的二进制大文件或测试密钥
+git diff --staged --name-only | grep -E "\.(exe|bin|sig|log|tar\.gz)$"
+```
+
+### 3. 提交与推送规范
+```bash
+# 仅添加源码、文档与前端资源
+git add src/ electron/ crypt/ package.json *.md *.bat *.ps1
+
+# 提交符合规范的语义化信息
+git commit -m "feat: complete military-grade dual-usb unlock, heir read-only isolation, and hardware anti-clone binding"
+
+# 推送至 GitHub 主分支
+git push origin main
+```
+
+---
 *文档由 LegacyLock 核心架构与军规安全审计团队制定并签署归档。*
+
+
 
