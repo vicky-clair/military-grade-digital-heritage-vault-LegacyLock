@@ -412,7 +412,58 @@ TEST 3: Rapid/Immediate Close during scan: PASSED (0 lingering)
 
 ---
 
-## 十一、 核心安全实施规范与敏感问题开发红线 (Core Security & Sensitive Development Redlines)
+## 十一、 三语国际化 (i18n) 与多设备自适应显示架构
+
+### 1. 三语国际化引擎架构设计 (`src/services/i18n/`)
+为满足涉外家庭、跨国信托与全球合规诉求，LegacyLock 构建了完全自主可控的轻量级三语国际化响应式引擎：
+- **严格遵循默认规范**：首次启动或未配置语言时，严格**默认为英文界面 (`en`)**；
+- **纯闭环三语支持**：
+  - `en`：English (默认国际通用语言)
+  - `zh`：简体中文 (适合中文母语所有者与家族成员)
+  - `ja`：日本語 (适合日本法域信托与继承场景)
+- **极简零额外依赖**：
+  - 弃用臃肿的 `i18next` / `react-i18next`（节省数十个 NPM 包与数百 KB 体积），采用纯 React Context + TypeScript 强类型字典结构；
+  - 字典类型 `TranslationDictionary` 对导航、设置、弹窗、错误提示等实行 100% 静态编译期类型校验，杜绝键名丢失；
+- **配置持久化与即时热响应**：
+  - 用户在设置中切换语言时，触发 `setLanguage`，全界面所有组件依赖 `useI18n()` 即刻完成毫秒级无损热重绘；
+  - 偏好自动同步写入 `localStorage` 与 Electron 主进程配置，跨重启永久记忆。
+
+### 2. 高分屏与小屏自适应算法 (`electron/main.cjs` + `App.tsx`)
+在跨世代使用中，用户与继承人使用的电脑硬件五花八门（从 11 英寸轻薄上网本、1080p 笔记本到 4K 高分屏台式机）：
+- **小屏智能自适应最大化**：
+  - Electron 启动时，自动读取主显示器的工作区尺寸 (`screen.getPrimaryDisplay().workAreaSize`)；
+  - 若屏幕工作区高度小于 768px 或宽度小于 1366px，主进程自动调用 `mainWindow.maximize()`，防止窗口在低分辨率屏幕上出现内容截断或标题栏出界；
+- **保底窗口尺寸硬约束**：
+  - 主进程强制设定 `minWidth: 800` 与 `minHeight: 500`，严禁窗口被压缩至破坏栅格布局的极小尺寸；
+- **安全工作区边界**：
+  - 严格依据 `workArea` 计算初始位置，绝不遮盖 Windows 底部任务栏或 macOS 顶部菜单栏；
+- **全局界面缩放与热键映射**：
+  - 支持键盘 `Ctrl + +` / `Ctrl + -` / `Ctrl + 0` 与 `Ctrl + 滚轮`，在 60% 至 200% 之间随心缩放；
+  - 缩放等级通过 `document.body.style.zoom` 注入，配合 `localStorage` 跨会话保存。
+
+---
+
+## 十二、 极致轻量化二进制构建与零孤儿进程治理
+
+### 1. Rust 密码学内核极限剥离优化 (`crypt/Cargo.toml`)
+为了将应用打包体积缩减到极致，Rust 核心模块采用了极简发布配置：
+```toml
+[profile.release]
+opt-level = "z"     # 优化二进制体积 (Size Optimization)
+lto = true          # 跨模块链接时全局优化 (Link Time Optimization)
+codegen-units = 1   # 降低并行编译单元以实现最大化死代码剔除
+panic = "abort"     # 移除展开栈，精简异常处理逻辑
+strip = true        # 剥离全部调试符号与符号表
+```
+- 优化效果：将 `vault-cli.exe` 独立可执行文件从最初的近 40MB 剧降至仅 **~500KB**，兼具极致性能与超轻体积。
+
+### 2. Electron 打包分发精简优化
+- **便携版 (Portable) 与 NSIS 安装包**：体积严格控制在 **约 63MB** 左右；
+- 剔除开发测试缓存与冗余构建构件，确保 U 盘冷存时占用极低，哪怕写入 16GB 的老旧 U 盘也游刃有余。
+
+---
+
+## 十三、 核心安全实施规范与敏感问题开发红线 (Core Security & Sensitive Development Redlines)
 
 在对 LegacyLock 进行二次开发、功能拓展或定制部署时，开发人员与维护人员必须严格遵守以下**六大军规安全开发红线**，杜绝引入新的安全漏洞：
 
@@ -456,7 +507,7 @@ TEST 3: Rapid/Immediate Close during scan: PASSED (0 lingering)
 
 ---
 
-## 十二、 Git 代码托管与开源发布防泄漏审查清单 (Git Release & Leak Prevention Checklist)
+## 十四、 Git 代码托管与开源发布防泄漏审查清单 (Git Release & Leak Prevention Checklist)
 
 在将项目代码推送或发布至 GitHub 等公网代码托管平台前，必须对照本清单逐项自检：
 

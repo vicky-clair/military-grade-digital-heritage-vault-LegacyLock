@@ -32,6 +32,7 @@ import {
   computeSecretKeyHash,
   generateEmergencyKitContent,
 } from '../services/cryptoService';
+import { useI18n } from '../services/i18n';
 
 interface SetLockPasswordModalProps {
   isOpen: boolean;
@@ -52,6 +53,7 @@ export const SetLockPasswordModal: React.FC<SetLockPasswordModalProps> = ({
   onSuccess,
   heirName,
 }) => {
+  const { t } = useI18n();
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [hint, setHint] = useState('');
@@ -66,15 +68,15 @@ export const SetLockPasswordModal: React.FC<SetLockPasswordModalProps> = ({
 
   // 军规密码强度计算
   const evaluateStrength = (pwd: string) => {
-    if (!pwd) return { label: '请输入密码', color: '#7E92C4', percent: 0 };
-    if (pwd.length < 6) return { label: '过短 (需不少于6位)', color: '#F43F5E', percent: 20 };
+    if (!pwd) return { label: t('usbModal.strengthNone'), color: '#7E92C4', percent: 0 };
+    if (pwd.length < 6) return { label: t('changePasswordModal.strengthTooShort'), color: '#F43F5E', percent: 20 };
     const hasNum = /\d/.test(pwd);
     const hasLetter = /[a-zA-Z]/.test(pwd);
     const hasSymbol = /[^a-zA-Z0-9]/.test(pwd);
     const score = (pwd.length >= 8 ? 1 : 0) + (hasNum ? 1 : 0) + (hasLetter ? 1 : 0) + (hasSymbol ? 1 : 0);
-    if (score >= 4) return { label: '极强 (军规推荐)', color: '#34D399', percent: 100 };
-    if (score >= 3) return { label: '强 (安全性良好)', color: '#60A5FA', percent: 75 };
-    return { label: '中等 (建议增加特殊符号)', color: '#FBBF24', percent: 45 };
+    if (score >= 4) return { label: t('changePasswordModal.strengthVeryStrong'), color: '#34D399', percent: 100 };
+    if (score >= 3) return { label: t('changePasswordModal.strengthStrong'), color: '#60A5FA', percent: 75 };
+    return { label: t('changePasswordModal.strengthMedium'), color: '#FBBF24', percent: 45 };
   };
 
   const strength = evaluateStrength(password);
@@ -86,7 +88,7 @@ export const SetLockPasswordModal: React.FC<SetLockPasswordModalProps> = ({
   };
 
   const handleRegenerateSecretKey = () => {
-    if (window.confirm('重新生成紧急安全密钥将替换当前生成的密钥，确定要重新生成吗？')) {
+    if (window.confirm(t('common.warning'))) {
       setSecretKey(generateSecretKey());
       setCopiedKey(false);
     }
@@ -97,7 +99,7 @@ export const SetLockPasswordModal: React.FC<SetLockPasswordModalProps> = ({
     const kitText = generateEmergencyKitContent({
       secretKey,
       masterPasswordHint: hint.trim(),
-      heirName: heirName || '法定继承人',
+      heirName: heirName || 'Legal Heir',
     });
     const blob = new Blob([new TextEncoder().encode(kitText)], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
@@ -114,17 +116,17 @@ export const SetLockPasswordModal: React.FC<SetLockPasswordModalProps> = ({
     setErrorMsg('');
 
     if (!password || password.length < 6) {
-      setErrorMsg('主密码长度不能少于 6 位字符');
+      setErrorMsg(t('setLockPasswordModal.lengthError'));
       return;
     }
 
     if (password !== confirmPassword) {
-      setErrorMsg('两次输入的密码不一致，请仔细核对');
+      setErrorMsg(t('setLockPasswordModal.mismatchError'));
       return;
     }
 
     if (!hasBackedUpSecretKey) {
-      setErrorMsg('请先勾选确认已妥善保存紧急安全密钥 (Secret Key) 方可继续');
+      setErrorMsg(t('setLockPasswordModal.backupRequiredError'));
       return;
     }
 
@@ -137,7 +139,7 @@ export const SetLockPasswordModal: React.FC<SetLockPasswordModalProps> = ({
 
       onSuccess(hashHex, saltHex, hint.trim(), secretKey, secKeyHash);
     } catch (err: any) {
-      setErrorMsg(`密码学参数初始化失败: ${err.message || '未知错误'}`);
+      setErrorMsg(`${t('common.error')}: ${err.message || ''}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -170,15 +172,15 @@ export const SetLockPasswordModal: React.FC<SetLockPasswordModalProps> = ({
             </div>
             <div>
               <div style={{ fontSize: 16, fontWeight: 700, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span>初始化主密码与安全密钥</span>
-                <span className="badge-pill purple" style={{ fontSize: 10.5, padding: '2px 8px' }}>军规级规格</span>
+                <span>{t('setLockPasswordModal.title')}</span>
+                <span className="badge-pill purple" style={{ fontSize: 10.5, padding: '2px 8px' }}>LVCF 2.0</span>
               </div>
               <p className="modal-title-desc">
-                初次配置将生成本地离线主密码 (Master PIN) 及高熵 128 位军规紧急安全密钥 (Secret Key)
+                {t('setLockPasswordModal.subtitle')}
               </p>
             </div>
           </div>
-          <button onClick={onClose} className="modal-window-close" title="取消">
+          <button onClick={onClose} className="modal-window-close" title={t('common.cancel')}>
             <X style={{ width: 16, height: 16 }} />
           </button>
         </div>
@@ -201,7 +203,7 @@ export const SetLockPasswordModal: React.FC<SetLockPasswordModalProps> = ({
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <Key style={{ width: 16, height: 16, color: '#C084FC' }} />
                   <span style={{ fontSize: 13, fontWeight: 700, color: '#F3E8FF' }}>
-                    紧急安全密钥 (Secret Key)
+                    {t('setLockPasswordModal.secretKeyTitle')}
                   </span>
                 </div>
                 <button
@@ -217,10 +219,10 @@ export const SetLockPasswordModal: React.FC<SetLockPasswordModalProps> = ({
                     fontSize: 11.5,
                     cursor: 'pointer',
                   }}
-                  title="重新生成新随机密钥"
+                  title="Generate New Key"
                 >
                   <RefreshCw style={{ width: 12, height: 12 }} />
-                  <span>换一个</span>
+                  <span>Refresh</span>
                 </button>
               </div>
 
@@ -259,13 +261,13 @@ export const SetLockPasswordModal: React.FC<SetLockPasswordModalProps> = ({
                   }}
                 >
                   {copiedKey ? <Check style={{ width: 12, height: 12 }} /> : <Copy style={{ width: 12, height: 12 }} />}
-                  <span>{copiedKey ? '已复制' : '复制'}</span>
+                  <span>{copiedKey ? t('setLockPasswordModal.copied') : t('setLockPasswordModal.copySecretKey')}</span>
                 </button>
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 10 }}>
                 <p style={{ fontSize: 11, color: '#D8B4FE', margin: 0, lineHeight: 1.4 }}>
-                  🛡️ 128 位真随机生成。重装系统或从 U 盘恢复备份时，必须同时提供【主密码】+【安全密钥】。
+                  🛡️ {t('setLockPasswordModal.secretKeyNotice')}
                 </p>
                 <button
                   type="button"
@@ -287,7 +289,7 @@ export const SetLockPasswordModal: React.FC<SetLockPasswordModalProps> = ({
                   }}
                 >
                   <Download style={{ width: 12, height: 12 }} />
-                  <span>下载救援卡</span>
+                  <span>{t('setLockPasswordModal.downloadEmergencyKit')}</span>
                 </button>
               </div>
             </div>
@@ -296,14 +298,14 @@ export const SetLockPasswordModal: React.FC<SetLockPasswordModalProps> = ({
               {/* 主密码输入 */}
               <div>
                 <label style={{ fontSize: 12, fontWeight: 600, color: '#C3D2F4', display: 'block', marginBottom: 6 }}>
-                  设置锁屏主密码 (Master Password) <span style={{ color: '#EF4444' }}>*</span>
+                  {t('setLockPasswordModal.passLabel')} <span style={{ color: '#EF4444' }}>*</span>
                 </label>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <input
                     type={showPassword ? 'text' : 'password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="输入 6~32 位字母、数字或符号"
+                    placeholder={t('setLockPasswordModal.passPlaceholder')}
                     autoFocus
                     style={{
                       flex: 1,
@@ -342,7 +344,7 @@ export const SetLockPasswordModal: React.FC<SetLockPasswordModalProps> = ({
                 {password && (
                   <div style={{ marginTop: 6 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 3 }}>
-                      <span style={{ color: '#8EA4D4' }}>强度评定:</span>
+                      <span style={{ color: '#8EA4D4' }}>{t('usbModal.masterPassLabel')}:</span>
                       <span style={{ color: strength.color, fontWeight: 600 }}>{strength.label}</span>
                     </div>
                     <div style={{ height: 4, width: '100%', background: 'rgba(255,255,255,0.1)', borderRadius: 2, overflow: 'hidden' }}>
@@ -362,13 +364,13 @@ export const SetLockPasswordModal: React.FC<SetLockPasswordModalProps> = ({
               {/* 确认密码输入 */}
               <div>
                 <label style={{ fontSize: 12, fontWeight: 600, color: '#C3D2F4', display: 'block', marginBottom: 6 }}>
-                  再次确认主密码 <span style={{ color: '#EF4444' }}>*</span>
+                  {t('setLockPasswordModal.confirmPassLabel')} <span style={{ color: '#EF4444' }}>*</span>
                 </label>
                 <input
                   type={showPassword ? 'text' : 'password'}
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="请再次输入相同的主密码"
+                  placeholder={t('setLockPasswordModal.confirmPassPlaceholder')}
                   style={{
                     width: '100%',
                     height: 40,
@@ -387,14 +389,14 @@ export const SetLockPasswordModal: React.FC<SetLockPasswordModalProps> = ({
               {/* 密码提示词 (可选) */}
               <div>
                 <label style={{ fontSize: 12, fontWeight: 600, color: '#C3D2F4', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-                  <span>密码提示词 (可选，遗忘时展示)</span>
+                  <span>{t('setLockPasswordModal.hintLabel')}</span>
                   <HelpCircle style={{ width: 13, height: 13, color: '#7E92C4' }} />
                 </label>
                 <input
                   type="text"
                   value={hint}
                   onChange={(e) => setHint(e.target.value)}
-                  placeholder="例如：最喜欢的一本书+毕业年份（切勿直接写明密码）"
+                  placeholder={t('setLockPasswordModal.hintPlaceholder')}
                   style={{
                     width: '100%',
                     height: 38,
@@ -431,7 +433,7 @@ export const SetLockPasswordModal: React.FC<SetLockPasswordModalProps> = ({
                   style={{ marginTop: 3, cursor: 'pointer' }}
                 />
                 <label style={{ fontSize: 11.5, color: hasBackedUpSecretKey ? '#A7F3D0' : '#FDE68A', lineHeight: 1.4, cursor: 'pointer' }}>
-                  我已妥善保存该【紧急安全密钥】与【主密码】。我明确知晓若重装应用或导入备份，必须同时输入密码与此安全密钥方可解密恢复数据（防止单凭密码被盗取导致数据泄露）。
+                  {t('setLockPasswordModal.backupCheckbox')}
                 </label>
               </div>
 
@@ -461,7 +463,7 @@ export const SetLockPasswordModal: React.FC<SetLockPasswordModalProps> = ({
           <div className="modal-window-footer" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: '#8EA4D4' }}>
               <ShieldCheck style={{ width: 15, height: 15, color: '#34D399' }} />
-              <span>PBKDF2-SHA256 100,000 轮加盐 + 128位双因子防线</span>
+              <span>PBKDF2-100k + 128-bit</span>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -471,7 +473,7 @@ export const SetLockPasswordModal: React.FC<SetLockPasswordModalProps> = ({
                 className="btn-action-cancel"
                 disabled={isSubmitting}
               >
-                取消
+                {t('common.cancel')}
               </button>
               <button
                 type="submit"
@@ -489,7 +491,7 @@ export const SetLockPasswordModal: React.FC<SetLockPasswordModalProps> = ({
                 ) : (
                   <Lock style={{ width: 14, height: 14 }} />
                 )}
-                <span>{isSubmitting ? '计算加盐哈希中...' : '保存密码与密钥并立即锁屏'}</span>
+                <span>{isSubmitting ? t('setLockPasswordModal.submittingBtn') : t('setLockPasswordModal.submitBtn')}</span>
               </button>
             </div>
           </div>

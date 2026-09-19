@@ -22,6 +22,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { VaultHealthReport } from '../types';
+import { useI18n } from '../services/i18n';
 
 /**
  * 密库健康自检弹窗属性接口
@@ -46,6 +47,8 @@ export const HealthCheckModal: React.FC<HealthCheckModalProps> = ({
   onRecheck,
   isChecking,
 }) => {
+  const { t } = useI18n();
+
   if (!isOpen || !report) return null;
 
   const getStatusBadge = () => {
@@ -53,20 +56,20 @@ export const HealthCheckModal: React.FC<HealthCheckModalProps> = ({
       case 'Healthy':
         return (
           <span style={{ padding: '3px 10px', borderRadius: 9999, background: 'rgba(52, 211, 153, 0.2)', color: '#34D399', border: '1px solid rgba(52, 211, 153, 0.4)', fontSize: 11, fontWeight: 700, fontFamily: 'JetBrains Mono' }}>
-            HEALTHY · 军规级健康
+            {t('healthCheckModal.healthyBadge')}
           </span>
         );
       case 'Warning':
         return (
           <span style={{ padding: '3px 10px', borderRadius: 9999, background: 'rgba(251, 191, 36, 0.2)', color: '#FBBF24', border: '1px solid rgba(251, 191, 36, 0.4)', fontSize: 11, fontWeight: 700, fontFamily: 'JetBrains Mono' }}>
-            WARNING · 存在潜在风险
+            {t('healthCheckModal.warningBadge')}
           </span>
         );
       case 'Damaged':
       case 'RecoveryRequired':
         return (
           <span style={{ padding: '3px 10px', borderRadius: 9999, background: 'rgba(244, 63, 94, 0.2)', color: '#FDA4AF', border: '1px solid rgba(244, 63, 94, 0.4)', fontSize: 11, fontWeight: 700, fontFamily: 'JetBrains Mono' }}>
-            DAMAGED · 完整性受损
+            {t('healthCheckModal.dangerBadge')}
           </span>
         );
     }
@@ -74,34 +77,34 @@ export const HealthCheckModal: React.FC<HealthCheckModalProps> = ({
 
   const checks = [
     {
-      name: 'LVCF 2.0 容器头与魔数校验 (Header Verification)',
+      name: 'LVCF 2.0 Header & Magic Verification',
       passed: report.headerVerified,
-      desc: '魔数 LEGACYLOCK、容器标准版本 2.0 及核心元数据自描述完整',
+      desc: 'Magic bytes LEGACYLOCK and LVCF 2.0 metadata self-consistency verified',
     },
     {
-      name: '所有者数字签名防篡改验证 (Manifest Signature)',
+      name: 'Owner Manifest Digital Signature',
       passed: report.signatureVerified,
-      desc: '使用所有者签名私钥验签，确保文件未被十六进制或第三方非法篡改',
+      desc: 'Owner Ed25519 digital signature verified against tampering',
     },
     {
-      name: '资产对象加密哈希完整性 (Object Hash Verification)',
+      name: 'Object Encrypted Hash Verification',
       passed: report.objectHashVerified,
-      desc: '全量数字资产密文 SHA-256 校验和完全匹配，杜绝静默位翻转',
+      desc: 'Full SHA-256 payload checksum matches cipher payload against bit-rot',
     },
     {
-      name: '单调递增防回滚检查 (Anti-Rollback Sequence)',
+      name: 'Anti-Rollback Monotonic Check',
       passed: report.antiRollbackVerified,
-      desc: '版本序号与代际 Monotonic 严格递增，防止攻击者覆盖旧保险库',
+      desc: 'Version sequence monotonically advances to defeat replay attacks',
     },
     {
-      name: '双介质密钥槽有效性 (Key Slot Verification)',
+      name: 'Key Slot Mapping Validity',
       passed: report.keySlotVerified,
-      desc: '主介质与继承介质公私钥槽位映射合法且处于有效期内',
+      desc: 'Master and heir public/private key slots mapped and active',
     },
     {
-      name: '30年长效离线自救应急包 (Company Disappearance Test)',
+      name: '30-Year Offline Rescue Kit Presence',
       passed: report.offlineRescuePresent,
-      desc: '介质内包含 W3C 标准 WebCrypto 离线单页，即使开发商倒闭亦能自主解密',
+      desc: 'W3C standard standalone rescue tool present on drive for lifetime recovery',
     },
   ];
 
@@ -133,19 +136,19 @@ export const HealthCheckModal: React.FC<HealthCheckModalProps> = ({
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ fontSize: 16, fontWeight: 700, color: '#FFFFFF' }}>
-                  存储介质健康与密码学自检
+                  {t('healthCheckModal.title')}
                 </span>
                 <span className="modal-badge-cat">
-                  Health Check
+                  Audit
                 </span>
               </div>
               <p style={{ fontSize: 11, color: '#8EA4D4', marginTop: 2 }}>
-                根据 LegacyLock v2 规范执行 6 项物理与密码学完整性巡检
+                {t('healthCheckModal.subtitle')}
               </p>
             </div>
           </div>
 
-          <button onClick={onClose} className="modal-window-close" title="关闭窗口">
+          <button onClick={onClose} className="modal-window-close" title={t('common.close')}>
             <X style={{ width: 16, height: 16 }} />
           </button>
         </div>
@@ -155,7 +158,7 @@ export const HealthCheckModal: React.FC<HealthCheckModalProps> = ({
           {/* 得分与总体状态 */}
           <div className="form-card" style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 18 }}>
             <div>
-              <span style={{ fontSize: 11, color: '#8EA4D4', fontFamily: 'JetBrains Mono' }}>综合健康指数</span>
+              <span style={{ fontSize: 11, color: '#8EA4D4', fontFamily: 'JetBrains Mono' }}>Score</span>
               <div style={{ fontSize: 28, fontWeight: 800, color: '#FFFFFF', fontFamily: 'JetBrains Mono', marginTop: 2 }}>
                 {report.score} <span style={{ fontSize: 14, color: '#7E92C4' }}>/ 100</span>
               </div>
@@ -167,7 +170,7 @@ export const HealthCheckModal: React.FC<HealthCheckModalProps> = ({
           {/* 6 项巡检项目清单 */}
           <div className="form-card">
             <div className="form-card-title">
-              <span>巡检项目清单 (6 项军规检测)</span>
+              <span>{t('healthCheckModal.title')}</span>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -219,7 +222,7 @@ export const HealthCheckModal: React.FC<HealthCheckModalProps> = ({
             >
               <div style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6, color: '#FBBF24' }}>
                 <AlertTriangle style={{ width: 16, height: 16 }} />
-                <span>发现潜在注意项：</span>
+                <span>{t('healthCheckModal.issueFound')}</span>
               </div>
               <ul style={{ paddingLeft: 18, color: '#E2E8F0', lineHeight: 1.6 }}>
                 {report.issues.map((issue, i) => (
@@ -233,7 +236,7 @@ export const HealthCheckModal: React.FC<HealthCheckModalProps> = ({
         {/* 底部独立按钮栏 */}
         <div className="modal-window-footer">
           <span style={{ fontSize: 11, color: '#8EA4D4', fontFamily: 'JetBrains Mono' }}>
-            上次巡检: {new Date(report.lastCheckedAt).toLocaleTimeString()}
+            {t('healthCheckModal.checkedAt')} {new Date(report.lastCheckedAt).toLocaleTimeString()}
           </span>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -244,13 +247,13 @@ export const HealthCheckModal: React.FC<HealthCheckModalProps> = ({
               style={{ display: 'flex', alignItems: 'center', gap: 6 }}
             >
               <RefreshCw style={{ width: 14, height: 14 }} className={isChecking ? 'animate-spin' : ''} />
-              <span>重新自检</span>
+              <span>{isChecking ? t('healthCheckModal.checkingBtn') : t('healthCheckModal.recheckBtn')}</span>
             </button>
             <button
               onClick={onClose}
               className="btn-action-submit"
             >
-              确认
+              {t('common.confirm')}
             </button>
           </div>
         </div>

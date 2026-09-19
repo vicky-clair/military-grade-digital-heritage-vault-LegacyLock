@@ -15,7 +15,7 @@
  *    - 分类选择面板 (CategoryPickerModal)、资产录入表单 (ItemModal)、双钥匙 PIN 配置 (UsbPasswordModal)、
  *      密库健康体检 (HealthCheckModal)、介质无损升级迁移 (MediaMigrationModal)。
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { RightContentArea } from './components/RightContentArea';
 import { CategoryPickerModal } from './components/CategoryPickerModal';
@@ -30,6 +30,7 @@ import { SetLockPasswordModal } from './components/SetLockPasswordModal';
 import { ChangePasswordModal } from './components/ChangePasswordModal';
 import { SubscriptionModal } from './components/SubscriptionModal';
 import { TakeoverControlModal } from './components/TakeoverControlModal';
+import { useI18n } from './services/i18n';
 import { INITIAL_VAULT_ITEMS } from './services/mockData';
 import { canModifyVault } from './services/subscriptionService';
 import {
@@ -53,6 +54,7 @@ import {
 import { getTheme, DEFAULT_THEME_ID } from './services/themes';
 
 export const App: React.FC = () => {
+  const { t } = useI18n();
   const [items, setItems] = useState<VaultItem[]>([]);
   const [isStorageLoaded, setIsStorageLoaded] = useState<boolean>(false);
 
@@ -108,6 +110,92 @@ export const App: React.FC = () => {
       document.body.style.background = currentTheme.mainStyle.background;
     }
   }, [currentTheme]);
+
+  // 全局界面缩放状态管理 (支持 Ctrl + / Ctrl - / Ctrl 0 适配高分屏或超小笔记本)
+  const [zoomLevel, setZoomLevel] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('legacylock_ui_zoom');
+      if (saved) {
+        const val = parseFloat(saved);
+        if (!isNaN(val) && val >= 0.6 && val <= 2.0) return val;
+      }
+    } catch (_) {}
+    return 1.0;
+  });
+
+  const applyZoom = useCallback((newZoom: number) => {
+    const clamped = Math.round(Math.max(0.6, Math.min(2.0, newZoom)) * 100) / 100;
+    setZoomLevel(clamped);
+    try {
+      localStorage.setItem('legacylock_ui_zoom', String(clamped));
+      if (typeof document !== 'undefined') {
+        (document.body.style as any).zoom = `${clamped * 100}%`;
+      }
+      if (isElectronApp() && window.legacyLockAPI?.setZoom) {
+        window.legacyLockAPI.setZoom(clamped);
+      }
+    } catch (_) {}
+  }, []);
+
+  // 监听初始 zoom 配置
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      (document.body.style as any).zoom = `${zoomLevel * 100}%`;
+    }
+    if (isElectronApp() && window.legacyLockAPI?.getZoom) {
+      window.legacyLockAPI.getZoom().then((res) => {
+        if (res?.success && typeof res.zoom === 'number') {
+          setZoomLevel(res.zoom);
+          (document.body.style as any).zoom = `${res.zoom * 100}%`;
+        }
+      });
+    }
+  }, []);
+
+  // 监听全局 Ctrl + / Ctrl - / Ctrl 0 快捷键与滚轮缩放
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        if (e.key === '=' || e.key === '+') {
+          e.preventDefault();
+          setZoomLevel((prev) => {
+            const next = Math.min(2.0, prev + 0.05);
+            applyZoom(next);
+            return next;
+          });
+        } else if (e.key === '-' || e.key === '_') {
+          e.preventDefault();
+          setZoomLevel((prev) => {
+            const next = Math.max(0.6, prev - 0.05);
+            applyZoom(next);
+            return next;
+          });
+        } else if (e.key === '0') {
+          e.preventDefault();
+          applyZoom(1.0);
+        }
+      }
+    };
+
+    const handleWheel = (e: WheelEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        const delta = e.deltaY < 0 ? 0.05 : -0.05;
+        setZoomLevel((prev) => {
+          const next = Math.max(0.6, Math.min(2.0, prev + delta));
+          applyZoom(next);
+          return next;
+        });
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('wheel', handleWheel, { passive: false });
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('wheel', handleWheel);
+    };
+  }, [applyZoom]);
 
   // 当前选中的左侧分类导航：默认选中「all (所有密鑰)」展示核心密匙资产
   const [selectedNav, setSelectedNav] = useState<NavCategoryType>('all');
@@ -186,7 +274,7 @@ export const App: React.FC = () => {
   };
 
   // 扫描硬件存储驱动器 (支持 Windows/macOS/Linux 外部硬盘与 U 盘)
-  const handleRefreshDrives = async () => {
+  const handleRefreshDrives = useCallback(async () => {
     setIsScanningDrives(true);
     if (isElectronApp() && window.legacyLockAPI) {
       try {
@@ -196,6 +284,8 @@ export const App: React.FC = () => {
         }
       } catch (err) {
         console.error('[扫描外部驱动器失败]', err);
+      } finally {
+        setIsScanningDrives(false);
       }
     } else {
       // 浏览器环境仿真与降级
@@ -233,10 +323,10 @@ export const App: React.FC = () => {
             mediaType: 'UsbFlash',
           },
         ]);
+        setIsScanningDrives(false);
       }, 300);
     }
-    setTimeout(() => setIsScanningDrives(false), 500);
-  };
+  }, []);
 
   // 启动即刻自动执行：恢复最后保存的主题配色 + 加密加载资产 + 自动识别外部存储介质
   useEffect(() => {
@@ -282,13 +372,20 @@ export const App: React.FC = () => {
     handleRefreshDrives();
   }, []);
 
-  // 军规级防暂离空闲自动锁屏监听
+  // 军规级防暂离空闲自动锁屏监听 (加入 1000ms 节流与配置缓存，杜绝鼠标高频移动时的 I/O 阻塞)
   useEffect(() => {
     let timeoutId: any = null;
+    let lastActivityTime = 0;
+    // 闭包缓存配置，彻底杜绝每次 mousemove 触发同步阻塞式 localStorage.getItem()
+    const autoLockMin = Number(localStorage.getItem('legacylock_autolock') || '15');
 
     const resetIdleTimer = () => {
+      const now = Date.now();
+      // 节流：1000ms 内最多重置一次计时器
+      if (now - lastActivityTime < 1000) return;
+      lastActivityTime = now;
+
       if (timeoutId) clearTimeout(timeoutId);
-      const autoLockMin = Number(localStorage.getItem('legacylock_autolock') || '15');
       if (autoLockMin > 0 && !isLocked) {
         timeoutId = setTimeout(() => {
           setIsLocked(true);
@@ -310,14 +407,21 @@ export const App: React.FC = () => {
     // 关键生命周期守卫：在存储尚未完成加载时，绝对禁止自动回写覆盖用户数据！
     if (!isStorageLoaded) return;
 
+    // 1. 本地持久化存储立即安全写入
     saveSecureLocalItems(items);
-    encryptVaultWeb(items, plan).then((c) => {
-      setContainer(c);
-      if (isElectronApp() && window.legacyLockAPI) {
-        window.legacyLockAPI.saveVaultContainer(c).catch(() => {});
-      }
-      runHealthCheck(c, items);
-    });
+
+    // 2. 导出容器重加密与健康体检加入 500ms 防抖，杜绝快速连续输入时的密集 PBKDF2/AES 计算
+    const debounceTimer = setTimeout(() => {
+      encryptVaultWeb(items, plan).then((c) => {
+        setContainer(c);
+        if (isElectronApp() && window.legacyLockAPI) {
+          window.legacyLockAPI.saveVaultContainer(c).catch(() => {});
+        }
+        runHealthCheck(c, items);
+      });
+    }, 500);
+
+    return () => clearTimeout(debounceTimer);
   }, [items, plan, isStorageLoaded]);
 
   useEffect(() => {
@@ -377,7 +481,7 @@ export const App: React.FC = () => {
       setIsSubscriptionModalOpen(true);
       return;
     }
-    if (window.confirm('确定要从数字遗产库中删除该资产项目吗？')) {
+    if (window.confirm(t('app.confirmDeleteAsset'))) {
       setItems((prev) => prev.filter((i) => i.id !== id));
     }
   };
@@ -524,7 +628,7 @@ export const App: React.FC = () => {
     setPlan(updatedPlan);
     localStorage.setItem('legacylock_plan', JSON.stringify(updatedPlan));
     setIsChangePasswordModalOpen(false);
-    alert('✅ 锁屏主密码已成功更新！');
+    alert(t('app.passwordUpdatedAlert'));
   };
 
   // 监听桌面端托盘与主进程事件 (关闭拦截与托盘一键锁库)
@@ -548,9 +652,9 @@ export const App: React.FC = () => {
     if (isElectronApp() && window.legacyLockAPI) {
       try {
         await window.legacyLockAPI.saveVaultContainer(container);
-        alert('✅ 核心数字遗产库已加密封装并成功同步写入目标移动介质！');
+        alert(t('app.vaultSavedSuccessAlert'));
       } catch (err: any) {
-        alert(`❌ 写入异常: ${err.message}`);
+        alert(`${t('app.writeErrorAlert')}${err.message}`);
       }
     } else {
       const blob = new Blob([JSON.stringify(container, null, 2)], {
@@ -562,7 +666,7 @@ export const App: React.FC = () => {
       a.download = `LegacyLock_LVCF2_Vault_${Date.now()}.json`;
       a.click();
       URL.revokeObjectURL(url);
-      alert('✅ 军规加密密包已生成并下载至本地！');
+      alert(t('app.packageDownloadedAlert'));
     }
   };
 
@@ -593,13 +697,13 @@ export const App: React.FC = () => {
       )
       .join('\n');
     navigator.clipboard.writeText(text);
-    alert('📋 当前密匙清单已成功复制到系统剪贴板！');
+    alert(t('app.copyAllSuccessAlert'));
   };
 
   // 军规级安全紧急销毁
   const handleEmergencyWipe = () => {
     if (!heirCanModify) {
-      alert('🔒 当前处于继承人只读模式，无权执行数据销毁。请先输入主密码与安全密钥接管控制权。');
+      alert(t('app.wipeReadOnlyBlockedAlert'));
       return;
     }
     localStorage.removeItem('legacylock_items_enc');
@@ -607,19 +711,19 @@ export const App: React.FC = () => {
     localStorage.removeItem('legacylock_plan');
     localStorage.removeItem('legacylock_seeded');
     setItems([]);
-    alert('⚠️ 军规级安全擦除完成！本地缓存与数字遗产密库已彻底清空。');
+    alert(t('app.wipeSuccessAlert'));
   };
 
   // 重新导入官方开箱示例
   const handleReloadMockData = () => {
-    if (window.confirm('确定要将官方演示示例资产重新导入密库吗？已录入的资产不会丢失。')) {
+    if (window.confirm(t('app.confirmReloadMock'))) {
       setItems((prev) => {
         const existingIds = new Set(prev.map((i) => i.id));
         const toAdd = INITIAL_VAULT_ITEMS.filter((i) => !existingIds.has(i.id));
         return [...prev, ...toAdd];
       });
       localStorage.setItem('legacylock_seeded', 'true');
-      alert('✅ 官方演示示例资产已成功重新导入！');
+      alert(t('app.reloadMockSuccessAlert'));
     }
   };
 
@@ -710,6 +814,8 @@ export const App: React.FC = () => {
             onReloadMockData={handleReloadMockData}
             canModify={heirCanModify}
             onRequestTakeover={() => setShowTakeoverModal(true)}
+            zoomLevel={zoomLevel}
+            onSetZoom={applyZoom}
           />
         </>
       )}

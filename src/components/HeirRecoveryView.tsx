@@ -30,6 +30,7 @@ import {
 import { VaultItem } from '../types';
 import { CATEGORIES, getCategoryDef } from '../services/categories';
 import { copyToClipboard } from '../services/clipboardService';
+import { useI18n } from '../services/i18n';
 
 /**
  * 安全 URL 过滤与校验函数 (防御 XSS 与协议注入)
@@ -70,6 +71,7 @@ export const HeirRecoveryView: React.FC<HeirRecoveryViewProps> = ({
   canModify,
   onRequestTakeover,
 }) => {
+  const { t } = useI18n();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
@@ -100,7 +102,7 @@ export const HeirRecoveryView: React.FC<HeirRecoveryViewProps> = ({
   // 一键导出明文接管清单
   const handleExportDecryptedJson = () => {
     const exportData = {
-      title: 'LegacyLock 数字遗产接管交接清单',
+      title: 'LegacyLock Digital Heritage Recovery Manifest',
       heir: heirName,
       vaultId,
       exportedAt: new Date().toISOString(),
@@ -121,7 +123,7 @@ export const HeirRecoveryView: React.FC<HeirRecoveryViewProps> = ({
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `LegacyLock_数字遗产接管清单_${heirName}_${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `LegacyLock_Recovery_Manifest_${heirName}_${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -142,14 +144,14 @@ export const HeirRecoveryView: React.FC<HeirRecoveryViewProps> = ({
           <div>
             <div className="flex items-center gap-2">
               <span className="text-sm font-bold text-white tracking-wide">
-                LegacyLock Recovery Mode · 继承人只读接管模式
+                {t('heirRecovery.title')}
               </span>
               <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-500/30 text-purple-200 font-mono font-bold border border-purple-400/30">
-                READ-ONLY HEIR
+                {t('heirRecovery.readOnlyBadge')}
               </span>
             </div>
             <p className="text-xs text-purple-200/70 mt-0.5">
-              法定继承人：<strong className="text-white">{heirName}</strong> · 密码学所有者签名有效 · 所有编辑删除权限已受控锁定
+              Heir: <strong className="text-white">{heirName}</strong> · {t('heirRecovery.subtitle')}
             </p>
           </div>
         </div>
@@ -163,13 +165,13 @@ export const HeirRecoveryView: React.FC<HeirRecoveryViewProps> = ({
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-600/40 to-indigo-600/40 hover:from-amber-600/60 hover:to-indigo-600/60 border border-amber-400/40 text-xs font-bold text-amber-200 transition-all shadow-lg shadow-amber-500/10"
             >
               <Crown className="w-3.5 h-3.5" />
-              <span>接管控制权 (转为所有者)</span>
+              <span>{t('heirRecovery.takeoverBtn')}</span>
             </button>
           )}
           {canModify && (
             <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/20 border border-emerald-400/30 text-xs font-bold text-emerald-300">
               <Crown className="w-3.5 h-3.5" />
-              已接管完全控制权 (读写模式)
+              {t('heirRecovery.takenOverBadge')}
             </span>
           )}
 
@@ -178,7 +180,7 @@ export const HeirRecoveryView: React.FC<HeirRecoveryViewProps> = ({
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-600/30 hover:bg-purple-600/50 border border-purple-400/30 text-xs font-semibold text-white transition-all shadow-sm"
           >
             <Download className="w-3.5 h-3.5" />
-            <span>导出解密清单 (JSON)</span>
+            <span>{t('heirRecovery.exportJsonBtn')}</span>
           </button>
 
           <button
@@ -186,7 +188,7 @@ export const HeirRecoveryView: React.FC<HeirRecoveryViewProps> = ({
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-semibold text-white transition-all"
           >
             <Printer className="w-3.5 h-3.5" />
-            <span>打印遗产单</span>
+            <span>{t('heirRecovery.printSheetBtn')}</span>
           </button>
 
           <button
@@ -194,7 +196,7 @@ export const HeirRecoveryView: React.FC<HeirRecoveryViewProps> = ({
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-semibold text-slate-200 hover:text-white transition-all ml-2"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
-            <span>退出接管模式</span>
+            <span>{t('heirRecovery.exitBtn')}</span>
           </button>
         </div>
       </div>
@@ -208,7 +210,7 @@ export const HeirRecoveryView: React.FC<HeirRecoveryViewProps> = ({
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="搜索接管资产名称、账号、密码或接管指示..."
+            placeholder={t('heirRecovery.searchPlaceholder')}
             className="w-full pl-10 pr-4 py-2 bg-[#171C2E] border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
           />
         </div>
@@ -253,11 +255,11 @@ export const HeirRecoveryView: React.FC<HeirRecoveryViewProps> = ({
         <div className="max-w-6xl mx-auto space-y-4">
           <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
             <span>
-              显示 {filteredItems.length} 项资产 (基于 LVCF 2.0 容器恢复)
+              {t('heirRecovery.totalAssetsPrefix')} {filteredItems.length} {t('heirRecovery.totalAssetsSuffix')}
             </span>
             <span className="flex items-center gap-1 text-emerald-400 font-mono">
               <Lock className="w-3 h-3" />
-              只读接管：已彻底禁用写回与修改
+              {t('topBar.readOnlyBanner')}
             </span>
           </div>
 
@@ -296,10 +298,10 @@ export const HeirRecoveryView: React.FC<HeirRecoveryViewProps> = ({
                         <button
                           onClick={() => setActiveInstructionItem(item)}
                           className="flex items-center gap-1 text-[11px] text-amber-400 hover:text-amber-300 bg-amber-400/10 border border-amber-400/20 px-2 py-0.5 rounded-lg"
-                          title="查看所有者预留的接管向导指示"
+                          title="Instruction Guide"
                         >
                           <BookOpen className="w-3 h-3" />
-                          <span>接管指南</span>
+                          <span>{t('itemCard.notes')}</span>
                         </button>
                       )}
                     </div>
@@ -308,13 +310,13 @@ export const HeirRecoveryView: React.FC<HeirRecoveryViewProps> = ({
                     <div className="space-y-2 p-3 rounded-xl bg-[#0D1220] border border-white/5 text-xs font-mono">
                       {item.username && (
                         <div className="flex items-center justify-between">
-                          <span className="text-slate-500 text-[10px]">账号:</span>
+                          <span className="text-slate-500 text-[10px]">{t('itemModal.usernameLabel')}:</span>
                           <div className="flex items-center gap-1.5 truncate max-w-[200px]">
                             <span className="text-slate-200 truncate">{item.username}</span>
                             <button
                               onClick={() => handleCopy(item.username!, `u-${item.id}`)}
                               className="text-slate-400 hover:text-white"
-                              title="复制账号"
+                              title={t('itemCard.copyUser')}
                             >
                               {copiedKey === `u-${item.id}` ? (
                                 <Check className="w-3 h-3 text-emerald-400" />
@@ -328,7 +330,7 @@ export const HeirRecoveryView: React.FC<HeirRecoveryViewProps> = ({
 
                       {item.password && (
                         <div className="flex items-center justify-between">
-                          <span className="text-slate-500 text-[10px]">密码:</span>
+                          <span className="text-slate-500 text-[10px]">{t('itemModal.passwordLabel')}:</span>
                           <div className="flex items-center gap-1.5">
                             <span className="text-slate-200 tracking-wider">
                               {isRevealed ? item.password : '••••••••••••'}
@@ -336,14 +338,14 @@ export const HeirRecoveryView: React.FC<HeirRecoveryViewProps> = ({
                             <button
                               onClick={() => toggleReveal(item.id)}
                               className="text-slate-400 hover:text-white"
-                              title={isRevealed ? '隐藏密码' : '显示密码'}
+                              title={isRevealed ? t('itemCard.hide') : t('itemCard.show')}
                             >
                               {isRevealed ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
                             </button>
                             <button
                               onClick={() => handleCopy(item.password!, `p-${item.id}`)}
                               className="text-slate-400 hover:text-white"
-                              title="复制密码"
+                              title={t('itemCard.copyPass')}
                             >
                               {copiedKey === `p-${item.id}` ? (
                                 <Check className="w-3 h-3 text-emerald-400" />
@@ -357,7 +359,7 @@ export const HeirRecoveryView: React.FC<HeirRecoveryViewProps> = ({
 
                       {item.url && (
                         <div className="flex items-center justify-between">
-                          <span className="text-slate-500 text-[10px]">端点:</span>
+                          <span className="text-slate-500 text-[10px]">{t('itemModal.urlLabel')}:</span>
                           {getSafeUrl(item.url) ? (
                             <a
                               href={getSafeUrl(item.url)!}
@@ -427,7 +429,7 @@ export const HeirRecoveryView: React.FC<HeirRecoveryViewProps> = ({
               <div className="flex items-center gap-2">
                 <BookOpen className="w-5 h-5 text-amber-400" />
                 <h3 className="text-sm font-bold text-white">
-                  接管向导指示 · {activeInstructionItem.title}
+                  {t('heirRecovery.instructionNotice')} {activeInstructionItem.title}
                 </h3>
               </div>
               <button
@@ -441,7 +443,7 @@ export const HeirRecoveryView: React.FC<HeirRecoveryViewProps> = ({
             <div className="p-4 rounded-xl bg-[#0D111E] border border-white/5 space-y-2 text-xs leading-relaxed text-slate-300">
               <p className="text-amber-300 font-semibold flex items-center gap-1.5">
                 <Info className="w-4 h-4" />
-                所有者给继承人预留的移交步骤说明：
+                {t('heirRecovery.instructionNotice')}
               </p>
               <p className="whitespace-pre-wrap text-slate-200">
                 {activeInstructionItem.inheritanceInstructions}
@@ -453,7 +455,7 @@ export const HeirRecoveryView: React.FC<HeirRecoveryViewProps> = ({
                 onClick={() => setActiveInstructionItem(null)}
                 className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-semibold transition-colors"
               >
-                已了解接管指引
+                {t('heirRecovery.closeInstruction')}
               </button>
             </div>
           </div>

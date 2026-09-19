@@ -19,6 +19,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { MediaType, UsbDrive } from '../types';
+import { useI18n } from '../services/i18n';
 
 /**
  * 介质迁移向导弹窗属性接口
@@ -40,6 +41,7 @@ export const MediaMigrationModal: React.FC<MediaMigrationModalProps> = ({
   drives,
   onMigrateSuccess,
 }) => {
+  const { t } = useI18n();
   const [targetDrive, setTargetDrive] = useState(drives.length > 1 ? drives[1].mountPath : '');
   const [targetType, setTargetType] = useState<MediaType>('UsbSSD');
   const [isMigrating, setIsMigrating] = useState(false);
@@ -49,18 +51,18 @@ export const MediaMigrationModal: React.FC<MediaMigrationModalProps> = ({
 
   const handleStartMigration = () => {
     if (!targetDrive) {
-      alert('请选择要迁移的目标存储介质');
+      alert(t('mediaMigrationModal.noDriveSelectedAlert'));
       return;
     }
 
     setIsMigrating(true);
-    setStatusText('正在初始化目标介质并复制 LVCF 2.0 容器文件...');
+    setStatusText(t('mediaMigrationModal.step1'));
 
     setTimeout(() => {
-      setStatusText('正在进行全量哈希重新比对与所有者数字签名有效性验证...');
+      setStatusText(t('mediaMigrationModal.step2'));
       setTimeout(() => {
         setIsMigrating(false);
-        setStatusText('✅ 介质迁移完成！目标介质已升级为主所有者介质 (Primary)，原介质建议作为 Owner Backup B 保管。');
+        setStatusText(t('mediaMigrationModal.successAlert'));
         onMigrateSuccess(targetDrive);
       }, 1200);
     }, 1000);
@@ -93,19 +95,19 @@ export const MediaMigrationModal: React.FC<MediaMigrationModalProps> = ({
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ fontSize: 16, fontWeight: 700, color: '#FFFFFF' }}>
-                  存储介质无缝迁移
+                  {t('mediaMigrationModal.title')}
                 </span>
                 <span className="modal-badge-cat">
-                  Media Migration
+                  Migration
                 </span>
               </div>
               <p style={{ fontSize: 11, color: '#8EA4D4', marginTop: 2 }}>
-                支持从普通 U 盘平滑升级到移动固态 SSD / 移动硬盘
+                {t('mediaMigrationModal.subtitle')}
               </p>
             </div>
           </div>
 
-          <button onClick={onClose} className="modal-window-close" title="关闭窗口">
+          <button onClick={onClose} className="modal-window-close" title={t('common.close')}>
             <X style={{ width: 16, height: 16 }} />
           </button>
         </div>
@@ -128,7 +130,7 @@ export const MediaMigrationModal: React.FC<MediaMigrationModalProps> = ({
           >
             <AlertCircle style={{ width: 16, height: 16, flexShrink: 0, marginTop: 2 }} />
             <p>
-              迁移过程将完整保留 <strong>Vault ID</strong>、<strong>防回滚序号</strong> 与 <strong>所有者数字签名</strong>。原介质可作为冷备份保管。
+              LVCF 2.0 <strong>Vault ID</strong> · <strong>Anti-Rollback Monotonic</strong> · <strong>Ed25519 Signature</strong>
             </p>
           </div>
 
@@ -136,23 +138,23 @@ export const MediaMigrationModal: React.FC<MediaMigrationModalProps> = ({
           <div className="form-card" style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', padding: 20 }}>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
               <Usb style={{ width: 32, height: 32, color: '#8EA4D4' }} />
-              <p style={{ fontSize: 13, fontWeight: 700, color: '#FFFFFF' }}>当前原介质</p>
-              <p style={{ fontSize: 11, color: '#7E92C4', fontFamily: 'JetBrains Mono' }}>普通 U 盘</p>
+              <p style={{ fontSize: 13, fontWeight: 700, color: '#FFFFFF' }}>Source Drive</p>
+              <p style={{ fontSize: 11, color: '#7E92C4', fontFamily: 'JetBrains Mono' }}>USB Flash Drive</p>
             </div>
 
             <ArrowRight style={{ width: 24, height: 24, color: '#00D4FF' }} />
 
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
               <HardDrive style={{ width: 32, height: 32, color: '#00D4FF' }} />
-              <p style={{ fontSize: 13, fontWeight: 700, color: '#FFFFFF' }}>目标新介质</p>
-              <p style={{ fontSize: 11, color: '#34D399', fontFamily: 'JetBrains Mono' }}>高速移动 SSD</p>
+              <p style={{ fontSize: 13, fontWeight: 700, color: '#FFFFFF' }}>Target Drive</p>
+              <p style={{ fontSize: 11, color: '#34D399', fontFamily: 'JetBrains Mono' }}>Portable SSD / NVMe</p>
             </div>
           </div>
 
           {/* 目标设备选择 */}
           <div className="form-card">
             <div className="framed-input-container">
-              <label className="framed-label">选择接入的目标存储介质 / 盘符</label>
+              <label className="framed-label">{t('mediaMigrationModal.selectTargetLabel')}</label>
               <select
                 value={targetDrive}
                 onChange={(e) => setTargetDrive(e.target.value)}
@@ -164,23 +166,23 @@ export const MediaMigrationModal: React.FC<MediaMigrationModalProps> = ({
                   </option>
                 ))}
                 <option value="NEW_EXTERNAL" style={{ background: '#12173B', color: '#FFFFFF' }}>
-                  其他外接存储驱动器 (自动格式化初始化)
+                  {t('mediaMigrationModal.selectDrivePlaceholder')}
                 </option>
               </select>
             </div>
 
             <div className="framed-input-container">
-              <label className="framed-label">目标介质物理类型</label>
+              <label className="framed-label">{t('mediaMigrationModal.targetTypeLabel')}</label>
               <select
                 value={targetType}
                 onChange={(e) => setTargetType(e.target.value as MediaType)}
                 className="framed-select"
               >
-                <option value="UsbSSD" style={{ background: '#12173B', color: '#FFFFFF' }}>高速移动固态硬盘 (Portable SSD)</option>
-                <option value="NvmeEnclosure" style={{ background: '#12173B', color: '#FFFFFF' }}>NVMe 移动硬盘盒</option>
-                <option value="UsbHDD" style={{ background: '#12173B', color: '#FFFFFF' }}>移动机械硬盘 (Portable HDD)</option>
-                <option value="SDCard" style={{ background: '#12173B', color: '#FFFFFF' }}>高耐久 SD / TF 存储卡</option>
-                <option value="UsbFlash" style={{ background: '#12173B', color: '#FFFFFF' }}>大容量 USB 3.2 闪存盘</option>
+                <option value="UsbSSD" style={{ background: '#12173B', color: '#FFFFFF' }}>Portable SSD (NVMe / USB 3.2)</option>
+                <option value="NvmeEnclosure" style={{ background: '#12173B', color: '#FFFFFF' }}>NVMe M.2 Enclosure</option>
+                <option value="UsbHDD" style={{ background: '#12173B', color: '#FFFFFF' }}>Portable HDD (Mechanical)</option>
+                <option value="SDCard" style={{ background: '#12173B', color: '#FFFFFF' }}>High Endurance SD / TF Card</option>
+                <option value="UsbFlash" style={{ background: '#12173B', color: '#FFFFFF' }}>High Capacity USB 3.2 Flash Drive</option>
               </select>
             </div>
           </div>
@@ -207,7 +209,7 @@ export const MediaMigrationModal: React.FC<MediaMigrationModalProps> = ({
             onClick={onClose}
             className="btn-action-cancel"
           >
-            取消
+            {t('common.cancel')}
           </button>
           <button
             onClick={handleStartMigration}
@@ -215,7 +217,7 @@ export const MediaMigrationModal: React.FC<MediaMigrationModalProps> = ({
             className="btn-action-submit"
           >
             <RefreshCw style={{ width: 14, height: 14 }} className={isMigrating ? 'animate-spin' : ''} />
-            <span>{isMigrating ? '正在执行迁移...' : '确认执行介质迁移'}</span>
+            <span>{isMigrating ? t('mediaMigrationModal.migratingBtn') : t('mediaMigrationModal.startMigrationBtn')}</span>
           </button>
         </div>
       </div>

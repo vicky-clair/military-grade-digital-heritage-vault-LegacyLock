@@ -24,12 +24,12 @@ import {
   AlertTriangle,
   RefreshCw,
   Usb,
-  Cpu,
   Shield,
   Key,
 } from 'lucide-react';
 import { UsbDrive, UsbPasswordConfig } from '../types';
 import { hashPassword, writeDriveHardwareBinding } from '../services/cryptoService';
+import { useI18n } from '../services/i18n';
 
 /**
  * U 盘密码配置弹窗属性接口
@@ -54,6 +54,8 @@ export const UsbPasswordModal: React.FC<UsbPasswordModalProps> = ({
   config,
   onSaveConfig,
 }) => {
+  const { t } = useI18n();
+
   // 主盘密码
   const [masterPassword, setMasterPassword] = useState('');
   const [confirmMasterPassword, setConfirmMasterPassword] = useState('');
@@ -75,15 +77,15 @@ export const UsbPasswordModal: React.FC<UsbPasswordModalProps> = ({
 
   // 密码强度评估
   const evaluateStrength = (pwd: string) => {
-    if (!pwd) return { label: '未输入新密码', color: '#7E92C4', percent: 0 };
-    if (pwd.length < 6) return { label: '弱 (少于6位)', color: '#F43F5E', percent: 25 };
+    if (!pwd) return { label: t('usbModal.strengthNone'), color: '#7E92C4', percent: 0 };
+    if (pwd.length < 6) return { label: t('usbModal.strengthWeak'), color: '#F43F5E', percent: 25 };
     const hasNum = /\d/.test(pwd);
     const hasLetter = /[a-zA-Z]/.test(pwd);
     const hasSymbol = /[^a-zA-Z0-9]/.test(pwd);
     const score = (pwd.length >= 8 ? 1 : 0) + (hasNum ? 1 : 0) + (hasLetter ? 1 : 0) + (hasSymbol ? 1 : 0);
-    if (score >= 4) return { label: '极强 (军规级)', color: '#34D399', percent: 100 };
-    if (score >= 3) return { label: '强', color: '#60A5FA', percent: 75 };
-    return { label: '中等', color: '#FBBF24', percent: 50 };
+    if (score >= 4) return { label: t('usbModal.strengthMilitary'), color: '#34D399', percent: 100 };
+    if (score >= 3) return { label: t('usbModal.strengthStrong'), color: '#60A5FA', percent: 75 };
+    return { label: t('usbModal.strengthMedium'), color: '#FBBF24', percent: 50 };
   };
 
   const masterStrength = evaluateStrength(masterPassword);
@@ -93,12 +95,12 @@ export const UsbPasswordModal: React.FC<UsbPasswordModalProps> = ({
     setFeedbackMsg(null);
 
     if (masterPassword && masterPassword !== confirmMasterPassword) {
-      setFeedbackMsg({ type: 'error', text: '主U盘两次输入的密码不一致，请核对后重新输入。' });
+      setFeedbackMsg({ type: 'error', text: t('usbModal.masterMismatchError') });
       return;
     }
 
     if (heirPassword && heirPassword !== confirmHeirPassword) {
-      setFeedbackMsg({ type: 'error', text: '副U盘两次输入的接管密码不一致，请核对。' });
+      setFeedbackMsg({ type: 'error', text: t('usbModal.heirMismatchError') });
       return;
     }
 
@@ -147,12 +149,12 @@ export const UsbPasswordModal: React.FC<UsbPasswordModalProps> = ({
         }
       }
 
-      setFeedbackMsg({ type: 'success', text: '✅ U盘双钥匙密码与硬件加密配置（含硬件防克隆绑定）已成功写入选定介质！' });
+      setFeedbackMsg({ type: 'success', text: `✅ ${t('usbModal.saveSuccess')}` });
       setTimeout(() => {
         onClose();
       }, 1200);
     } catch (err: any) {
-      setFeedbackMsg({ type: 'error', text: `写入介质失败: ${err.message || '未知错误'}` });
+      setFeedbackMsg({ type: 'error', text: `${t('common.error')}: ${err.message || ''}` });
     } finally {
       setIsSaving(false);
     }
@@ -185,22 +187,22 @@ export const UsbPasswordModal: React.FC<UsbPasswordModalProps> = ({
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ fontSize: 16, fontWeight: 700, color: '#FFFFFF' }}>
-                  U盘密码与双钥匙接管控制中心
+                  {t('usbModal.title')}
                 </span>
                 <span className="modal-badge-cat" style={{ color: '#00D4FF', borderColor: 'rgba(0,212,255,0.3)' }}>
-                  双钥匙架构
+                  Dual-Key
                 </span>
                 <span className="modal-badge-cat">
                   AES-256-GCM
                 </span>
               </div>
               <p style={{ fontSize: 11, color: '#8EA4D4', marginTop: 2 }}>
-                一体化配置所有者 Master PIN 与法定继承人 Heir PIN，并自动校验物理介质加密参数
+                {t('usbModal.subtitle')}
               </p>
             </div>
           </div>
 
-          <button onClick={onClose} className="modal-window-close" title="关闭窗口">
+          <button onClick={onClose} className="modal-window-close" title="Close">
             <X style={{ width: 16, height: 16 }} />
           </button>
         </div>
@@ -212,12 +214,12 @@ export const UsbPasswordModal: React.FC<UsbPasswordModalProps> = ({
             <div className="form-card-title" style={{ marginBottom: 4 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#00D4FF' }}>
                 <HardDrive style={{ width: 15, height: 15 }} />
-                <span>目标物理介质 (U盘 / 移动固态硬盘 / 磁盘)</span>
+                <span>{t('usbModal.targetDriveLabel')}</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <span style={{ width: 7, height: 7, borderRadius: '50%', background: drives.length > 0 ? '#10B981' : '#F59E0B' }} />
                 <span style={{ fontSize: 11, color: '#8EA4D4', fontFamily: 'JetBrains Mono' }}>
-                  {drives.length} 个外接介质在线
+                  {drives.length} {t('settings.drivesOnline')}
                 </span>
               </div>
             </div>
@@ -232,12 +234,12 @@ export const UsbPasswordModal: React.FC<UsbPasswordModalProps> = ({
                 {drives.length > 0 ? (
                   drives.map((d) => (
                     <option key={d.mountPath} value={d.mountPath} style={{ background: '#12173B', color: '#FFFFFF' }}>
-                      {d.name} ({d.mountPath}) · {d.mediaType || 'USB'} · {d.hasPasswordProtected ? '已开启双钥匙保护' : '未加锁'}
+                      {d.name} ({d.mountPath}) · {d.mediaType || 'USB'} · {d.hasPasswordProtected ? 'Dual-Key' : 'Unlocked'}
                     </option>
                   ))
                 ) : (
                   <option value="" style={{ background: '#12173B', color: '#FFFFFF' }}>
-                    未检测到外接介质 (将配置本地离线安全凭证)
+                    {t('usbModal.noDriveDetected')}
                   </option>
                 )}
               </select>
@@ -266,12 +268,12 @@ export const UsbPasswordModal: React.FC<UsbPasswordModalProps> = ({
                   </div>
                   <div>
                     <div style={{ fontSize: 13.5, fontWeight: 700, color: '#FFFFFF' }}>
-                      所有者主 U 盘密码 (Master PIN)
+                      {t('usbModal.masterTitle')}
                     </div>
-                    <div style={{ fontSize: 10.5, color: '#8EA4D4' }}>日常解锁与管理最高授权</div>
+                    <div style={{ fontSize: 10.5, color: '#8EA4D4' }}>{t('usbModal.masterDesc')}</div>
                   </div>
                 </div>
-                <span className="usb-key-badge master">所有者专属</span>
+                <span className="usb-key-badge master">Master</span>
               </div>
 
               <div
@@ -285,19 +287,19 @@ export const UsbPasswordModal: React.FC<UsbPasswordModalProps> = ({
                   lineHeight: 1.45,
                 }}
               >
-                插入主盘时必须验证此 PIN 码方可解锁，防止介质失窃被他人插机窃取。
+                AES-256-GCM + PBKDF2-100,000 Zero-Knowledge Protection
               </div>
 
               <div className="framed-input-container">
                 <label className="framed-label" style={{ fontSize: 11.5 }}>
-                  设置新主盘密码 {config?.hasMasterPassword && <span style={{ color: '#34D399' }}>(已设)</span>}
+                  {t('usbModal.masterPassLabel')}
                 </label>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <input
                     type={showMasterPass ? 'text' : 'password'}
                     value={masterPassword}
                     onChange={(e) => setMasterPassword(e.target.value)}
-                    placeholder={config?.hasMasterPassword ? '留空保持原密码，或输入新密码' : '输入 6~32 位安全访问密码'}
+                    placeholder={t('usbModal.masterPassPlaceholder')}
                     className="framed-input font-mono"
                     style={{ flex: 1, height: 36, fontSize: 12.5 }}
                   />
@@ -305,7 +307,7 @@ export const UsbPasswordModal: React.FC<UsbPasswordModalProps> = ({
                     type="button"
                     onClick={() => setShowMasterPass(!showMasterPass)}
                     className="btn-framed-icon"
-                    title={showMasterPass ? '隐藏密码' : '显示密码'}
+                    title={showMasterPass ? 'Hide' : 'Show'}
                     style={{ height: 36, width: 36 }}
                   >
                     {showMasterPass ? <EyeOff style={{ width: 14, height: 14 }} /> : <Eye style={{ width: 14, height: 14 }} />}
@@ -316,7 +318,7 @@ export const UsbPasswordModal: React.FC<UsbPasswordModalProps> = ({
                 {masterPassword && (
                   <div style={{ marginTop: 2 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10.5, marginBottom: 3 }}>
-                      <span style={{ color: '#8EA4D4' }}>密码强度：</span>
+                      <span style={{ color: '#8EA4D4' }}>Entropy:</span>
                       <span style={{ color: masterStrength.color, fontWeight: 700 }}>{masterStrength.label}</span>
                     </div>
                     <div style={{ width: '100%', height: 3.5, background: 'rgba(255,255,255,0.08)', borderRadius: 2, overflow: 'hidden' }}>
@@ -334,24 +336,24 @@ export const UsbPasswordModal: React.FC<UsbPasswordModalProps> = ({
               </div>
 
               <div className="framed-input-container">
-                <label className="framed-label" style={{ fontSize: 11.5 }}>再次确认主盘密码</label>
+                <label className="framed-label" style={{ fontSize: 11.5 }}>{t('usbModal.confirmMasterPassLabel')}</label>
                 <input
                   type={showMasterPass ? 'text' : 'password'}
                   value={confirmMasterPassword}
                   onChange={(e) => setConfirmMasterPassword(e.target.value)}
-                  placeholder="再次输入上述主盘密码核对"
+                  placeholder={t('usbModal.confirmMasterPassPlaceholder')}
                   className="framed-input font-mono"
                   style={{ height: 36, fontSize: 12.5 }}
                 />
               </div>
 
               <div className="framed-input-container">
-                <label className="framed-label" style={{ fontSize: 11.5 }}>主密码提示备忘 (Password Hint，可选)</label>
+                <label className="framed-label" style={{ fontSize: 11.5 }}>{t('usbModal.masterHintLabel')}</label>
                 <input
                   type="text"
                   value={masterHint}
                   onChange={(e) => setMasterHint(e.target.value)}
-                  placeholder="例：常用生日后四位+特定符号"
+                  placeholder={t('usbModal.masterHintPlaceholder')}
                   className="framed-input"
                   style={{ height: 36, fontSize: 12.5 }}
                 />
@@ -359,7 +361,7 @@ export const UsbPasswordModal: React.FC<UsbPasswordModalProps> = ({
 
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10.5, color: '#7E92C4', marginTop: 'auto' }}>
                 <Shield style={{ width: 12, height: 12, color: '#00D4FF' }} />
-                <span>与主介质硬件绑定，单日输错 5 次将触发介质只读锁定</span>
+                <span>{t('usbModal.hardwareCryptoStatus')}</span>
               </div>
             </div>
 
@@ -383,12 +385,12 @@ export const UsbPasswordModal: React.FC<UsbPasswordModalProps> = ({
                   </div>
                   <div>
                     <div style={{ fontSize: 13.5, fontWeight: 700, color: '#FFFFFF' }}>
-                      法定继承人接管口令 (Heir PIN)
+                      {t('usbModal.heirTitle')}
                     </div>
-                    <div style={{ fontSize: 10.5, color: '#8EA4D4' }}>继承人生效接管专属授权</div>
+                    <div style={{ fontSize: 10.5, color: '#8EA4D4' }}>{t('usbModal.heirDesc')}</div>
                   </div>
                 </div>
-                <span className="usb-key-badge heir">继承人专用</span>
+                <span className="usb-key-badge heir">Heir</span>
               </div>
 
               <div
@@ -402,20 +404,19 @@ export const UsbPasswordModal: React.FC<UsbPasswordModalProps> = ({
                   lineHeight: 1.45,
                 }}
               >
-                🔐 <strong>继承人三重硬性防盗约束：</strong>
-                继承人接管时必须同时接入【双 U 盘（主盘 + 副盘）】，并提供【继承人口令 + 紧急安全密钥 (Secret Key)】方可解密；单纯偷取密码在重装后无法恢复数据！
+                🔐 Dual-USB + Master Secret Key Joint Recovery
               </div>
 
               <div className="framed-input-container">
                 <label className="framed-label" style={{ fontSize: 11.5 }}>
-                  设置继承人口令 {config?.hasHeirPassword && <span style={{ color: '#34D399' }}>(已设)</span>}
+                  {t('usbModal.heirPassLabel')}
                 </label>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <input
                     type={showHeirPass ? 'text' : 'password'}
                     value={heirPassword}
                     onChange={(e) => setHeirPassword(e.target.value)}
-                    placeholder={config?.hasHeirPassword ? '留空保持原口令，或输入新口令' : '输入指定给继承人的接管口令'}
+                    placeholder={t('usbModal.heirPassPlaceholder')}
                     className="framed-input font-mono"
                     style={{ flex: 1, height: 36, fontSize: 12.5 }}
                   />
@@ -423,7 +424,7 @@ export const UsbPasswordModal: React.FC<UsbPasswordModalProps> = ({
                     type="button"
                     onClick={() => setShowHeirPass(!showHeirPass)}
                     className="btn-framed-icon"
-                    title={showHeirPass ? '隐藏口令' : '显示口令'}
+                    title={showHeirPass ? 'Hide' : 'Show'}
                     style={{ height: 36, width: 36 }}
                   >
                     {showHeirPass ? <EyeOff style={{ width: 14, height: 14 }} /> : <Eye style={{ width: 14, height: 14 }} />}
@@ -432,24 +433,24 @@ export const UsbPasswordModal: React.FC<UsbPasswordModalProps> = ({
               </div>
 
               <div className="framed-input-container">
-                <label className="framed-label" style={{ fontSize: 11.5 }}>确认继承人接管口令</label>
+                <label className="framed-label" style={{ fontSize: 11.5 }}>{t('usbModal.confirmHeirPassLabel')}</label>
                 <input
                   type={showHeirPass ? 'text' : 'password'}
                   value={confirmHeirPassword}
                   onChange={(e) => setConfirmHeirPassword(e.target.value)}
-                  placeholder="再次输入上述继承人口令核对"
+                  placeholder={t('usbModal.confirmHeirPassPlaceholder')}
                   className="framed-input font-mono"
                   style={{ height: 36, fontSize: 12.5 }}
                 />
               </div>
 
               <div className="framed-input-container">
-                <label className="framed-label" style={{ fontSize: 11.5 }}>继承人提示备忘 (可手写在随盘信封中)</label>
+                <label className="framed-label" style={{ fontSize: 11.5 }}>{t('usbModal.heirHintLabel')}</label>
                 <input
                   type="text"
                   value={heirHint}
                   onChange={(e) => setHeirHint(e.target.value)}
-                  placeholder="例：见家族遗嘱公证书第3条或纪念日期"
+                  placeholder={t('usbModal.heirHintPlaceholder')}
                   className="framed-input"
                   style={{ height: 36, fontSize: 12.5 }}
                 />
@@ -457,54 +458,7 @@ export const UsbPasswordModal: React.FC<UsbPasswordModalProps> = ({
 
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10.5, color: '#C084FC', marginTop: 'auto' }}>
                 <ShieldCheck style={{ width: 12, height: 12, color: '#C084FC' }} />
-                <span>双 U 盘物理防伪 + PIN 码 + Secret Key 三重认证，防盗密恢复</span>
-              </div>
-            </div>
-          </div>
-
-          {/* 3. 军规级硬件安全参数状态条 (整合原第3个Tab为直观认证条) */}
-          <div className="usb-security-spec-bar">
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 7, color: '#34D399', fontSize: 12, fontWeight: 700 }}>
-                <Cpu style={{ width: 15, height: 15 }} />
-                <span>底层军规加密规格与介质防篡改参数</span>
-              </div>
-              <span style={{ fontSize: 10.5, color: '#8EA4D4', fontFamily: 'JetBrains Mono' }}>
-                STANDARD: LLCS-1 MILITARY SPEC
-              </span>
-            </div>
-
-            <div className="usb-security-badge-row">
-              <div className="usb-security-badge-item">
-                <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#34D399' }} />
-                <div>
-                  <div style={{ color: '#E2E8F0', fontWeight: 600, fontSize: 11.5 }}>AES-256-GCM + Argon2id</div>
-                  <div style={{ color: '#7E92C4', fontSize: 10 }}>高抗 ASIC/GPU 离线暴力破解</div>
-                </div>
-              </div>
-
-              <div className="usb-security-badge-item">
-                <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#60A5FA' }} />
-                <div>
-                  <div style={{ color: '#E2E8F0', fontWeight: 600, fontSize: 11.5 }}>Ed25519 硬件介质签名</div>
-                  <div style={{ color: '#7E92C4', fontSize: 10 }}>物理介质指纹绑定防克隆</div>
-                </div>
-              </div>
-
-              <div className="usb-security-badge-item">
-                <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#C084FC' }} />
-                <div>
-                  <div style={{ color: '#E2E8F0', fontWeight: 600, fontSize: 11.5 }}>单调计数器防重放</div>
-                  <div style={{ color: '#7E92C4', fontSize: 10 }}>防固件回滚 (Sequence #1)</div>
-                </div>
-              </div>
-
-              <div className="usb-security-badge-item">
-                <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#F59E0B' }} />
-                <div>
-                  <div style={{ color: '#E2E8F0', fontWeight: 600, fontSize: 11.5 }}>物理介质零明文保存</div>
-                  <div style={{ color: '#7E92C4', fontSize: 10 }}>内存即用即焚 · 无后门残留</div>
-                </div>
+                <span>Ed25519 + Monotonic Counter Replay Protection</span>
               </div>
             </div>
           </div>
@@ -538,7 +492,7 @@ export const UsbPasswordModal: React.FC<UsbPasswordModalProps> = ({
         <div className="modal-window-footer">
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: '#8EA4D4' }}>
             <Usb style={{ width: 15, height: 15, color: '#00D4FF' }} />
-            <span>插拔介质后即时生效 · 跨 Windows / macOS / Linux 全系统</span>
+            <span>Windows / macOS / Linux Universal Hardware Spec</span>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -547,7 +501,7 @@ export const UsbPasswordModal: React.FC<UsbPasswordModalProps> = ({
               onClick={onClose}
               className="btn-action-cancel"
             >
-              取消
+              {t('common.cancel')}
             </button>
             <button
               type="button"
@@ -560,7 +514,7 @@ export const UsbPasswordModal: React.FC<UsbPasswordModalProps> = ({
               ) : (
                 <ShieldCheck style={{ width: 14, height: 14 }} />
               )}
-              <span>{isSaving ? '正在写入物理介质...' : '保存并写入U盘双钥匙密码'}</span>
+              <span>{isSaving ? t('usbModal.savingBtn') : t('usbModal.saveSettingsBtn')}</span>
             </button>
           </div>
         </div>

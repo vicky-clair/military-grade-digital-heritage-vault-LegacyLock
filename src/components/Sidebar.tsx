@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import { NavCategoryType } from '../types';
 import { ThemeDefinition } from '../services/themes';
+import { useI18n } from '../services/i18n';
 
 /**
  * 侧边栏属性接口
@@ -88,6 +89,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     (categoryCounts['medical'] || 0);
 
   const formatBadge = (num: number) => (num > 0 ? num : '--');
+  const { t } = useI18n();
 
   return (
     <aside
@@ -105,8 +107,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         </div>
         <div style={{ minWidth: 0, flex: 1 }}>
-          <h1 className="sidebar-brand-title" title="LegacyLock 军规遗产密钥库">LegacyLock 军规遗产密钥库</h1>
-          <p className="sidebar-brand-sub" title="军规级双U盘数字遗产保险箱">军规级双U盘数字遗产保险箱</p>
+          <h1 className="sidebar-brand-title" title={t('brand.title')}>{t('brand.title')}</h1>
+          <p className="sidebar-brand-sub" title={t('brand.sub')}>{t('brand.sub')}</p>
         </div>
       </div>
 
@@ -114,7 +116,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div className="sidebar-nav-scroll">
         {/* 分组 1: 核心数字资产 */}
         <div className="sidebar-section">
-          <div className="sidebar-section-title">核心数字资产</div>
+          <div className="sidebar-section-title">{t('nav.coreGroup')}</div>
 
           {/* 所有密匙 (总计) */}
           <button
@@ -123,7 +125,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           >
             <div className="nav-item-left">
               <LayoutGrid className="nav-item-icon" />
-              <span>所有密鑰</span>
+              <span>{t('nav.all')}</span>
             </div>
             <span className="sidebar-nav-badge">
               {totalCount}
@@ -137,7 +139,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           >
             <div className="nav-item-left">
               <KeyRound className="nav-item-icon" />
-              <span>登录信息</span>
+              <span>{t('nav.login')}</span>
             </div>
             <span className="sidebar-nav-badge">{formatBadge(loginCount)}</span>
           </button>
@@ -149,7 +151,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           >
             <div className="nav-item-left">
               <FileText className="nav-item-icon" />
-              <span>安全备注</span>
+              <span>{t('nav.note')}</span>
             </div>
             <span className="sidebar-nav-badge">{formatBadge(noteCount)}</span>
           </button>
@@ -161,7 +163,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           >
             <div className="nav-item-left">
               <UserCheck className="nav-item-icon" />
-              <span>身份标识</span>
+              <span>{t('nav.identity')}</span>
             </div>
             <span className="sidebar-nav-badge">{formatBadge(identityCount)}</span>
           </button>
@@ -173,7 +175,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           >
             <div className="nav-item-left">
               <CreditCard className="nav-item-icon" />
-              <span>信用卡</span>
+              <span>{t('nav.card')}</span>
             </div>
             <span className="sidebar-nav-badge">{formatBadge(cardCount)}</span>
           </button>
@@ -185,7 +187,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           >
             <div className="nav-item-left">
               <Lock className="nav-item-icon" />
-              <span>独立密码</span>
+              <span>{t('nav.password')}</span>
             </div>
             <span className="sidebar-nav-badge">{formatBadge(passwordCount)}</span>
           </button>
@@ -197,7 +199,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           >
             <div className="nav-item-left">
               <FileCode className="nav-item-icon" />
-              <span>加密文档</span>
+              <span>{t('nav.document')}</span>
             </div>
             <span className="sidebar-nav-badge">{formatBadge(documentCount)}</span>
           </button>
@@ -205,7 +207,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* 分组 2: 凭据与网络开发 */}
         <div className="sidebar-section">
-          <div className="sidebar-section-title">凭据与网络</div>
+          <div className="sidebar-section-title">{t('nav.devGroup')}</div>
 
           {/* SSH 密钥 */}
           <button
@@ -214,7 +216,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           >
             <div className="nav-item-left">
               <Terminal className="nav-item-icon" />
-              <span>SSH 密钥</span>
+              <span>{t('nav.sshKey')}</span>
             </div>
             <span className="sidebar-nav-badge">{formatBadge(sshCount)}</span>
           </button>
@@ -226,7 +228,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           >
             <div className="nav-item-left">
               <Code2 className="nav-item-icon" />
-              <span>API 凭据</span>
+              <span>{t('nav.apiCredential')}</span>
             </div>
             <span className="sidebar-nav-badge">{formatBadge(apiCount)}</span>
           </button>
@@ -238,7 +240,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           >
             <div className="nav-item-left">
               <Wallet className="nav-item-icon" />
-              <span>加密钱包</span>
+              <span>{t('nav.cryptoWallet')}</span>
             </div>
             <span className="sidebar-nav-badge">{formatBadge(cryptoCount)}</span>
           </button>
@@ -250,7 +252,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           >
             <div className="nav-item-left">
               <Server className="nav-item-icon" />
-              <span>服务器与数据库</span>
+              <span>{t('nav.server')}</span>
             </div>
             <span className="sidebar-nav-badge">{formatBadge(serverCount)}</span>
           </button>
@@ -262,7 +264,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           >
             <div className="nav-item-left">
               <Wifi className="nav-item-icon" />
-              <span>无线路由器</span>
+              <span>{t('nav.router')}</span>
             </div>
             <span className="sidebar-nav-badge">{formatBadge(wifiCount)}</span>
           </button>
@@ -274,7 +276,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           >
             <div className="nav-item-left">
               <Mail className="nav-item-icon" />
-              <span>电子邮件</span>
+              <span>{t('nav.email')}</span>
             </div>
             <span className="sidebar-nav-badge">{formatBadge(mailCount)}</span>
           </button>
@@ -286,7 +288,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           >
             <div className="nav-item-left">
               <Award className="nav-item-icon" />
-              <span>会员与资产</span>
+              <span>{t('nav.membership')}</span>
             </div>
             <span className="sidebar-nav-badge">{formatBadge(membershipCount)}</span>
           </button>
@@ -294,7 +296,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* 存储与备份 (左侧加密导入导出模块) */}
         <div className="sidebar-section">
-          <div className="sidebar-section-title">存储与备份</div>
+          <div className="sidebar-section-title">{t('nav.personalGroup')}</div>
           <button
             onClick={() => onSelectNav('import_export')}
             className={`sidebar-nav-item ${selectedNav === 'import_export' ? 'active' : ''}`}
@@ -304,7 +306,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 className="nav-item-icon"
                 style={{ color: selectedNav === 'import_export' ? '#00D4FF' : '#38BDF8' }}
               />
-              <span>加密导入导出</span>
+              <span>{t('nav.importExport')}</span>
             </div>
             <span
               className="sidebar-nav-badge"
@@ -320,16 +322,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
       </div>
 
-      {/* 底部系统设置按钮 (原添加新资产/密钥位置) */}
+      {/* 底部系统设置按钮 */}
       <div className="sidebar-footer">
         <button
           onClick={() => onSelectNav('settings')}
           className={`sidebar-settings-btn ${selectedNav === 'settings' ? 'active' : ''}`}
-          title="打开系统设置、应用说明、安全警示与自检中心"
+          title={t('nav.settings')}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
             <Settings className="settings-btn-icon" style={{ width: 17, height: 17 }} />
-            <span style={{ fontWeight: 600, fontSize: 13 }}>系统设置</span>
+            <span style={{ fontWeight: 600, fontSize: 13 }}>{t('nav.settings')}</span>
           </div>
           <span className="settings-version-tag">v2.5.0</span>
         </button>

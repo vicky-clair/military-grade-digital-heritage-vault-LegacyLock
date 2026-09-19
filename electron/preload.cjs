@@ -126,6 +126,30 @@ contextBridge.exposeInMainWorld('legacyLockAPI', {
   maximizeWindow: () => ipcRenderer.invoke('window:maximize'),
 
   /**
+   * 获取当前窗口是否处于最大化状态
+   */
+  isMaximized: () => ipcRenderer.invoke('window:is-maximized'),
+
+  /**
+   * 设置应用界面缩放因子 (0.6 ~ 2.0)
+   */
+  setZoom: (factor) => ipcRenderer.invoke('window:set-zoom', factor),
+
+  /**
+   * 获取当前应用界面缩放因子
+   */
+  getZoom: () => ipcRenderer.invoke('window:get-zoom'),
+
+  /**
+   * 监听窗口最大化与还原状态切换
+   */
+  onMaximizedChange: (callback) => {
+    const handler = (_event, isMax) => callback(isMax);
+    ipcRenderer.on('window:maximized-change', handler);
+    return () => ipcRenderer.removeListener('window:maximized-change', handler);
+  },
+
+  /**
    * 请求关闭当前窗口 (触发关闭拦截)
    */
   closeWindow: () => ipcRenderer.invoke('window:close'),

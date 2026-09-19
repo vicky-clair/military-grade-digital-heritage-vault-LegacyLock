@@ -31,7 +31,8 @@ import {
   ShieldCheck,
   Compass,
   Palette,
-  ChevronDown,
+  Maximize2,
+  Minimize2,
   Search,
   Lock,
   Paperclip,
@@ -45,6 +46,7 @@ import { CATEGORIES, getCategoryDef } from '../services/categories';
 import { THEMES, ThemeDefinition } from '../services/themes';
 import { copyToClipboard } from '../services/clipboardService';
 import { getSubscriptionState, getTrialDaysRemaining, isTrialActive } from '../services/subscriptionService';
+import { useI18n } from '../services/i18n';
 import { ImportExportView } from './ImportExportView';
 import { SettingsView } from './SettingsView';
 
@@ -121,6 +123,10 @@ interface RightContentAreaProps {
   canModify?: boolean;
   /** 请求接管控制权回调 (打开 TakeoverControlModal) */
   onRequestTakeover?: () => void;
+  /** 全局界面缩放倍数 */
+  zoomLevel?: number;
+  /** 设置全局界面缩放倍数回调 */
+  onSetZoom?: (zoom: number) => void;
 }
 
 export const RightContentArea: React.FC<RightContentAreaProps> = ({
@@ -148,7 +154,10 @@ export const RightContentArea: React.FC<RightContentAreaProps> = ({
   onOpenSubscription,
   canModify = true,
   onRequestTakeover,
+  zoomLevel = 1.0,
+  onSetZoom,
 }) => {
+  const { t } = useI18n();
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [revealedIds, setRevealedIds] = useState<Record<string, boolean>>({});
   const [revealedCustomFieldIds, setRevealedCustomFieldIds] = useState<Record<string, boolean>>({});
@@ -157,6 +166,21 @@ export const RightContentArea: React.FC<RightContentAreaProps> = ({
 
   // 订阅与试用状态跟踪
   const [subState, setSubState] = useState(() => getSubscriptionState());
+  const [isWindowMaximized, setIsWindowMaximized] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.legacyLockAPI?.isMaximized) {
+      window.legacyLockAPI.isMaximized().then((res) => {
+        setIsWindowMaximized(Boolean(res?.isMaximized));
+      });
+    }
+    if (typeof window !== 'undefined' && window.legacyLockAPI?.onMaximizedChange) {
+      const cleanup = window.legacyLockAPI.onMaximizedChange((isMax) => {
+        setIsWindowMaximized(isMax);
+      });
+      return cleanup;
+    }
+  }, []);
 
   useEffect(() => {
     const handleSubChange = (e: any) => {
@@ -223,44 +247,21 @@ export const RightContentArea: React.FC<RightContentAreaProps> = ({
     switch (selectedNav) {
       case 'settings':
         return {
-          title: '系统设置与安全中心',
-          subtitle: '软件版本、LVCF 2.0 规格标准、灾难防范重要提醒与高级安全控制',
+          title: t('nav.settings'),
+          subtitle: t('settings.subtitle'),
         };
       case 'import_export':
         return {
-          title: '加密导入与导出',
-          subtitle: '基于 AES-256-GCM + PBKDF2 离线高强度加密，支持跨设备迁移与双 U 盘防灾备份',
+          title: t('nav.importExport'),
+          subtitle: 'AES-256-GCM + PBKDF2',
         };
       case 'all':
-        return { title: '所有密鑰', subtitle: `已收錄所有核心密匙與資產 ${items.length} 項` };
-      case 'login':
-        return { title: '登录信息', subtitle: '網站、在線服務及應用程序的登錄憑據' };
-      case 'note':
-        return { title: '安全备注', subtitle: '加密便簽、遺囑說明、保險櫃口令與私密筆記' };
-      case 'identity':
-        return { title: '身份标识', subtitle: '居民身份證、護照、社保號及家庭法定身份' };
-      case 'card':
-        return { title: '信用卡', subtitle: '銀行卡、國際結算賬戶、存單與支付憑據' };
-      case 'password':
-        return { title: '独立密码', subtitle: '獨立的設備鎖屏口令、PIN 碼與固件密碼' };
-      case 'document':
-        return { title: '加密文档', subtitle: '房產證、信託協議、合同公證與軟件許可授權' };
-      case 'sshKey':
-        return { title: 'SSH 密钥', subtitle: '伺服器運維根密鑰、私鑰與代碼倉庫憑據' };
-      case 'apiCredential':
-        return { title: 'API 凭据', subtitle: '雲平台接口、AI 服務令牌與開發 API Key' };
-      case 'cryptoWallet':
-        return { title: '加密钱包', subtitle: '區塊鏈硬件冷錢包、助記詞與數字資產私鑰' };
-      case 'server':
-        return { title: '服务器与数据库', subtitle: '物理主機、雲 VPS 與生產數據庫憑據' };
-      case 'router':
-        return { title: '无线路由器', subtitle: '家庭主路由器、WiFi 訪問密碼與網絡存儲 NAS' };
-      case 'email':
-        return { title: '电子邮件', subtitle: '安全企業郵局、私人密郵與通訊賬號' };
-      case 'membership':
-        return { title: '会员与资产', subtitle: '私人會員卡、積分獎勵、醫療檔案與遊戲資產' };
+        return { title: t('nav.all'), subtitle: `${items.length} items` };
       default:
-        return { title: '所有密鑰', subtitle: `已收錄所有核心密匙與資產 ${items.length} 項` };
+        return {
+          title: t(`nav.${selectedNav}`),
+          subtitle: t(`categories.${selectedNav}.desc`),
+        };
     }
   };
 
@@ -272,7 +273,7 @@ export const RightContentArea: React.FC<RightContentAreaProps> = ({
     selectedNav !== 'import_export' &&
     CATEGORIES.some((c) => c.id === selectedNav);
 
-  const categoryActionTitle = selectedNav === 'all' ? '添加新资产 / 密钥' : navInfo.title;
+  const categoryActionTitle = selectedNav === 'all' ? t('topBar.addNew') : navInfo.title;
 
   return (
     <main
@@ -280,10 +281,15 @@ export const RightContentArea: React.FC<RightContentAreaProps> = ({
       style={{ background: currentTheme.mainStyle.background }}
       onClick={() => setIsThemeMenuOpen(false)}
     >
-      {/* 顶部工具栏：消除大面积空隙，紧凑且功能完善 */}
+      {/* 顶部工具栏：消除大面积空隙，紧凑且功能完善 (支持双击最大化) */}
       <header
         className="main-topbar"
         style={{ background: currentTheme.mainStyle.topbarBg }}
+        onDoubleClick={(e) => {
+          if (e.target === e.currentTarget || (e.target as HTMLElement).classList.contains('main-topbar')) {
+            window.legacyLockAPI?.maximizeWindow?.();
+          }
+        }}
       >
         <div className="topbar-left">
           {/* 主行动按钮 (动态对齐当前分类标题，如「+ 登录信息」) */}
@@ -321,14 +327,14 @@ export const RightContentArea: React.FC<RightContentAreaProps> = ({
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="搜尋已收錄密匙或資產..."
+              placeholder={t('topBar.searchPlaceholder')}
               className="search-input"
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
                 style={{ color: '#7E92C4', cursor: 'pointer', padding: 2 }}
-                title="清除搜索"
+                title="Clear"
               >
                 <X style={{ width: 12, height: 12 }} />
               </button>
@@ -336,7 +342,7 @@ export const RightContentArea: React.FC<RightContentAreaProps> = ({
           </div>
         </div>
 
-        {/* 中间快捷安全操作与主题工具组 (重新布局，填充横向空间) */}
+        {/* 中间快捷安全操作与主题工具组 */}
         <div className="topbar-center-tools">
           {/* 渐变主题切换按钮 */}
           <div style={{ position: 'relative' }}>
@@ -346,7 +352,7 @@ export const RightContentArea: React.FC<RightContentAreaProps> = ({
                 setIsThemeMenuOpen(!isThemeMenuOpen);
               }}
               className="topbar-tool-pill"
-              title="切换渐变配色主题"
+              title={t('topBar.theme')}
             >
               <Palette style={{ width: 15, height: 15, color: '#FCD34D' }} />
               <span
@@ -358,7 +364,7 @@ export const RightContentArea: React.FC<RightContentAreaProps> = ({
                   border: '1px solid rgba(255,255,255,0.7)',
                 }}
               />
-              <span className="tool-pill-label">渐变主题</span>
+              <span className="tool-pill-label">{t('topBar.theme')}</span>
             </button>
 
             {/* 主题选择下拉菜单 */}
@@ -368,7 +374,7 @@ export const RightContentArea: React.FC<RightContentAreaProps> = ({
                 onClick={(e) => e.stopPropagation()}
               >
                 <div style={{ padding: '4px 8px 8px 8px', fontSize: 11, fontWeight: 700, color: '#7E92C4', borderBottom: '1px solid rgba(255,255,255,0.1)', marginBottom: 4 }}>
-                  選擇漸變配色
+                  {t('topBar.theme')}
                 </div>
                 {THEMES.map((th) => (
                   <button
@@ -402,20 +408,20 @@ export const RightContentArea: React.FC<RightContentAreaProps> = ({
           <button
             onClick={onOpenUsbPassword}
             className="topbar-tool-pill cyan-highlight"
-            title="设置/修改U盘硬件保护PIN码与副盘接管口令"
+            title={t('topBar.usbPassword')}
           >
             <KeyRound style={{ width: 15, height: 15, color: '#00D4FF' }} />
-            <span className="tool-pill-label cyan-text">U盘密码</span>
+            <span className="tool-pill-label cyan-text">{t('topBar.usbPassword')}</span>
           </button>
 
           {/* 密库健康自检快捷入口 */}
           <button
             onClick={onOpenHealthCheck}
             className="topbar-tool-pill green-highlight"
-            title="执行密库完整性与密码学 6 项自检"
+            title={t('topBar.healthCheck')}
           >
             <ShieldCheck style={{ width: 15, height: 15, color: '#34D399' }} />
-            <span className="tool-pill-label green-text">密库自检</span>
+            <span className="tool-pill-label green-text">{t('topBar.healthCheck')}</span>
           </button>
 
           {/* 一键立即安全锁屏 */}
@@ -427,10 +433,10 @@ export const RightContentArea: React.FC<RightContentAreaProps> = ({
                 borderColor: 'rgba(168, 85, 247, 0.4)',
                 background: 'rgba(168, 85, 247, 0.12)',
               }}
-              title="立即锁定密库并阻断内存敏感凭据暴露"
+              title={t('topBar.lockNow')}
             >
               <Lock style={{ width: 14, height: 14, color: '#C084FC' }} />
-              <span className="tool-pill-label" style={{ color: '#D8B4FE' }}>立即锁屏</span>
+              <span className="tool-pill-label" style={{ color: '#D8B4FE' }}>{t('topBar.lockNow')}</span>
             </button>
           )}
 
@@ -495,14 +501,18 @@ export const RightContentArea: React.FC<RightContentAreaProps> = ({
           <div className="window-controls">
             <button
               className="win-btn"
-              title="最大化/还原窗口"
+              title={isWindowMaximized ? "还原窗口 (Restore Window)" : "最大化窗口 (Maximize Window)"}
               onClick={() => {
                 if (typeof window !== 'undefined' && window.legacyLockAPI?.maximizeWindow) {
                   window.legacyLockAPI.maximizeWindow();
                 }
               }}
             >
-              <ChevronDown style={{ width: 14, height: 14 }} />
+              {isWindowMaximized ? (
+                <Minimize2 style={{ width: 14, height: 14 }} />
+              ) : (
+                <Maximize2 style={{ width: 14, height: 14 }} />
+              )}
             </button>
             <button
               className="win-btn"
@@ -604,6 +614,8 @@ export const RightContentArea: React.FC<RightContentAreaProps> = ({
             onEmergencyWipe={onEmergencyWipe}
             onReloadMockData={onReloadMockData}
             onOpenSubscription={onOpenSubscription}
+            zoomLevel={zoomLevel}
+            onSetZoom={onSetZoom}
           />
         ) : selectedNav === 'import_export' ? (
           <ImportExportView
@@ -632,12 +644,10 @@ export const RightContentArea: React.FC<RightContentAreaProps> = ({
             </div>
 
             <p className="empty-text-label">
-              {searchQuery ? `未找到与 “${searchQuery}” 匹配的密匙或资产` : '暂未录入此类别的密匙与资产'}
+              {searchQuery ? `${t('itemCard.emptyTitle')} ("${searchQuery}")` : t('itemCard.emptyTitle')}
             </p>
             <p style={{ fontSize: 12, color: '#7E92C4', marginBottom: 16 }}>
-              {selectedNav === 'all'
-                ? '点击下方按钮即可一键录入账号、密码、密钥或数字资产'
-                : `点击下方按钮即可一键录入该分类的${categoryActionTitle}`}
+              {t('itemCard.emptyDesc')}
             </p>
 
             <button
@@ -650,36 +660,34 @@ export const RightContentArea: React.FC<RightContentAreaProps> = ({
               }}
               className="btn-topbar-add-primary"
               style={{ height: 40, padding: '0 24px', borderRadius: 10, fontSize: 13, gap: 8 }}
-              title={
-                isReadOnly
-                  ? '当前处于试用到期只读模式，点击升级订阅以录入'
-                  : selectedNav === 'all'
-                  ? '添加新资产或密钥'
-                  : `添加${categoryActionTitle}`
-              }
+              title={t('itemCard.emptyBtn')}
             >
               <Plus style={{ width: 16, height: 16 }} />
-              <span>{categoryActionTitle}</span>
+              <span>{t('itemCard.emptyBtn')}</span>
             </button>
           </div>
         ) : (
-          /* 展示资产卡片网格 */
-          <div className="vault-grid">
+          <div className="vault-items-grid">
             {filteredItems.map((item) => {
               const catDef = getCategoryDef(item.category);
-              const Icon = catDef.icon;
               const isRevealed = revealedIds[item.id];
 
               return (
-                <div key={item.id} className="vault-card">
-                  <div className="vault-card-header">
+                <div key={item.id} className="vault-item-card">
+                  <div className="card-top-row">
                     <div className="card-title-group">
-                      <div className="card-cat-icon" style={{ background: catDef.bgColor }}>
-                        <Icon className="w-4 h-4" />
+                      <div
+                        className="card-category-badge"
+                        style={{
+                          background: catDef.bgColor,
+                          color: catDef.color,
+                        }}
+                      >
+                        <catDef.icon />
                       </div>
                       <div>
                         <h3 className="card-title-text">{item.title}</h3>
-                        <span className="card-cat-label">{catDef.name}</span>
+                        <span className="card-cat-label">{t(`categories.${catDef.id}.name`) || catDef.name}</span>
                       </div>
                     </div>
 
@@ -687,7 +695,7 @@ export const RightContentArea: React.FC<RightContentAreaProps> = ({
                       <button
                         onClick={() => onEditItem(item)}
                         className="btn-card-action"
-                        title={effectiveReadOnly ? '查阅明文与详情 (只读模式)' : '编辑'}
+                        title={effectiveReadOnly ? 'View Details' : t('itemCard.edit')}
                       >
                         <Edit style={{ width: 14, height: 14 }} />
                       </button>
@@ -704,7 +712,7 @@ export const RightContentArea: React.FC<RightContentAreaProps> = ({
                           }
                         }}
                         className="btn-card-action danger"
-                        title={effectiveReadOnly ? (!canModify ? '只读模式下无法删除，需接管控制权' : '只读模式下无法删除，点击开通订阅') : '删除'}
+                        title={t('itemCard.delete')}
                       >
                         <Trash2 style={{ width: 14, height: 14 }} />
                       </button>
@@ -714,13 +722,13 @@ export const RightContentArea: React.FC<RightContentAreaProps> = ({
                   <div className="card-fields-box">
                     {item.username && (
                       <div className="card-field-row">
-                        <span className="card-field-label">账号:</span>
+                        <span className="card-field-label">ID:</span>
                         <div className="card-field-value-group">
                           <span className="card-field-value">{item.username}</span>
                           <button
                             onClick={() => handleCopy(item.username!, `u-${item.id}`)}
                             className="btn-mini-copy"
-                            title="复制账号"
+                            title={t('itemCard.copyUser')}
                           >
                             {copiedId === `u-${item.id}` ? (
                               <Check style={{ width: 12, height: 12, color: '#34D399' }} />
@@ -734,7 +742,7 @@ export const RightContentArea: React.FC<RightContentAreaProps> = ({
 
                     {item.password && (
                       <div className="card-field-row">
-                        <span className="card-field-label">密码:</span>
+                        <span className="card-field-label">PW:</span>
                         <div className="card-field-value-group">
                           <span className="card-field-value">
                             {isRevealed ? item.password : '••••••••••••'}

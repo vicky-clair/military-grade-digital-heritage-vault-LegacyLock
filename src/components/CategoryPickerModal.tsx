@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { VaultCategory } from '../types';
 import { CATEGORIES, CategoryDefinition } from '../services/categories';
+import { useI18n } from '../services/i18n';
 
 /**
  * 分类选择弹窗属性接口
@@ -47,45 +48,46 @@ interface CategoryGroup {
   description: string;
 }
 
-const CATEGORY_GROUPS: CategoryGroup[] = [
-  {
-    id: 'popular',
-    name: '常用推荐',
-    badge: '⭐ 核心高频',
-    categoryIds: ['login', 'note', 'card', 'identity', 'password', 'document'],
-    description: '日常最高频使用的密码、卡片、身份与私密便签',
-  },
-  {
-    id: 'tech',
-    name: '技术运维',
-    badge: '💻 基础设施',
-    categoryIds: ['sshKey', 'apiCredential', 'server', 'database', 'router', 'softwareLicense', 'email'],
-    description: '服务器运维、云平台开发密钥、路由器与生产数据库凭据',
-  },
-  {
-    id: 'finance',
-    name: '财务与资产',
-    badge: '💰 资产与权益',
-    categoryIds: ['cryptoWallet', 'bankAccount', 'membership', 'reward'],
-    description: '区块链冷钱包助记词、银行对公储蓄、商务会所及航司里程',
-  },
-  {
-    id: 'docs',
-    name: '证照与生活',
-    badge: '🪪 法定档案',
-    categoryIds: ['passport', 'driverLicense', 'ssn', 'medical', 'outdoorLicense', 'game'],
-    description: '护照跨境出行、驾驶证、医保急救卡、特种执照与数字遗产',
-  },
-];
-
 export const CategoryPickerModal: React.FC<CategoryPickerModalProps> = ({
   isOpen,
   onClose,
   onSelectCategory,
 }) => {
+  const { t } = useI18n();
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState<string>('all');
   const searchInputRef = useRef<HTMLInputElement>(null);
+
+  const categoryGroups: CategoryGroup[] = useMemo(() => [
+    {
+      id: 'popular',
+      name: t('categoryPicker.popularTab'),
+      badge: t('categoryPicker.popularTab'),
+      categoryIds: ['login', 'note', 'card', 'identity', 'password', 'document'],
+      description: t('categories.login.desc'),
+    },
+    {
+      id: 'tech',
+      name: t('categoryPicker.techTab'),
+      badge: t('categoryPicker.techTab'),
+      categoryIds: ['sshKey', 'apiCredential', 'server', 'database', 'router', 'softwareLicense', 'email'],
+      description: t('categories.sshKey.desc'),
+    },
+    {
+      id: 'finance',
+      name: t('categoryPicker.financeTab'),
+      badge: t('categoryPicker.financeTab'),
+      categoryIds: ['cryptoWallet', 'bankAccount', 'membership', 'reward'],
+      description: t('categories.cryptoWallet.desc'),
+    },
+    {
+      id: 'docs',
+      name: t('categoryPicker.docsTab'),
+      badge: t('categoryPicker.docsTab'),
+      categoryIds: ['passport', 'driverLicense', 'ssn', 'medical', 'outdoorLicense', 'game'],
+      description: t('categories.identity.desc'),
+    },
+  ], [t]);
 
   // 监听 ESC 键关闭
   useEffect(() => {
@@ -124,7 +126,7 @@ export const CategoryPickerModal: React.FC<CategoryPickerModalProps> = ({
       if (activeTab === 'all') {
         return CATEGORIES;
       }
-      const group = CATEGORY_GROUPS.find((g) => g.id === activeTab);
+      const group = categoryGroups.find((g) => g.id === activeTab);
       if (!group) return CATEGORIES;
       return group.categoryIds
         .map((id) => categoryMap.get(id))
@@ -132,24 +134,26 @@ export const CategoryPickerModal: React.FC<CategoryPickerModalProps> = ({
     }
 
     return CATEGORIES.filter((cat) => {
-      const matchName = cat.name.toLowerCase().includes(q);
+      const localizedName = t(`categories.${cat.id}.name`) || cat.name;
+      const localizedDesc = t(`categories.${cat.id}.desc`) || cat.description;
+      const matchName = localizedName.toLowerCase().includes(q) || cat.name.toLowerCase().includes(q);
       const matchEng = cat.englishName.toLowerCase().includes(q);
-      const matchDesc = cat.description.toLowerCase().includes(q);
+      const matchDesc = localizedDesc.toLowerCase().includes(q) || cat.description.toLowerCase().includes(q);
       const matchFields = cat.defaultFields?.some((f) =>
         f.name.toLowerCase().includes(q)
       );
       return matchName || matchEng || matchDesc || matchFields;
     });
-  }, [search, activeTab, categoryMap]);
+  }, [search, activeTab, categoryMap, categoryGroups, t]);
 
   // 统计每个分组的数量
   const groupCounts = useMemo(() => {
     const counts: Record<string, number> = { all: CATEGORIES.length };
-    CATEGORY_GROUPS.forEach((g) => {
+    categoryGroups.forEach((g) => {
       counts[g.id] = g.categoryIds.length;
     });
     return counts;
-  }, []);
+  }, [categoryGroups]);
 
   if (!isOpen) return null;
 
@@ -173,10 +177,10 @@ export const CategoryPickerModal: React.FC<CategoryPickerModalProps> = ({
               </div>
               <div>
                 <h2 id="cat-picker-title" className="cat-header-title">
-                  选择要添加的资产类型
+                  {t('categoryPicker.title')}
                 </h2>
                 <p className="cat-header-subtitle">
-                  采用军规零知识加密模板，为不同数据形态预设专属安全字段与防护
+                  {t('categoryPicker.subtitle')}
                 </p>
               </div>
             </div>
@@ -184,8 +188,8 @@ export const CategoryPickerModal: React.FC<CategoryPickerModalProps> = ({
             <button
               className="cat-modern-close-btn"
               onClick={onClose}
-              title="按 ESC 或点击关闭"
-              aria-label="关闭选择弹窗"
+              title="ESC"
+              aria-label="Close"
             >
               <span className="cat-close-kbd">ESC</span>
               <X className="w-4 h-4" />
@@ -201,7 +205,7 @@ export const CategoryPickerModal: React.FC<CategoryPickerModalProps> = ({
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="搜索资产类型、凭据用途或字段 (如: 助记词、SSH、2FA、密码、信用卡、PIN...)"
+                placeholder={t('categoryPicker.searchPlaceholder')}
                 className="cat-modern-search-input"
               />
               {search && (
@@ -212,7 +216,7 @@ export const CategoryPickerModal: React.FC<CategoryPickerModalProps> = ({
                     setSearch('');
                     searchInputRef.current?.focus();
                   }}
-                  title="清空搜索"
+                  title="Clear search"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
@@ -228,10 +232,10 @@ export const CategoryPickerModal: React.FC<CategoryPickerModalProps> = ({
                 className={`cat-tab-pill ${activeTab === 'all' ? 'active' : ''}`}
                 onClick={() => setActiveTab('all')}
               >
-                <span>🌐 全部资产</span>
+                <span>{t('categoryPicker.allAssets')}</span>
                 <span className="cat-tab-badge">{groupCounts.all}</span>
               </button>
-              {CATEGORY_GROUPS.map((group) => (
+              {categoryGroups.map((group) => (
                 <button
                   key={group.id}
                   type="button"
@@ -246,15 +250,15 @@ export const CategoryPickerModal: React.FC<CategoryPickerModalProps> = ({
           ) : (
             <div className="cat-search-status-bar">
               <span>
-                搜索关键词「<strong className="text-[#00D4FF]">{search}</strong>」：找到{' '}
-                <strong className="text-white">{filteredCategories.length}</strong> 种匹配模板
+                {t('categoryPicker.searchFoundPrefix')}<strong className="text-[#00D4FF]">{search}</strong>{t('categoryPicker.searchFoundSuffix')}:{' '}
+                <strong className="text-white">{filteredCategories.length}</strong>
               </span>
               <button
                 type="button"
                 className="cat-reset-search-link"
                 onClick={() => setSearch('')}
               >
-                返回全部
+                {t('categoryPicker.returnAll')}
               </button>
             </div>
           )}
@@ -267,9 +271,9 @@ export const CategoryPickerModal: React.FC<CategoryPickerModalProps> = ({
               <div className="cat-empty-icon-circle">
                 <FolderOpen className="w-8 h-8 text-[#7E92C4]" />
               </div>
-              <h3 className="cat-empty-title">未找到匹配的资产类型</h3>
+              <h3 className="cat-empty-title">{t('categoryPicker.emptyTitle')}</h3>
               <p className="cat-empty-desc">
-                未能检索到与「{search}」完全匹配的预置模板。您可以尝试其他关键词，或直接基于通用文档进行记录。
+                {t('categoryPicker.emptyDesc')}
               </p>
               <button
                 type="button"
@@ -280,13 +284,13 @@ export const CategoryPickerModal: React.FC<CategoryPickerModalProps> = ({
                   searchInputRef.current?.focus();
                 }}
               >
-                重置搜索并查看全部模板
+                {t('categoryPicker.resetBtn')}
               </button>
             </div>
           ) : !isSearching && activeTab === 'all' ? (
             // 全部模式：按人性化分组渲染优雅的区块，避免一盘散沙
             <div className="cat-grouped-sections">
-              {CATEGORY_GROUPS.map((group) => {
+              {categoryGroups.map((group) => {
                 const itemsInGroup = group.categoryIds
                   .map((id) => categoryMap.get(id))
                   .filter(Boolean) as CategoryDefinition[];
@@ -336,7 +340,7 @@ export const CategoryPickerModal: React.FC<CategoryPickerModalProps> = ({
           <div className="cat-footer-info">
             <ShieldCheck className="w-4 h-4 text-[#00D4FF] flex-shrink-0" />
             <span className="cat-footer-tip">
-              所有模板均支持在创建后自由追加<strong>「自定义字段」</strong>与<strong>「加密附件 (≤2MB)」</strong>
+              AES-256-GCM Zero-Knowledge Protection
             </span>
           </div>
           <button
@@ -344,7 +348,7 @@ export const CategoryPickerModal: React.FC<CategoryPickerModalProps> = ({
             className="cat-footer-cancel-btn"
             onClick={onClose}
           >
-            取消关闭
+            {t('common.cancel')}
           </button>
         </div>
       </div>
@@ -361,7 +365,10 @@ interface CategoryCardProps {
 }
 
 const CategoryCard: React.FC<CategoryCardProps> = ({ cat, onSelect }) => {
+  const { t, language } = useI18n();
   const Icon = cat.icon;
+  const displayName = t(`categories.${cat.id}.name`) || cat.name;
+  const displayDesc = t(`categories.${cat.id}.desc`) || cat.description;
 
   return (
     <div
@@ -397,16 +404,16 @@ const CategoryCard: React.FC<CategoryCardProps> = ({ cat, onSelect }) => {
       <div className="cat-card-content">
         <div className="cat-card-header-row">
           <div className="cat-card-title-wrap">
-            <span className="cat-card-name">{cat.name}</span>
-            <span className="cat-card-english-badge">{cat.englishName}</span>
+            <span className="cat-card-name">{displayName}</span>
+            {language !== 'en' && <span className="cat-card-english-badge">{cat.englishName}</span>}
           </div>
           <div className="cat-card-arrow-box">
             <ArrowRight className="w-3.5 h-3.5 cat-card-arrow" />
           </div>
         </div>
 
-        <p className="cat-card-description" title={cat.description}>
-          {cat.description}
+        <p className="cat-card-description" title={displayDesc}>
+          {displayDesc}
         </p>
 
         {/* Preset field preview tags */}
@@ -419,7 +426,7 @@ const CategoryCard: React.FC<CategoryCardProps> = ({ cat, onSelect }) => {
             ))}
             {cat.defaultFields.length > 2 && (
               <span className="cat-field-tag cat-field-tag-more">
-                +{cat.defaultFields.length - 2} 项预设
+                +{cat.defaultFields.length - 2}
               </span>
             )}
           </div>

@@ -40,6 +40,12 @@
     "directories": {
       "output": "release"
     },
+    "electronLanguages": [
+      "en-US",
+      "zh-CN",
+      "ja"
+    ],
+    "compression": "maximum",
     "files": [
       "dist/**/*",
       "electron/**/*",
@@ -62,7 +68,8 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "LegacyLock 遗产保险锁"
+      "shortcutName": "LegacyLock 遗产保险锁",
+      "differentialPackage": false
     },
     "portable": {
       "artifactName": "${productName}-v${version}-Windows-Portable.${ext}"

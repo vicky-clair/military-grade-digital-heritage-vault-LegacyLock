@@ -25,7 +25,7 @@
 
 ### 📚 Official Manuals / 核心手册 / 公式マニュアル
 [👤 **Owner Manual (USER_MANUAL.md)**](./USER_MANUAL.md) · [🗝️ **Heir Manual (HEIR_MANUAL.md)**](./HEIR_MANUAL.md)  
-[📖 **Dev & Audit Guide (DEVELOPMENT.md)**](./DEVELOPMENT.md) · [❓ **Security FAQ**](./DEVELOPMENT.md#九-数据保存继承流程与敏感安全威胁深度问答-inheritance-flow--security-faq)
+[⚖️ **Permissions Matrix (OWNER_VS_HEIR_PERMISSIONS.md)**](./OWNER_VS_HEIR_PERMISSIONS.md) · [📖 **Dev & Audit Guide (DEVELOPMENT.md)**](./DEVELOPMENT.md)
 
 </div>
 
@@ -82,6 +82,8 @@ In the digital era, private keys, crypto seed phrases, bank credentials, real-es
 
 | Feature Domain | Implementation & Defense Mechanism |
 | :--- | :--- |
+| **Tri-lingual i18n (EN/ZH/JA)** | Native real-time language switching across **English (Default)**, **简体中文**, and **日本語** with zero third-party bloat and cross-session persistence. |
+| **Responsive Display & Zoom** | Automatic screen adaptation: auto-maximizes on compact laptop screens (< 1366x768), strictly adheres to `800x500` minimum bounds, and supports global zoom scaling (`Ctrl + + / - / 0`, wheel zoom, and UI slider). |
 | **12 Asset Categories** | Structured fields for Logins, Notes, Identity, Banking Cards, Master Passwords, Legal Documents, SSH Keys, API Tokens, Crypto Wallets, Servers, Routers, and Memberships. |
 | **CSPRNG Password Generator** | Generates 20-character military-grade passwords using `window.crypto.getRandomValues` with unbiased rejection sampling (CWE-338 eliminated). |
 | **Air-Gapped CSP & Zero Telemetry** | Strict Content Security Policy blocks any external network traffic. External fonts replaced with native system font stacks. Zero `fetch` / `axios` calls. |
@@ -89,6 +91,8 @@ In the digital era, private keys, crypto seed phrases, bank credentials, real-es
 | **30-Second Clipboard Purge** | Copying passwords or seed phrases automatically arms a 30-second destruction timer, silently wiping the system clipboard to thwart malware sniffing. |
 | **Zero Footprint Cold Mode** | Owners who share PCs can wipe local LevelDB cache (`ERASE-ALL`), storing assets exclusively on Drive A. Eject the drive, and the computer is 100% clean. |
 | **Universal Media Support** | Scans external USB Flash drives, USB External HDDs, and USB SSDs across Windows (including `D:\`), macOS (`/Volumes`), and Linux (`lsblk`). |
+| **Ultra-Lightweight Binary** | Highly optimized packaging: ~63MB single-file portable executable & NSIS installer, with the native Rust cryptographic core stripped to ~500KB and zero zombie processes on exit. |
+| **3-Month Free Trial & Soft Grace** | Includes a full-featured 3-month free trial. Expiration never locks your data; existing credentials remain 100% viewable, copyable, and exportable forever. |
 
 ---
 
@@ -117,9 +121,9 @@ npm run electron
 .\启动LegacyLock.bat
 
 # 5. Out-of-the-box Windows Binaries (Zero npm/Node prerequisite):
-# - Standalone Portable EXE: release/LegacyLock-v1.0.0-Windows-Portable.exe
+# - Standalone Portable EXE (~63MB): release/LegacyLock-v1.0.0-Windows-Portable.exe
 # - Unpacked Directory: release/win-unpacked/LegacyLock.exe
-# - NSIS Installer: release/LegacyLock Setup 1.0.0.exe
+# - NSIS Setup Installer (~63MB): release/LegacyLock Setup 1.0.0.exe
 ```
 
 #### Production Packaging
@@ -154,18 +158,23 @@ npm run dist:linux
 
 ### 2. 核心功能亮点
 
-1. **12 大维度数字资产管理**：支持账号登录、安全便签、身份信息、银行金融、独立密码、加密文档、SSH私钥、API凭据、加密冷钱包、服务器数据库、路由器和会员资产；
-2. **真随机数密码发生器 (CSPRNG)**：基于底层内核高熵安全随机源与拒绝采样算法生成 20 位军规口令；
-3. **全屏防暂离锁屏**：无操作超时自动全屏模糊锁定，强制验证 Master PIN 唤醒，顶部常驻一键「立即锁屏」；
-4. **30 秒敏感剪贴板自毁**：复制密码或助记词后自动挂载 30s 销毁定时器，超时主动清空剪贴板，防止木马嗅探；
-5. **全平台外部存储识别**：原生兼容 USB 闪存盘、USB 移动机械硬盘 (HDD) 与移动固态 (SSD)，完美支持 Windows（含 `D:\` 盘及后续盘符）、macOS 与 Linux。
+1. **三语原生国际化 (English / 简体中文 / 日本語)**：默认英文界面，支持在设置中毫秒级无损切换中、英、日三语，且设置跨会话永久保存；
+2. **屏幕自适应与全自由缩放 (Display & Zoom Adaptation)**：小屏笔记本 (< 1366x768) 自动最大化防截断；保底 `800x500` 最小窗口尺寸；支持 `Ctrl + + / - / 0`、滚轮及设置滑块全局缩放；
+3. **12 大维度数字资产管理**：支持账号登录、安全便签、身份信息、银行金融、独立密码、加密文档、SSH私钥、API凭据、加密冷钱包、服务器数据库、路由器和会员资产；
+4. **真随机数密码发生器 (CSPRNG)**：基于底层内核高熵安全随机源与拒绝采样算法生成 20 位军规口令；
+5. **全屏防暂离锁屏**：无操作超时自动全屏模糊锁定，强制验证 Master PIN 唤醒，顶部常驻一键「立即锁屏」；
+6. **30 秒敏感剪贴板自毁**：复制密码或助记词后自动挂载 30s 销毁定时器，超时主动清空剪贴板，防止木马嗅探；
+7. **全平台外部存储识别**：原生兼容 USB 闪存盘、USB 移动机械硬盘 (HDD) 与移动固态 (SSD)，完美支持 Windows（含 `D:\` 盘及后续盘符）、macOS 与 Linux；
+8. **极致轻量化打包 (~63MB)**：Rust 原生密码内核体积剥离优化至仅 ~500KB，桌面便携版与安装包仅约 63MB，退出时 0 孤儿进程残留；
+9. **3 个月免费试用与柔性权益保障**：开箱即享 3 个月全功能免费试用；试用到期绝不扣押用户数据，既有资产 100% 永久安全可查可复制导出。
 
 ---
 
 ### 3. 两部专属实操手册导读
 
 - [👤 **所有者使用手册 (USER_MANUAL.md)**](./USER_MANUAL.md)：资产录入、双密码配置（Master PIN vs Heir PIN）、制作双 U 盘、纯冷存物理模式（电脑不存数据）、介质健康自检与纸质留档单封存；
-- [🗝️ **法定继承人接管手册 (HEIR_MANUAL.md)**](./HEIR_MANUAL.md)：三大凭证核对（副盘B、主盘A、Heir PIN）、免安装便携版运行、双盘插机联合激活、只读接管实操与区块链/金融资产落地转移指引。
+- [🗝️ **法定继承人接管手册 (HEIR_MANUAL.md)**](./HEIR_MANUAL.md)：三大凭证核对（副盘B、主盘A、Heir PIN）、免安装便携版运行、双盘插机联合激活、只读接管实操与区块链/金融资产落地转移指引；
+- [⚖️ **所有者与继承人权限全景对照 (OWNER_VS_HEIR_PERMISSIONS.md)**](./OWNER_VS_HEIR_PERMISSIONS.md)：系统各操作权限的逐项对照与双密码认证提升逻辑。
 
 ---
 
@@ -189,12 +198,16 @@ npm run dist:linux
 
 | 機能カテゴリ | セキュリティ仕様と防御メカニズム |
 | :--- | :--- |
+| **多言語UI対応 (英語/日本語/中国語)** | 英語（初期設定）、日本語、簡体字中国語をネイティブサポート。設定画面から即座に切り替え可能で、再起動後も設定を維持。 |
+| **画面解像度自動適応 & UIズーム** | 低解像度ラップトップ（< 1366x768）での自動最大化。最小ウィンドウサイズ `800x500` の厳格な保持。`Ctrl + + / - / 0`、マウスホイール、スライダーによる自由なUI拡大縮小。 |
 | **12種類の資産管理** | ログイン情報、メモ、個人識別、銀行口座、パスワード、暗号化文書、SSH鍵、APIトークン、暗号資産ウォレット、サーバー、ルーター、会員権。 |
 | **暗号学的に安全な乱数生成器 (CSPRNG)** | `window.crypto.getRandomValues` と拒絶サンプリング法を用いて、予測不能な20桁の高強度パスワードを生成。 |
 | **自動スクリーンロック** | 一定時間操作がない場合、高密度ガウスぼかしスクリーンロックが作動。トップバーの「今すぐロック」ボタンで即座に離席保護。 |
 | **30秒クリップボード自動消去** | パスワードや秘密鍵をコピーした後、30秒後に自動的にクリップボードをクリアし、マルウェアによる盗聴を防止。 |
 | **ゼロ・フットプリント（完全コールドモード）** | 家族とPCを共有している場合、ローカルデータを消去し、Drive A のみに保存可能。USBを抜けばPC上に痕跡は一切残りません。 |
 | **クロスプラットフォーム対応** | Windows（`D:\` ドライブを含む全ドライブ）、macOS、Linux でのUSBフラッシュメモリ、外付けHDD/SSDの自動検出に対応。 |
+| **超軽量バイナリ最適化 (~63MB)** | Rust 暗号化コアを約500KBまで極限ストリップ。ポータブル実行ファイル・インストーラーは約63MBの超軽量設計。終了時のゾンビプロセス残存ゼロ。 |
+| **3ヶ月無料トライアル & 恒久閲覧保証** | 3ヶ月の無料トライアル付き。トライアル終了後も既存データは一切ロックされず、いつでも閲覧・コピー・エクスポートが可能。 |
 
 ---
 
@@ -202,6 +215,7 @@ npm run dist:linux
 
 - [👤 **所有者向け利用マニュアル (USER_MANUAL.md)**](./USER_MANUAL.md)：資産登録、デュアルPIN設定（Master PIN / Heir PIN）、デュアルUSB作成、完全コールドモード運用、ペーパーバックアップ手順。
 - [🗝️ **相続人向け継承マニュアル (HEIR_MANUAL.md)**](./HEIR_MANUAL.md)：必須3大要素の確認（副USB B、主USB A、Heir PIN）、ポータブル版の起動、デュアルUSB同時接続による復号、暗号資産移行ガイド。
+- [⚖️ **権限・機能対照表 (OWNER_VS_HEIR_PERMISSIONS.md)**](./OWNER_VS_HEIR_PERMISSIONS.md)：所有者と相続人の権限分離、読み取り専用保護、および権限昇格認証ルール。
 
 ---
 
@@ -215,12 +229,13 @@ xr-LegacyLock/
 │   └── preload.cjs          # 安全 IPC 桥接层
 ├── src/                     # React 19 + TypeScript 前端渲染层
 │   ├── components/          # 视图组件 (CategoryPicker, ItemModal, LockScreen, SettingsView等)
-│   ├── services/            # 密码学调用、剪贴板自毁、主题规范、数据模型
+│   ├── services/            # 密码学调用、剪贴板自毁、主题规范、数据模型、i18n 多语言引擎
 │   ├── types/               # 接口规范与 LVCF 2.0 数据结构
-│   ├── App.tsx              # 应用状态编排、空闲锁屏监听与密文解密恢复
+│   ├── App.tsx              # 应用状态编排、空闲锁屏监听、UI 缩放与自适应
 │   └── index.css            # 现代军规设计系统、中文字体栈与样式
 ├── USER_MANUAL.md           # 所有者日常管理与安全配置手册 (Owner Manual)
 ├── HEIR_MANUAL.md           # 法定继承人身后接管与解密指南 (Heir Manual)
+├── OWNER_VS_HEIR_PERMISSIONS.md # 所有者与继承人权限与功能对照表 (Permissions Matrix)
 ├── DEVELOPMENT.md           # 详细技术架构与军规安全审计报告 (Dev & Audit Report)
 ├── README.md                # 本开源主文档 (Multi-language Document)
 └── 启动LegacyLock.bat       # Windows 桌面一键启动脚本

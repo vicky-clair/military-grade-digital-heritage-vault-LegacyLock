@@ -17,7 +17,7 @@
  * 5. 跨重启配置与主题持久化 (legacylock_settings.json)。
  */
 
-const { app, BrowserWindow, ipcMain, dialog, Tray, Menu, nativeImage } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, Tray, Menu, nativeImage, screen } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { spawn, exec, execSync } = require('child_process');
@@ -347,26 +347,132 @@ function startEmbeddedServer(port = 5173) {
 }
 
 async function createWindow() {
-  console.log('[Electron Main] Creating main browser window...');
-  mainWindow = new BrowserWindow({
-    width: 1260,
-    height: 860,
-    minWidth: 1024,
-    minHeight: 700,
+  console.log('[Electron Main] Creating main browser window with adaptive screen fitting...');
+
+  // 1. 获取当前主显示器可用工作区尺寸 (去除任务栏占用)
+  let workArea = { width: 1366, height: 768 };
+  try {
+    const primaryDisplay = screen.getPrimaryDisplay();
+    if (primaryDisplay && primaryDisplay.workAreaSize) {
+      workArea = primaryDisplay.workAreaSize;
+    }
+  } catch (err) {
+    console.warn('[Electron Main] 获取屏幕工作区异常，使用通用兜底分辨率:', err.message);
+  }
+
+  // 2. 读取持久化窗口状态与缩放配置
+  let savedSettings = {};
+  try {
+    const settingsPath = getSettingsFilePath();
+    if (fs.existsSync(settingsPath)) {
+      savedSettings = JSON.parse(fs.readFileSync(settingsPath, 'utf8')) || {};
+    }
+  } catch (_) {}
+
+  const savedBounds = savedSettings.windowBounds || {};
+
+  // 3. 动态计算初始宽高：优先使用安全范围内的记忆尺寸，若无或超出屏幕则自动按屏幕比例自适应
+  let initialWidth = savedBounds.width || Math.min(1240, Math.max(900, Math.floor(workArea.width * 0.92)));
+  let initialHeight = savedBounds.height || Math.min(800, Math.max(580, Math.floor(workArea.height * 0.90)));
+
+  // 严密防范窗口尺寸超出实际屏幕导致底部被任务栏遮挡
+  if (initialWidth > workArea.width) initialWidth = Math.max(800, workArea.width - 30);
+  if (initialHeight > workArea.height) initialHeight = Math.max(500, workArea.height - 30);
+
+  // 最小尺寸放宽至 800x500，确保在 1280x720 (150% DPI 缩放) 或分屏下完全自由缩放不被锁定
+  const minWidth = Math.min(800, workArea.width);
+  const minHeight = Math.min(500, workArea.height);
+
+  const windowOptions = {
+    width: initialWidth,
+    height: initialHeight,
+    minWidth,
+    minHeight,
     title: 'LegacyLock 遗产保险锁 (军规级数字遗产双保险箱)',
     backgroundColor: '#0E1525',
-    show: true, // 确保直接可见
+    show: false, // 动态调整最大化后显示，消除视觉闪烁
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: false,
+      zoomFactor: typeof savedSettings.zoomFactor === 'number' ? savedSettings.zoomFactor : 1.0,
     },
-  });
+  };
+
+  // 仅在合法坐标且未移出屏幕时恢复位置，否则保持居中
+  if (
+    typeof savedBounds.x === 'number' &&
+    typeof savedBounds.y === 'number' &&
+    savedBounds.x >= 0 &&
+    savedBounds.y >= 0 &&
+    savedBounds.x < workArea.width - 100 &&
+    savedBounds.y < workArea.height - 100
+  ) {
+    windowOptions.x = savedBounds.x;
+    windowOptions.y = savedBounds.y;
+  } else {
+    windowOptions.center = true;
+  }
+
+  mainWindow = new BrowserWindow(windowOptions);
+
+  // 4. 屏幕尺寸过紧时（笔记本常见的 1080p 开启 125%/150% 缩放导致高度不足 860px），或上次处于最大化状态：
+  // 自动执行最大化，确保 100% 完整显示全部内容与底部操作按钮
+  const shouldAutoMaximize =
+    savedBounds.isMaximized === true ||
+    (!savedBounds.width && (workArea.height <= 860 || workArea.width <= 1366));
+
+  if (shouldAutoMaximize) {
+    mainWindow.maximize();
+  }
 
   mainWindow.show();
   mainWindow.focus();
+
+  // 5. 监听窗口变化并持久化记录尺寸与最大化状态
+  function saveWindowBounds() {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    try {
+      const isMaximized = mainWindow.isMaximized();
+      const bounds = mainWindow.getBounds();
+      const settingsPath = getSettingsFilePath();
+      let current = {};
+      if (fs.existsSync(settingsPath)) {
+        try { current = JSON.parse(fs.readFileSync(settingsPath, 'utf8')) || {}; } catch (_) {}
+      }
+      current.windowBounds = {
+        x: bounds.x,
+        y: bounds.y,
+        width: bounds.width,
+        height: bounds.height,
+        isMaximized,
+      };
+      fs.writeFileSync(settingsPath, JSON.stringify(current, null, 2), 'utf8');
+    } catch (_) {}
+  }
+
+  let boundsTimer = null;
+  const debouncedSaveBounds = () => {
+    if (boundsTimer) clearTimeout(boundsTimer);
+    boundsTimer = setTimeout(saveWindowBounds, 500);
+  };
+
+  mainWindow.on('resize', debouncedSaveBounds);
+  mainWindow.on('move', debouncedSaveBounds);
+  mainWindow.on('maximize', () => {
+    debouncedSaveBounds();
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('window:maximized-change', true);
+    }
+  });
+  mainWindow.on('unmaximize', () => {
+    debouncedSaveBounds();
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('window:maximized-change', false);
+    }
+  });
 
   // 主窗口关闭时拦截并转入托盘询问流程
   mainWindow.on('close', (e) => {
@@ -403,8 +509,23 @@ async function createWindow() {
   }
 }
 
+let inFlightWindowsScan = null;
+let lastWindowsScanResult = null;
+let lastWindowsScanTime = 0;
+
 function scanWindowsDrives() {
-  return new Promise((resolve) => {
+  const now = Date.now();
+  // 1. 节流防抖：若 1500ms 内已有最新扫描结果，直接复用缓存，绝不拉起 PowerShell
+  if (now - lastWindowsScanTime < 1500 && lastWindowsScanResult) {
+    return Promise.resolve(lastWindowsScanResult);
+  }
+
+  // 2. 并发互斥锁：若已有正在执行中的扫描任务，直接复用该 Promise，彻底杜绝多个 powershell 进程堆叠
+  if (inFlightWindowsScan) {
+    return inFlightWindowsScan;
+  }
+
+  inFlightWindowsScan = new Promise((resolve) => {
     const drives = [];
     const systemDrive = (process.env.SystemDrive || 'C:').toUpperCase();
     const seenPaths = new Set();
@@ -421,6 +542,9 @@ function scanWindowsDrives() {
     const finish = () => {
       if (resolved) return;
       resolved = true;
+      inFlightWindowsScan = null;
+      lastWindowsScanTime = Date.now();
+      lastWindowsScanResult = drives;
 
       // 兜底轮询 A~Z 盘符（跳过系统盘），确保 100% 检测到 D: 及其他所有外接盘符
       const allLetters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
@@ -560,6 +684,8 @@ function scanWindowsDrives() {
       finish();
     }
   });
+
+  return inFlightWindowsScan;
 }
 
 function scanMacDrives() {
@@ -1064,6 +1190,38 @@ function registerIpcHandlers() {
       }
     }
     return { success: true };
+  });
+
+  ipcMain.handle('window:is-maximized', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      return { isMaximized: mainWindow.isMaximized() };
+    }
+    return { isMaximized: false };
+  });
+
+  ipcMain.handle('window:set-zoom', (_, factor) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      const zoom = Math.max(0.6, Math.min(2.0, Number(factor) || 1.0));
+      mainWindow.webContents.setZoomFactor(zoom);
+      try {
+        const settingsPath = getSettingsFilePath();
+        let current = {};
+        if (fs.existsSync(settingsPath)) {
+          try { current = JSON.parse(fs.readFileSync(settingsPath, 'utf8')) || {}; } catch (_) {}
+        }
+        current.zoomFactor = zoom;
+        fs.writeFileSync(settingsPath, JSON.stringify(current, null, 2), 'utf8');
+      } catch (_) {}
+      return { success: true, zoom };
+    }
+    return { success: false, zoom: 1.0 };
+  });
+
+  ipcMain.handle('window:get-zoom', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      return { success: true, zoom: mainWindow.webContents.getZoomFactor() };
+    }
+    return { success: false, zoom: 1.0 };
   });
 
   ipcMain.handle('window:close', () => {

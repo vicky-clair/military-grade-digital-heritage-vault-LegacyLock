@@ -14,6 +14,7 @@
 
 import React, { useState } from 'react';
 import { X, ShieldCheck, Power, MinusSquare, Check } from 'lucide-react';
+import { useI18n } from '../services/i18n';
 
 interface CloseConfirmModalProps {
   isOpen: boolean;
@@ -26,6 +27,7 @@ export const CloseConfirmModal: React.FC<CloseConfirmModalProps> = ({
   onClose,
   onConfirm,
 }) => {
+  const { language } = useI18n();
   const [selectedAction, setSelectedAction] = useState<'minimize_to_tray' | 'quit'>('minimize_to_tray');
   const [rememberChoice, setRememberChoice] = useState(false);
 
@@ -62,14 +64,14 @@ export const CloseConfirmModal: React.FC<CloseConfirmModalProps> = ({
             </div>
             <div>
               <div style={{ fontSize: 16, fontWeight: 700, color: '#FFFFFF' }}>
-                关闭应用确认
+                {language === 'zh' ? '关闭应用确认' : language === 'ja' ? '終了の確認' : 'Close Application Confirmation'}
               </div>
               <p style={{ fontSize: 11.5, color: '#8EA4D4', marginTop: 2 }}>
-                请选择关闭主窗口时的操作行为
+                {language === 'zh' ? '请选择关闭主窗口时的操作行为' : language === 'ja' ? 'メインウィンドウを閉じる際の動作を選択してください' : 'Choose action when closing main window'}
               </p>
             </div>
           </div>
-          <button onClick={onClose} className="modal-window-close" title="取消并返回">
+          <button onClick={onClose} className="modal-window-close" title={language === 'zh' ? '取消并返回' : language === 'ja' ? 'キャンセルして戻る' : 'Cancel and return'}>
             <X style={{ width: 16, height: 16 }} />
           </button>
         </div>
@@ -131,7 +133,7 @@ export const CloseConfirmModal: React.FC<CloseConfirmModalProps> = ({
                     gap: 6,
                   }}
                 >
-                  <span>最小化到系统托盘 (推荐)</span>
+                  <span>{language === 'zh' ? '最小化到系统托盘 (推荐)' : language === 'ja' ? 'システムトレイに最小化 (推奨)' : 'Minimize to System Tray (Recommended)'}</span>
                   <span
                     style={{
                       fontSize: 10.5,
@@ -142,7 +144,7 @@ export const CloseConfirmModal: React.FC<CloseConfirmModalProps> = ({
                       border: '1px solid rgba(52, 211, 153, 0.3)',
                     }}
                   >
-                    后台守护
+                    {language === 'zh' ? '后台守护' : language === 'ja' ? 'バックグラウンド' : 'Background Guard'}
                   </span>
                   {typeof window !== 'undefined' && localStorage.getItem('legacylock_lock_on_tray') !== 'false' && (
                     <span
@@ -155,14 +157,22 @@ export const CloseConfirmModal: React.FC<CloseConfirmModalProps> = ({
                         border: '1px solid rgba(0, 212, 255, 0.3)',
                       }}
                     >
-                      自动锁定已启用
+                      {language === 'zh' ? '自动锁定已启用' : language === 'ja' ? '自動ロック有効' : 'Auto-Lock Enabled'}
                     </span>
                   )}
                 </div>
                 <p style={{ fontSize: 11.5, color: '#8EA4D4', marginTop: 4, lineHeight: 1.5 }}>
                   {typeof window !== 'undefined' && localStorage.getItem('legacylock_lock_on_tray') === 'false'
-                    ? '应用隐藏至系统托盘保持后台静默守护，当前已在设置中关闭自动锁定。双击托盘图标可瞬间呼出主界面。'
-                    : '应用隐藏至系统托盘并自动锁定密库（可在设置中修改为不自动锁定）。双击托盘图标验证密码后方可恢复访问。'}
+                    ? (language === 'zh'
+                        ? '应用隐藏至系统托盘保持后台静默守护，当前已在设置中关闭自动锁定。双击托盘图标可瞬间呼出主界面。'
+                        : language === 'ja'
+                        ? 'アプリはシステムトレイで待機し、自動ロックは無効です。ダブルクリックですぐに開きます。'
+                        : 'Application runs silently in the system tray with auto-lock disabled. Double-click tray icon to open.')
+                    : (language === 'zh'
+                        ? '应用隐藏至系统托盘并自动锁定密库（可在设置中修改为不自动锁定）。双击托盘图标验证密码后方可恢复访问。'
+                        : language === 'ja'
+                        ? 'アプリはトレイに最小化され自動ロックされます。トレイアイコンをダブルクリックして認証後に復帰します。'
+                        : 'Application minimizes to system tray and auto-locks. Double-click tray icon to unlock and resume.')}
                 </p>
               </div>
             </div>
@@ -221,11 +231,15 @@ export const CloseConfirmModal: React.FC<CloseConfirmModalProps> = ({
                     gap: 6,
                   }}
                 >
-                  <span>彻底退出 LegacyLock</span>
+                  <span>{language === 'zh' ? '彻底退出 LegacyLock' : language === 'ja' ? 'LegacyLock を完全に終了' : 'Quit LegacyLock Completely'}</span>
                   <Power style={{ width: 13, height: 13, color: '#F43F5E' }} />
                 </div>
                 <p style={{ fontSize: 11.5, color: '#8EA4D4', marginTop: 4, lineHeight: 1.5 }}>
-                  安全退出全部进程并释放内存，终止防暂离与外接介质热插拔监控。下次需从开始菜单或快捷方式重新启动。
+                  {language === 'zh'
+                    ? '安全退出全部进程并释放内存，终止防暂离与外接介质热插拔监控。下次需从开始菜单或快捷方式重新启动。'
+                    : language === 'ja'
+                    ? 'すべてのプロセスを安全に終了し、メモリを解放します。次回はショートカット等から起動してください。'
+                    : 'Safely terminates all processes, frees memory, and stops hardware monitoring. Restart anytime from shortcut.'}
                 </p>
               </div>
             </div>
@@ -256,7 +270,11 @@ export const CloseConfirmModal: React.FC<CloseConfirmModalProps> = ({
               htmlFor="rememberCloseChoice"
               style={{ fontSize: 12, color: '#CBD5E1', cursor: 'pointer' }}
             >
-              不再提示，记住我的选择 (后续可随时在「系统设置」中修改)
+              {language === 'zh'
+                ? '不再提示，记住我的选择 (后续可随时在「系统设置」中修改)'
+                : language === 'ja'
+                ? '次回から表示しない (後から「設定」画面でいつでも変更可能)'
+                : 'Do not ask again, remember my choice (Can be changed in Settings)'}
             </label>
           </div>
         </div>
@@ -265,7 +283,7 @@ export const CloseConfirmModal: React.FC<CloseConfirmModalProps> = ({
         <div className="modal-window-footer" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: '#8EA4D4' }}>
             <ShieldCheck style={{ width: 15, height: 15, color: '#00D4FF' }} />
-            <span>军规安全守护就绪</span>
+            <span>{language === 'zh' ? '军规安全守护就绪' : language === 'ja' ? '軍用規格セキュリティ待機中' : 'Military Security Guard Ready'}</span>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -274,7 +292,7 @@ export const CloseConfirmModal: React.FC<CloseConfirmModalProps> = ({
               onClick={onClose}
               className="btn-action-cancel"
             >
-              取消
+              {language === 'zh' ? '取消' : language === 'ja' ? 'キャンセル' : 'Cancel'}
             </button>
             <button
               type="button"
@@ -287,7 +305,7 @@ export const CloseConfirmModal: React.FC<CloseConfirmModalProps> = ({
                     : 'linear-gradient(135deg, #0284C7 0%, #00D4FF 100%)',
               }}
             >
-              确定执行
+              {language === 'zh' ? '确定执行' : language === 'ja' ? '実行する' : 'Confirm'}
             </button>
           </div>
         </div>

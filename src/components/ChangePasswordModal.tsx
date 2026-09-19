@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { UsbPasswordConfig } from '../types';
 import { hashPassword, verifyPassword } from '../services/cryptoService';
+import { useI18n } from '../services/i18n';
 
 interface ChangePasswordModalProps {
   isOpen: boolean;
@@ -39,6 +40,7 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
   config,
   onSuccess,
 }) => {
+  const { t } = useI18n();
   const hasExistingPassword = Boolean(
     config?.hasMasterPassword && config?.masterPasswordHash && config?.masterPasswordSalt
   );
@@ -70,15 +72,15 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
 
   // 密码强度评估
   const evaluateStrength = (pwd: string) => {
-    if (!pwd) return { label: '请输入密码', color: '#7E92C4', percent: 0 };
-    if (pwd.length < 6) return { label: '过短 (需不少于6位)', color: '#F43F5E', percent: 20 };
+    if (!pwd) return { label: t('usbModal.strengthNone'), color: '#7E92C4', percent: 0 };
+    if (pwd.length < 6) return { label: t('changePasswordModal.strengthTooShort'), color: '#F43F5E', percent: 20 };
     const hasNum = /\d/.test(pwd);
     const hasLetter = /[a-zA-Z]/.test(pwd);
     const hasSymbol = /[^a-zA-Z0-9]/.test(pwd);
     const score = (pwd.length >= 8 ? 1 : 0) + (hasNum ? 1 : 0) + (hasLetter ? 1 : 0) + (hasSymbol ? 1 : 0);
-    if (score >= 4) return { label: '极强 (军规推荐)', color: '#34D399', percent: 100 };
-    if (score >= 3) return { label: '强 (安全性良好)', color: '#60A5FA', percent: 75 };
-    return { label: '中等 (建议增加特殊符号)', color: '#FBBF24', percent: 45 };
+    if (score >= 4) return { label: t('changePasswordModal.strengthVeryStrong'), color: '#34D399', percent: 100 };
+    if (score >= 3) return { label: t('changePasswordModal.strengthStrong'), color: '#60A5FA', percent: 75 };
+    return { label: t('changePasswordModal.strengthMedium'), color: '#FBBF24', percent: 45 };
   };
 
   const strength = evaluateStrength(newPassword);
@@ -90,7 +92,7 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
     // 若已有旧密码，先校验旧密码
     if (hasExistingPassword) {
       if (!oldPassword) {
-        setErrorMsg('请输入原锁屏密码以验证身份');
+        setErrorMsg(t('changePasswordModal.oldPassError'));
         return;
       }
       setIsSubmitting(true);
@@ -101,12 +103,12 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
           config?.masterPasswordSalt
         );
         if (!isOldValid) {
-          setErrorMsg('原密码验证不正确，请重新输入');
+          setErrorMsg(t('changePasswordModal.oldPassError'));
           setIsSubmitting(false);
           return;
         }
       } catch (err: any) {
-        setErrorMsg(`验证原密码失败: ${err.message || '未知错误'}`);
+        setErrorMsg(`${t('common.error')}: ${err.message || ''}`);
         setIsSubmitting(false);
         return;
       }
@@ -114,19 +116,19 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
 
     // 校验新密码
     if (!newPassword || newPassword.length < 6) {
-      setErrorMsg('新密码长度不能少于 6 位字符');
+      setErrorMsg(t('changePasswordModal.newPassLengthError'));
       setIsSubmitting(false);
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      setErrorMsg('两次输入的新密码不一致，请仔细核对');
+      setErrorMsg(t('changePasswordModal.mismatchError'));
       setIsSubmitting(false);
       return;
     }
 
     if (hasExistingPassword && oldPassword === newPassword) {
-      setErrorMsg('新密码不能与原密码相同');
+      setErrorMsg(t('changePasswordModal.samePassError'));
       setIsSubmitting(false);
       return;
     }
@@ -136,7 +138,7 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
       onSuccess(hashHex, saltHex, hint.trim());
       onClose();
     } catch (err: any) {
-      setErrorMsg(`密码加密存储计算失败: ${err.message || '未知错误'}`);
+      setErrorMsg(`${t('common.error')}: ${err.message || ''}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -169,16 +171,14 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
             </div>
             <div>
               <div style={{ fontSize: 16, fontWeight: 700, color: '#FFFFFF' }}>
-                {hasExistingPassword ? '修改锁屏主密码' : '设置锁屏主密码'}
+                {t('changePasswordModal.title')}
               </div>
               <p style={{ fontSize: 11.5, color: '#8EA4D4', marginTop: 2 }}>
-                {hasExistingPassword
-                  ? '验证原密码后设置新的防暂离锁屏口令'
-                  : '设定所有者日常防暂离锁屏认证密码'}
+                {t('changePasswordModal.subtitle')}
               </p>
             </div>
           </div>
-          <button onClick={onClose} className="modal-window-close" title="关闭">
+          <button onClick={onClose} className="modal-window-close" title={t('common.close')}>
             <X style={{ width: 16, height: 16 }} />
           </button>
         </div>
@@ -191,14 +191,14 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
               {hasExistingPassword && (
                 <div>
                   <label style={{ fontSize: 12, fontWeight: 600, color: '#C3D2F4', display: 'block', marginBottom: 6 }}>
-                    原锁屏密码 <span style={{ color: '#EF4444' }}>*</span>
+                    {t('changePasswordModal.oldPassLabel')} <span style={{ color: '#EF4444' }}>*</span>
                   </label>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <input
                       type={showOldPass ? 'text' : 'password'}
                       value={oldPassword}
                       onChange={(e) => setOldPassword(e.target.value)}
-                      placeholder="输入当前使用的锁屏密码"
+                      placeholder={t('changePasswordModal.oldPassPlaceholder')}
                       autoFocus
                       style={{
                         flex: 1,
@@ -238,14 +238,14 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
               {/* 新密码输入 */}
               <div>
                 <label style={{ fontSize: 12, fontWeight: 600, color: '#C3D2F4', display: 'block', marginBottom: 6 }}>
-                  {hasExistingPassword ? '新锁屏密码' : '设置锁屏密码'} <span style={{ color: '#EF4444' }}>*</span>
+                  {t('changePasswordModal.newPassLabel')} <span style={{ color: '#EF4444' }}>*</span>
                 </label>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <input
                     type={showNewPass ? 'text' : 'password'}
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="输入 6~32 位新密码"
+                    placeholder={t('changePasswordModal.newPassPlaceholder')}
                     autoFocus={!hasExistingPassword}
                     style={{
                       flex: 1,
@@ -284,7 +284,7 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
                 {newPassword && (
                   <div style={{ marginTop: 6 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 3 }}>
-                      <span style={{ color: '#8EA4D4' }}>新密码强度:</span>
+                      <span style={{ color: '#8EA4D4' }}>{t('usbModal.masterPassLabel')}:</span>
                       <span style={{ color: strength.color, fontWeight: 600 }}>{strength.label}</span>
                     </div>
                     <div style={{ height: 4, width: '100%', background: 'rgba(255,255,255,0.1)', borderRadius: 2, overflow: 'hidden' }}>
@@ -304,13 +304,13 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
               {/* 再次确认新密码 */}
               <div>
                 <label style={{ fontSize: 12, fontWeight: 600, color: '#C3D2F4', display: 'block', marginBottom: 6 }}>
-                  再次确认新密码 <span style={{ color: '#EF4444' }}>*</span>
+                  {t('changePasswordModal.confirmPassLabel')} <span style={{ color: '#EF4444' }}>*</span>
                 </label>
                 <input
                   type={showNewPass ? 'text' : 'password'}
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="请再次输入相同的新密码"
+                  placeholder={t('changePasswordModal.confirmPassPlaceholder')}
                   style={{
                     width: '100%',
                     height: 40,
@@ -329,14 +329,14 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
               {/* 密码提示词 */}
               <div>
                 <label style={{ fontSize: 12, fontWeight: 600, color: '#C3D2F4', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-                  <span>密码提示词 (可选)</span>
+                  <span>{t('changePasswordModal.hintLabel')}</span>
                   <HelpCircle style={{ width: 13, height: 13, color: '#7E92C4' }} />
                 </label>
                 <input
                   type="text"
                   value={hint}
                   onChange={(e) => setHint(e.target.value)}
-                  placeholder="锁屏遗忘时显示的联想提示词"
+                  placeholder={t('changePasswordModal.hintPlaceholder')}
                   style={{
                     width: '100%',
                     height: 38,
@@ -377,7 +377,7 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
           <div className="modal-window-footer" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: '#8EA4D4' }}>
               <ShieldCheck style={{ width: 15, height: 15, color: '#34D399' }} />
-              <span>PBKDF2 100,000 轮哈希与随机加盐</span>
+              <span>PBKDF2 100,000</span>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -387,7 +387,7 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
                 className="btn-action-cancel"
                 disabled={isSubmitting}
               >
-                取消
+                {t('common.cancel')}
               </button>
               <button
                 type="submit"
@@ -405,7 +405,7 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
                 ) : (
                   <CheckCircle2 style={{ width: 14, height: 14 }} />
                 )}
-                <span>{isSubmitting ? '加密运算中...' : hasExistingPassword ? '确认修改密码' : '确认设置密码'}</span>
+                <span>{isSubmitting ? t('changePasswordModal.savingBtn') : t('changePasswordModal.saveBtn')}</span>
               </button>
             </div>
           </div>

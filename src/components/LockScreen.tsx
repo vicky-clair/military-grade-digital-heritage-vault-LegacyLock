@@ -34,6 +34,7 @@ import {
   computeSecretKeyHash,
   cleanSecretKey,
 } from '../services/cryptoService';
+import { useI18n } from '../services/i18n';
 
 /**
  * 锁屏组件属性接口
@@ -64,6 +65,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({
   onHeirReadOnlyUnlock,
   onRescanDrives,
 }) => {
+  const { t } = useI18n();
   const [pin, setPin] = useState('');
   const [showPin, setShowPin] = useState(false);
   const [useSecretKeyUnlock, setUseSecretKeyUnlock] = useState(false);
@@ -78,13 +80,13 @@ export const LockScreen: React.FC<LockScreenProps> = ({
   const [wipeConfirmText, setWipeConfirmText] = useState('');
   const [wipeError, setWipeError] = useState('');
 
-  // 锁屏期间自动定期 2.5 秒探测 U 盘插拔状态
+  // 锁屏期间自动定期 6 秒平缓探测 U 盘插拔状态 (避免高频轮询争抢 CPU)
   useEffect(() => {
     if (!isOpen) return;
     onRescanDrives?.();
     const interval = setInterval(() => {
       onRescanDrives?.();
-    }, 2500);
+    }, 6000);
     return () => clearInterval(interval);
   }, [isOpen, onRescanDrives]);
 
@@ -124,7 +126,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({
     if (useSecretKeyUnlock) {
       const cleanKey = cleanSecretKey(secretKeyInput);
       if (!cleanKey) {
-        setErrorMsg('请输入完整的 128 位紧急安全密钥 (Secret Key)');
+        setErrorMsg(t('lockScreen.emptySecretKeyError'));
         return;
       }
 
@@ -141,10 +143,10 @@ export const LockScreen: React.FC<LockScreenProps> = ({
         if (isValid) {
           onUnlock();
         } else {
-          setErrorMsg('安全密钥校验未通过：与当前密库绑定的 128 位紧急安全密钥不匹配！');
+          setErrorMsg(t('lockScreen.invalidSecretKey'));
         }
       } catch (err: any) {
-        setErrorMsg(`验证失败: ${err.message || '未知错误'}`);
+        setErrorMsg(`${t('common.error')}: ${err.message || ''}`);
       } finally {
         setIsVerifying(false);
       }
@@ -154,7 +156,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({
     // 模式二：日常 Master PIN 码验证解锁
     if (hasPinConfigured) {
       if (!pin) {
-        setErrorMsg('请输入主 U 盘访问密码 (Master PIN)');
+        setErrorMsg(t('lockScreen.emptyPinError'));
         return;
       }
 
@@ -169,10 +171,10 @@ export const LockScreen: React.FC<LockScreenProps> = ({
         if (isValid) {
           onUnlock();
         } else {
-          setErrorMsg('密码错误：PIN 码不匹配，介质已记录单次异常访问！');
+          setErrorMsg(t('lockScreen.invalidPin'));
         }
       } catch (err: any) {
-        setErrorMsg(`验证失败: ${err.message || '未知错误'}`);
+        setErrorMsg(`${t('common.error')}: ${err.message || ''}`);
       } finally {
         setIsVerifying(false);
       }
@@ -251,13 +253,13 @@ export const LockScreen: React.FC<LockScreenProps> = ({
 
         {/* 标题与当前时间 */}
         <div style={{ fontSize: 13, color: '#00D4FF', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>
-          MILITARY LOCK SYSTEM
+          {t('lockScreen.militaryLockSystem')}
         </div>
         <h2 style={{ fontSize: 20, fontWeight: 800, color: '#FFFFFF', marginBottom: 6 }}>
-          数字遗产密钥库已安全锁定
+          {t('lockScreen.vaultLocked')}
         </h2>
         <div style={{ fontSize: 12, color: '#8EA4D4', marginBottom: 20 }}>
-          {currentTime} · 检测到长时间闲置或防暂离锁定
+          {currentTime} · {t('lockScreen.idleTimeoutNotice')}
         </div>
 
         {/* 状态徽章条 */}
@@ -278,7 +280,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({
           }}
         >
           <Cpu style={{ width: 14, height: 14, color: '#00D4FF' }} />
-          <span>内存敏感凭证已切断暴露 · AES-256-GCM 静止保护中</span>
+          <span>{t('lockScreen.memoryProtected')}</span>
         </div>
 
         {/* 解锁表单 */}
@@ -287,16 +289,16 @@ export const LockScreen: React.FC<LockScreenProps> = ({
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, textAlign: 'left' }}>
               <label style={{ fontSize: 12, fontWeight: 600, color: '#FCD34D', display: 'flex', alignItems: 'center', gap: 6 }}>
                 <Key style={{ width: 14, height: 14 }} />
-                <span>输入 128 位紧急安全密钥 (Secret Key)</span>
+                <span>{t('lockScreen.secretKeyInputLabel')}</span>
               </label>
               <div style={{ fontSize: 11, color: '#8EA4D4', marginBottom: 2 }}>
-                请查阅纸质应急单 (Emergency Kit) 或安全信封中的 128 位密钥应急解锁
+                {t('lockScreen.secretKeyNotice')}
               </div>
               <input
                 type="text"
                 value={secretKeyInput}
                 onChange={(e) => setSecretKeyInput(e.target.value.toUpperCase())}
-                placeholder="例如：LL-XXXX-XXXX-XXXX-XXXX..."
+                placeholder={t('lockScreen.secretKeyPlaceholder')}
                 autoFocus
                 style={{
                   width: '100%',
@@ -328,13 +330,13 @@ export const LockScreen: React.FC<LockScreenProps> = ({
                   padding: 0,
                 }}
               >
-                ← 返回使用主 U 盘密码 (PIN) 解锁
+                {t('lockScreen.returnToPinBtn')}
               </button>
             </div>
           ) : hasPinConfigured ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, textAlign: 'left' }}>
               <label style={{ fontSize: 12, fontWeight: 600, color: '#C3D2F4', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span>输入所有者主 U 盘密码 (PIN)</span>
+                <span>{t('lockScreen.masterPinLabel')}</span>
                 {config?.masterPasswordHint && (
                   <button
                     type="button"
@@ -351,7 +353,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({
                     }}
                   >
                     <HelpCircle style={{ width: 12, height: 12 }} />
-                    <span>{showHint ? '隐藏提示' : '密码提示'}</span>
+                    <span>{showHint ? t('lockScreen.hideHint') : t('lockScreen.showHint')}</span>
                   </button>
                 )}
               </label>
@@ -367,7 +369,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({
                     marginBottom: 4,
                   }}
                 >
-                  💡 提示：{config.masterPasswordHint}
+                  💡 {t('lockScreen.pinHint')}：{config.masterPasswordHint}
                 </div>
               )}
 
@@ -376,7 +378,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({
                   type={showPin ? 'text' : 'password'}
                   value={pin}
                   onChange={(e) => setPin(e.target.value)}
-                  placeholder="输入 6~32 位主 U 盘密码"
+                  placeholder={t('lockScreen.pinPlaceholder')}
                   autoFocus
                   style={{
                     flex: 1,
@@ -433,13 +435,13 @@ export const LockScreen: React.FC<LockScreenProps> = ({
                   }}
                 >
                   <Key style={{ width: 12, height: 12 }} />
-                  <span>忘记密码？使用 128 位紧急安全密钥解锁</span>
+                  <span>{t('lockScreen.forgotPin')}</span>
                 </button>
               )}
             </div>
           ) : (
             <div style={{ fontSize: 12, color: '#8EA4D4', padding: '12px 0' }}>
-              当前未配置介质物理 PIN 码，点击下方按钮立即恢复访问工作区。
+              {t('lockScreen.noPinConfigured')}
             </div>
           )}
 
@@ -498,12 +500,12 @@ export const LockScreen: React.FC<LockScreenProps> = ({
             )}
             <span>
               {isVerifying
-                ? '正在验证安全凭据...'
+                ? t('lockScreen.verifying')
                 : useSecretKeyUnlock
-                ? '验证安全密钥并应急解锁'
+                ? t('lockScreen.verifySecretKey')
                 : hasPinConfigured
-                ? '验证 PIN 并解锁密库'
-                : '点击恢复访问'}
+                ? t('lockScreen.verifyPin')
+                : t('lockScreen.resumeAccess')}
             </span>
           </button>
         </form>
@@ -530,9 +532,9 @@ export const LockScreen: React.FC<LockScreenProps> = ({
                     <Usb style={{ width: 15, height: 15, color: '#34D399' }} />
                   </div>
                   <div>
-                    <div style={{ fontSize: 12.5, fontWeight: 700, color: '#34D399' }}>🟢 检测到主副双 U 盘已就绪</div>
+                    <div style={{ fontSize: 12.5, fontWeight: 700, color: '#34D399' }}>{t('lockScreen.dualUsbTitle')}</div>
                     <div style={{ fontSize: 11, color: '#A7F3D0', marginTop: 1 }}>
-                      主盘 ({masterUsbDrive?.driveLetter || masterUsbDrive?.name}) + 继承人盘 ({heirUsbDrive?.driveLetter || heirUsbDrive?.name})
+                      {t('lockScreen.dualUsbSlotDesc')}: ({masterUsbDrive?.driveLetter || masterUsbDrive?.name}) + ({heirUsbDrive?.driveLetter || heirUsbDrive?.name})
                     </div>
                   </div>
                 </div>
@@ -547,7 +549,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({
                       cursor: 'pointer',
                       padding: 4,
                     }}
-                    title="重新检测 U 盘"
+                    title={t('lockScreen.dualUsbRescanBtn')}
                   >
                     <RefreshCw style={{ width: 13, height: 13 }} />
                   </button>
@@ -561,10 +563,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({
                   if (heirUsbDrive) {
                     const bindRes = await verifyDriveHardwareBinding(heirUsbDrive);
                     if (!bindRes.matched) {
-                      setErrorMsg(
-                        bindRes.error ||
-                        '❌ 继承人 U 盘硬件防克隆绑定校验未通过！检测到密钥文件被强制转移到未授权介质，拒绝解锁！'
-                      );
+                      setErrorMsg(bindRes.error || t('lockScreen.wipeHardwareBindError'));
                       return;
                     }
                   }
@@ -589,10 +588,10 @@ export const LockScreen: React.FC<LockScreenProps> = ({
                 }}
               >
                 <BookOpen style={{ width: 15, height: 15 }} />
-                <span>通过双 U 盘解锁应用 (继承人只读查看)</span>
+                <span>{t('lockScreen.heirUnlockBtn')}</span>
               </button>
               <div style={{ fontSize: 10.5, color: '#A7F3D0', opacity: 0.85, textAlign: 'center', lineHeight: 1.4 }}>
-                仅可进行数据查看与复制，不可进行修改；输入主密码与安全密钥方可修改
+                {t('lockScreen.dualUsbReadOnlyWarning')}
               </div>
             </div>
           ) : (
@@ -613,7 +612,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <Usb style={{ width: 13, height: 13, color: '#7E92C4' }} />
                   <span style={{ fontSize: 11.5, fontWeight: 600, color: '#94A3B8' }}>
-                    双 U 盘继承人免密解锁通道 (只读模式)
+                    {t('lockScreen.dualUsbChannelTitle')}
                   </span>
                 </div>
                 {onRescanDrives && (
@@ -632,19 +631,19 @@ export const LockScreen: React.FC<LockScreenProps> = ({
                     }}
                   >
                     <RefreshCw style={{ width: 11, height: 11 }} />
-                    <span>检测 U 盘</span>
+                    <span>{t('lockScreen.dualUsbRescanBtn')}</span>
                   </button>
                 )}
               </div>
               <div style={{ fontSize: 11, color: '#64748B', lineHeight: 1.4 }}>
-                继承人可插入【所有者主 U 盘】与【继承人专属 U 盘】双介质免密解锁查阅
+                {t('lockScreen.dualUsbChannelDesc')}
               </div>
               <div style={{ display: 'flex', gap: 8, fontSize: 10.5 }}>
                 <span style={{ color: masterUsbDrive ? '#34D399' : '#64748B' }}>
-                  {masterUsbDrive ? '✅ 主盘已接入' : '⚪ 主盘未检测'}
+                  {masterUsbDrive ? t('lockScreen.masterDriveOnline') : t('lockScreen.masterDriveOffline')}
                 </span>
                 <span style={{ color: heirUsbDrive ? '#34D399' : '#64748B' }}>
-                  {heirUsbDrive ? '✅ 继承人盘已接入' : '⚪ 继承人盘未检测'}
+                  {heirUsbDrive ? t('lockScreen.heirDriveOnline') : t('lockScreen.heirDriveOffline')}
                 </span>
               </div>
             </div>
@@ -670,7 +669,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({
                 textDecoration: 'underline',
               }}
             >
-              紧急情况？执行军规数据即刻自毁
+              {t('lockScreen.wipeTrigger')}
             </button>
           </div>
         )}
@@ -716,10 +715,10 @@ export const LockScreen: React.FC<LockScreenProps> = ({
                   </div>
                   <div>
                     <h3 style={{ fontSize: 16, fontWeight: 800, color: '#EF4444', margin: 0 }}>
-                      【第一重确认】严重警告：数据自毁
+                      {t('lockScreen.wipeStep1Title')}
                     </h3>
                     <div style={{ fontSize: 11, color: '#FDA4AF', marginTop: 2 }}>
-                      数据极其重要，此操作属于终极不可逆销毁
+                      {t('lockScreen.wipeStep1Sub')}
                     </div>
                   </div>
                 </div>
@@ -735,7 +734,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({
                     lineHeight: 1.6,
                   }}
                 >
-                  ⚠️ <strong>请注意：</strong>一旦确认自毁，本设备上的所有密码条目、私钥、身份证书及遗产配置将被<strong>立即彻底粉碎擦除</strong>，没有任何找回途径！您确定要继续进入最终确认步骤吗？
+                  {t('lockScreen.wipeStep1Desc')}
                 </div>
 
                 <div style={{ display: 'flex', gap: 10, marginTop: 6 }}>
@@ -754,7 +753,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({
                       cursor: 'pointer',
                     }}
                   >
-                    放弃取消 (推荐)
+                    {t('lockScreen.wipeStep1Cancel')}
                   </button>
                   <button
                     type="button"
@@ -775,7 +774,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({
                       boxShadow: '0 4px 14px rgba(239, 68, 68, 0.4)',
                     }}
                   >
-                    我已知晓，进入第二次确认
+                    {t('lockScreen.wipeStep1Next')}
                   </button>
                 </div>
               </>
@@ -790,16 +789,16 @@ export const LockScreen: React.FC<LockScreenProps> = ({
                   </div>
                   <div>
                     <h3 style={{ fontSize: 16, fontWeight: 800, color: '#F87171', margin: 0 }}>
-                      【第二重确认】终极授权执行
+                      {t('lockScreen.wipeStep2Title')}
                     </h3>
                     <div style={{ fontSize: 11, color: '#FDA4AF', marginTop: 2 }}>
-                      输入验证词 DESTROY 后方可执行销毁
+                      {t('lockScreen.wipeStep2Sub')}
                     </div>
                   </div>
                 </div>
 
                 <div style={{ fontSize: 12, color: '#CBD5E1', lineHeight: 1.5 }}>
-                  为彻底防止误触，请在下方文本框中手动输入大写确认词 <strong style={{ color: '#EF4444', fontFamily: 'monospace' }}>DESTROY</strong> 以授权立即销毁：
+                  {t('lockScreen.wipeStep2Desc')}
                 </div>
 
                 <input
@@ -809,7 +808,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({
                     setWipeConfirmText(e.target.value);
                     setWipeError('');
                   }}
-                  placeholder="请输入 DESTROY"
+                  placeholder={t('lockScreen.wipeStep2Placeholder')}
                   autoFocus
                   style={{
                     height: 42,
@@ -846,7 +845,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({
                       cursor: 'pointer',
                     }}
                   >
-                    紧急中止返回
+                    {t('lockScreen.wipeStep2Cancel')}
                   </button>
                   <button
                     type="button"
@@ -856,7 +855,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({
                         setWipeStep(0);
                         onEmergencyWipe?.();
                       } else {
-                        setWipeError('确认词不匹配，请输入 DESTROY');
+                        setWipeError('DESTROY');
                       }
                     }}
                     style={{
@@ -876,7 +875,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({
                         : 'none',
                     }}
                   >
-                    确认彻底自毁数据
+                    {t('lockScreen.wipeStep2DestroyBtn')}
                   </button>
                 </div>
               </>

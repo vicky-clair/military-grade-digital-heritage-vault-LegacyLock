@@ -65,6 +65,10 @@ declare global {
       saveAppSettings: (settings: Record<string, any>) => Promise<{ success: boolean; error?: string }>;
       minimizeWindow?: () => Promise<{ success: boolean }>;
       maximizeWindow?: () => Promise<{ success: boolean }>;
+      isMaximized?: () => Promise<{ isMaximized: boolean }>;
+      setZoom?: (factor: number) => Promise<{ success: boolean; zoom?: number }>;
+      getZoom?: () => Promise<{ success: boolean; zoom: number }>;
+      onMaximizedChange?: (callback: (isMax: boolean) => void) => () => void;
       closeWindow?: () => Promise<{ success: boolean }>;
       minimizeToTray?: () => Promise<{ success: boolean }>;
       quitApp?: () => Promise<{ success: boolean }>;

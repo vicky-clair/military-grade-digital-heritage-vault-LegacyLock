@@ -44,6 +44,8 @@ import {
   Eye,
   EyeOff,
   Sparkles,
+  Globe,
+  Maximize2,
 } from 'lucide-react';
 import { THEMES, ThemeDefinition } from '../services/themes';
 import { UsbDrive, UsbPasswordConfig } from '../types';
@@ -54,6 +56,7 @@ import {
   isTrialActive,
   SubscriptionState,
 } from '../services/subscriptionService';
+import { useI18n, SupportedLanguage } from '../services/i18n';
 
 /**
  * 系统设置视图属性接口
@@ -89,6 +92,10 @@ interface SettingsViewProps {
   onReloadMockData?: () => void;
   /** 唤起商业订阅/试用管理弹窗回调 */
   onOpenSubscription?: () => void;
+  /** 全局界面缩放倍数 */
+  zoomLevel?: number;
+  /** 设置全局界面缩放倍数回调 */
+  onSetZoom?: (zoom: number) => void;
 }
 
 /**
@@ -121,7 +128,25 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   onEmergencyWipe,
   onReloadMockData,
   onOpenSubscription,
+  zoomLevel = 1.0,
+  onSetZoom,
 }) => {
+  const { language, setLanguage, t } = useI18n();
+  const [isMaximized, setIsMaximized] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.legacyLockAPI?.isMaximized) {
+      window.legacyLockAPI.isMaximized().then((res) => {
+        setIsMaximized(Boolean(res?.isMaximized));
+      });
+    }
+    if (typeof window !== 'undefined' && window.legacyLockAPI?.onMaximizedChange) {
+      const cleanup = window.legacyLockAPI.onMaximizedChange((max) => {
+        setIsMaximized(max);
+      });
+      return cleanup;
+    }
+  }, []);
   const [expandedSection, setExpandedSection] = useState<string | null>('drives');
 
   // 订阅与试用状态
@@ -277,14 +302,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             <Sliders style={{ width: 24, height: 24, color: '#00D4FF' }} />
           </div>
           <div>
-            <h2 className="settings-hero-title">系统设置与军规安全控制中心</h2>
+            <h2 className="settings-hero-title">{t('settings.title')}</h2>
             <p className="settings-hero-sub">
-              软件版本、LVCF 2.0 规格标准、灾难防范重要提醒与高级安全控制
+              {t('settings.subtitle')}
             </p>
           </div>
         </div>
         <div className="settings-hero-badges">
-          <span className="badge-pill cyan">离线冷存储</span>
+          <span className="badge-pill cyan">{t('brand.coldStorage')}</span>
           <span className="badge-pill green">AES-256-GCM</span>
           <span className="badge-pill purple">LVCF 2.0</span>
         </div>
@@ -846,49 +871,118 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
             {/* 偏好开关列表 */}
             <div className="settings-toggles-section">
-              <h4 className="toggles-header-title">操作安全偏好</h4>
+              <h4 className="toggles-header-title">{t('settings.securityPrefsTitle')}</h4>
+
+              {/* 界面显示语言设置 (严格限定中、英、日三语，默认为英文) */}
+              <div className="settings-toggle-row" style={{ borderBottom: '1px solid rgba(0, 212, 255, 0.15)', paddingBottom: 16, marginBottom: 16 }}>
+                <div>
+                  <div className="toggle-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <Globe style={{ width: 16, height: 16, color: '#00D4FF' }} />
+                    <span style={{ color: '#00D4FF', fontWeight: 700 }}>{t('settings.languageTitle')}</span>
+                  </div>
+                  <div className="toggle-sub">{t('settings.languageDesc')}</div>
+                </div>
+                <select
+                  value={language}
+                  onChange={(e) => setLanguage(e.target.value as SupportedLanguage)}
+                  className="settings-select-input"
+                  style={{ minWidth: 170, fontWeight: 700, color: '#00D4FF', borderColor: 'rgba(0, 212, 255, 0.4)', background: 'rgba(0, 212, 255, 0.08)' }}
+                >
+                  <option value="en">English (Default)</option>
+                  <option value="zh">简体中文 (Chinese)</option>
+                  <option value="ja">日本語 (Japanese)</option>
+                </select>
+              </div>
+
+              {/* 窗口显示与界面缩放适配 (解决笔记本高分屏或150%缩放下内容显示不全) */}
+              <div className="settings-toggle-row" style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.08)', paddingBottom: 16, marginBottom: 16 }}>
+                <div>
+                  <div className="toggle-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <Maximize2 style={{ width: 16, height: 16, color: '#38BDF8' }} />
+                    <span style={{ color: '#38BDF8', fontWeight: 700 }}>{t('settings.displayTitle')}</span>
+                  </div>
+                  <div className="toggle-sub">{t('settings.displayDesc')}</div>
+                  <div style={{ fontSize: 11, color: '#93C5FD', marginTop: 4, opacity: 0.85 }}>
+                    {t('settings.zoomTip')}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <select
+                    value={zoomLevel}
+                    onChange={(e) => onSetZoom?.(Number(e.target.value))}
+                    className="settings-select-input"
+                    style={{ minWidth: 150 }}
+                    title={t('settings.zoomLabel')}
+                  >
+                    <option value={0.8}>80% (超小屏 / 150% 缩放)</option>
+                    <option value={0.85}>85% (紧凑视野)</option>
+                    <option value={0.9}>90% (轻薄本推荐)</option>
+                    <option value={1.0}>100% (标准默认)</option>
+                    <option value={1.1}>110% (大屏 / 舒适)</option>
+                    <option value={1.25}>125% (高分屏)</option>
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (typeof window !== 'undefined' && window.legacyLockAPI?.maximizeWindow) {
+                        window.legacyLockAPI.maximizeWindow();
+                      }
+                    }}
+                    className="btn btn-outline"
+                    style={{
+                      padding: '6px 12px',
+                      fontSize: 12,
+                      borderColor: 'rgba(56, 189, 248, 0.4)',
+                      color: '#38BDF8',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {isMaximized ? t('settings.restoreBtn') : t('settings.maximizeBtn')}
+                  </button>
+                </div>
+              </div>
 
               {/* 自动锁定时间 */}
               <div className="settings-toggle-row">
                 <div>
-                  <div className="toggle-label">无操作自动锁定时间</div>
-                  <div className="toggle-sub">离开电脑后自动锁定界面，防范临时他人窥视</div>
+                  <div className="toggle-label">{t('settings.autoLockLabel')}</div>
+                  <div className="toggle-sub">{t('settings.autoLockSub')}</div>
                 </div>
                 <select
                   value={autoLockMinutes}
                   onChange={(e) => setAutoLockMinutes(Number(e.target.value))}
                   className="settings-select-input"
                 >
-                  <option value={5}>5 分钟</option>
-                  <option value={15}>15 分钟 (推荐)</option>
-                  <option value={30}>30 分钟</option>
-                  <option value={60}>60 分钟</option>
-                  <option value={0}>从不自动锁定</option>
+                  <option value={5}>{t('settings.autoLock5m')}</option>
+                  <option value={15}>{t('settings.autoLock15m')}</option>
+                  <option value={30}>{t('settings.autoLock30m')}</option>
+                  <option value={60}>{t('settings.autoLock60m')}</option>
+                  <option value={0}>{t('settings.autoLockNever')}</option>
                 </select>
               </div>
 
               {/* 关闭主窗口时的行为 */}
               <div className="settings-toggle-row">
                 <div>
-                  <div className="toggle-label">关闭主窗口时的行为</div>
-                  <div className="toggle-sub">选择点击右上角关闭按钮 (X) 时的系统响应动作</div>
+                  <div className="toggle-label">{t('settings.closeActionLabel')}</div>
+                  <div className="toggle-sub">{t('settings.closeActionSub')}</div>
                 </div>
                 <select
                   value={closeAction}
                   onChange={(e) => setCloseAction(e.target.value as any)}
                   className="settings-select-input"
                 >
-                  <option value="ask">每次询问 (默认)</option>
-                  <option value="minimize_to_tray">最小化到系统托盘 (推荐)</option>
-                  <option value="quit">直接退出应用</option>
+                  <option value="ask">{t('settings.closeActionAsk')}</option>
+                  <option value="minimize_to_tray">{t('settings.closeActionTray')}</option>
+                  <option value="quit">{t('settings.closeActionQuit')}</option>
                 </select>
               </div>
 
-              {/* 最小化在托盘时自动锁定 (可修改不自动锁定) */}
+              {/* 最小化在托盘时自动锁定 */}
               <div className="settings-toggle-row">
                 <div>
                   <div className="toggle-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span>最小化在托盘时自动锁定</span>
+                    <span>{t('settings.lockOnTrayLabel')}</span>
                     <span
                       style={{
                         fontSize: 10.5,
@@ -899,17 +993,17 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                         fontWeight: 600,
                       }}
                     >
-                      {lockOnTray ? '已开启' : '不自动锁定'}
+                      {lockOnTray ? t('settings.lockOnTrayOn') : t('settings.lockOnTrayOff')}
                     </span>
                   </div>
                   <div className="toggle-sub">
-                    应用最小化或隐藏到系统托盘时自动锁定密库，再次打开时须验证密码，离开电脑更安全
+                    {t('settings.lockOnTraySub')}
                   </div>
                 </div>
                 <button
                   onClick={() => setLockOnTray(!lockOnTray)}
                   className={`settings-switch ${lockOnTray ? 'active' : ''}`}
-                  title={lockOnTray ? '点击关闭自动锁定 (修改为不自动锁定)' : '点击开启最小化自动锁定'}
+                  title={lockOnTray ? 'Toggle off' : 'Toggle on'}
                 >
                   <div className="switch-knob" />
                 </button>
@@ -918,8 +1012,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               {/* 剪贴板自动清空 */}
               <div className="settings-toggle-row">
                 <div>
-                  <div className="toggle-label">敏感凭据剪贴板自动清空</div>
-                  <div className="toggle-sub">复制密码或私钥后 30 秒自动清除系统剪切板，防恶意嗅探</div>
+                  <div className="toggle-label">{t('settings.clearClipboardLabel')}</div>
+                  <div className="toggle-sub">{t('settings.clearClipboardSub')}</div>
                 </div>
                 <button
                   onClick={() => setAutoClearClipboard(!autoClearClipboard)}
@@ -932,8 +1026,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               {/* 默认掩码隐藏密码 */}
               <div className="settings-toggle-row">
                 <div>
-                  <div className="toggle-label">资产卡片默认以掩码隐藏密码</div>
-                  <div className="toggle-sub">打开密匙库时密码显示为 ••••••••，点击眼睛方可明文查看</div>
+                  <div className="toggle-label">{t('settings.maskPasswordLabel')}</div>
+                  <div className="toggle-sub">{t('settings.maskPasswordSub')}</div>
                 </div>
                 <button
                   onClick={() => setDefaultMaskPassword(!defaultMaskPassword)}
