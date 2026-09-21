@@ -1,0 +1,42 @@
+
+> legacylock@1.0.3 test
+> node --test tests/*.test.cjs
+
+✔ secondary is key-only and unchanged while primary updates without it, including credential changes (1289.7368ms)
+✔ readonly file import never replaces another local vault; owner merge preserves local USB configuration (1156.0948ms)
+✔ information exports require both factors and roundtrip unicode on a fresh installation (614.0767ms)
+✔ local destruction requires fresh factors and two confirmations, preserves external backups (576.5672ms)
+✔ tray hides only after locking; restore and explicit exit remain available (4.4172ms)
+✔ unavailable native tray never hides the only window (0.316ms)
+✔ invalid tray image is rejected before creating or hiding a native window (0.3679ms)
+✔ appearance preferences persist; demo cannot authorize heirs or bypass queued writes (423.2561ms)
+✔ both owner factors are required; signature and payload tampering fail closed (484.9942ms)
+✔ recovery needs two independently signed shares and cannot sign writes (158.0518ms)
+✔ reconfiguration rotates data key; old pair cannot open current or future data (470.9132ms)
+✔ credential changes preserve items; previous factors fail against new envelope (511.6958ms)
+✔ serialized item writes survive restart and restart is always locked (404.0855ms)
+✔ lock invalidates queued writes and in-flight authentication (230.7999ms)
+✔ write failure keeps prior disk and in-memory data and does not report success (128.2837ms)
+✔ corrupt or oversized local data is not replaced with an empty vault (8.49ms)
+✔ distinct partitions on the same physical disk cannot qualify as a pair (0.5669ms)
+✔ real controller provisions, syncs and restores read-only on a different computer (482.2108ms)
+✔ partial two-device provisioning failure leaves original local generation usable (549.2865ms)
+✔ stale and foreign backups cannot replace the local vault; canceled export creates nothing (386.8447ms)
+✔ attachment sizes, types and parser work limits are enforced (0.6838ms)
+✔ legacy migration refuses unauthenticated metadata and excessive KDF work (0.6836ms)
+✔ legacy authenticated export imports assets only, without retaining old plan secrets (77.726ms)
+✔ atomic writes retain a complete previous version (116.3384ms)
+已验证签名并恢复全部数据（含附件）。输出为明文，请妥善保管。原密库未修改。
+✔ offline reader recovers attachments and refuses to overwrite an existing output (357.4137ms)
+✔ uncertain post-rename failure locks the session rather than continuing with stale data (109.3626ms)
+✔ locking while the export chooser is open prevents the subsequent write (191.4107ms)
+✔ checked-in LVCF 3 golden files stay readable by both authorized paths (100.6675ms)
+✔ lock during initial disk check does not resurrect an initialized owner session (2.3524ms)
+ℹ tests 29
+ℹ suites 0
+ℹ pass 29
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5554.4432

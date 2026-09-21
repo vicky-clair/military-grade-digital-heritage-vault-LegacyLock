@@ -9,6 +9,7 @@ const {
   clipboard,
   Tray,
   Menu,
+  nativeImage,
 } = require("electron");
 const path = require("node:path");
 const { pathToFileURL } = require("node:url");
@@ -43,6 +44,7 @@ let win,
   timer,
   closing = false,
   polling = false;
+let closePrompt = false;
 const entry = path.join(__dirname, "..", "dist", "index.html"),
   entryUrl = pathToFileURL(entry).href;
 function lock() {
@@ -269,19 +271,41 @@ else {
       });
       win.webContents.on("render-process-gone", lock);
       win.webContents.on("did-start-loading", lock);
-      win.on("close", (event) => {
+      win.on("close", async (event) => {
         if (closing) return;
         event.preventDefault();
-        if (preferences.value.closeToTray && tray.hide()) return;
-        lock();
-        store.queue.finally(() => {
-          closing = true;
-          app.quit();
-        });
+        if (closePrompt) return;
+        closePrompt = true;
+        try {
+          const choice = await dialog.showMessageBox(win, {
+            type: "question",
+            title: "LegacyLock",
+            message: text("关闭应用确认"),
+            detail: text("隐藏到托盘会立即锁定密库。请选择关闭方式。"),
+            buttons: [text("锁定并隐藏到托盘"), text("退出应用"), text("取消")],
+            defaultId: preferences.value.closeToTray ? 0 : 1,
+            cancelId: 2,
+            noLink: true,
+          });
+          if (closing || win.isDestroyed()) return;
+          if (choice.response === 0) {
+            if (!tray.hide())
+              await dialog.showMessageBox(win, {
+                type: "error",
+                message: text("无法创建托盘，窗口保持打开。"),
+                buttons: [text("关闭")],
+              });
+          } else if (choice.response === 1) app.quit();
+        } catch {
+          if (!win.isDestroyed()) win.show();
+        } finally {
+          closePrompt = false;
+        }
       });
       tray = new VaultTray({
         Tray,
         Menu,
+        nativeImage,
         icon: path.join(__dirname, "tray-icon.png"),
         window: () => win,
         lock,

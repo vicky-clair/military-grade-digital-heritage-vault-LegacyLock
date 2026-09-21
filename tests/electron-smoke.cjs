@@ -17,6 +17,15 @@ const fs = require("node:fs/promises"),
   path = require("node:path"),
   assert = require("node:assert/strict");
 const dir = path.resolve(process.argv[2]);
+const startupStarted = performance.now();
+let closeChoice = 0,
+  closeDialogs = 0,
+  lastCloseOptions;
+dialog.showMessageBox = async (_win, options) => {
+  closeDialogs++;
+  lastCloseOptions = options;
+  return { response: closeChoice };
+};
 const trayModule = require("../electron/vault-tray.cjs");
 const RealTray = trayModule.VaultTray;
 let trayController, trayMenu;
@@ -88,13 +97,22 @@ app.on("browser-window-created", (_event, win) => {
         throw new Error(e.message + "\nTest step: " + s);
       });
     const tick = () => new Promise((r) => setTimeout(r, 150));
+    const visible = async (selector) => {
+      const deadline = Date.now() + 5000;
+      while (
+        !(await js(`!!document.querySelector(${JSON.stringify(selector)})`))
+      ) {
+        if (Date.now() > deadline) throw Error("UI did not load: " + selector);
+        await new Promise((r) => setTimeout(r, 50));
+      }
+    };
     const screenshot = async (name) => {
       const folder = path.join(
         __dirname,
         "..",
         "audit",
         "2026-09-21",
-        "restored-ui",
+        "master-detail-ui",
       );
       await fs.mkdir(folder, { recursive: true });
       // Hidden windows can return an older compositor frame. Request frames before retaining one.
@@ -114,6 +132,32 @@ app.on("browser-window-created", (_event, win) => {
     };
     try {
       await tick();
+      process.stdout.write(
+        `Initial locked UI ready: ${Math.round(performance.now() - startupStarted)} ms (isolated test environment)\n`,
+      );
+      await new Promise((resolve, reject) => {
+        const env = { ...process.env };
+        delete env.ELECTRON_RUN_AS_NODE;
+        const child = require("node:child_process").spawn(
+          process.execPath,
+          [path.join(__dirname, "single-instance-child.cjs"), dir],
+          { env, windowsHide: true, stdio: "ignore" },
+        );
+        const timeout = setTimeout(() => {
+          child.kill();
+          reject(Error("Second instance timed out"));
+        }, 10000);
+        child.on("error", (e) => {
+          clearTimeout(timeout);
+          reject(e);
+        });
+        child.on("exit", (code) => {
+          clearTimeout(timeout);
+          code === 0
+            ? resolve()
+            : reject(Error("Second instance acquired lock: " + code));
+        });
+      });
       assert.equal(await js("typeof window.vaultAPI.initialize"), "function");
       assert.equal(await js("typeof window.legacyLockAPI"), "undefined");
       assert.equal(await js("typeof require"), "undefined");
@@ -205,9 +249,15 @@ app.on("browser-window-created", (_event, win) => {
         `Array.from(document.querySelectorAll('button')).find(b=>b.textContent.includes('添加新资产')).click()`,
       );
       await tick();
+      await visible(".cat-rich-card");
       await js("document.querySelector('.cat-rich-card').click()");
       await tick();
+      await visible(".modal-window-dialog");
       await screenshot("02-item-editor.png");
+      assert.equal(
+        await js("document.querySelector('.btn-quick-add-link')===null"),
+        true,
+      );
       assert.equal(
         await js(
           "(()=>{const r=document.querySelector('dialog.modal-backdrop').getBoundingClientRect();return r.left===0 && r.top===0 && r.width===window.innerWidth;})()",
@@ -219,6 +269,10 @@ app.on("browser-window-created", (_event, win) => {
       );
       await tick();
       const originalRename = fs.rename;
+      await js(
+        `(()=>{const f=document.querySelector('.modal-window-dialog textarea.framed-textarea:not(.font-mono)');Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(f,'完整备注第一行\\n完整备注第二行');f.dispatchEvent(new Event('input',{bubbles:true}));})()`,
+      );
+      await tick();
       fs.rename = async () => {
         throw new Error("Synthetic disk write failure");
       };
@@ -243,7 +297,74 @@ app.on("browser-window-created", (_event, win) => {
         true,
       );
       assert.match(await js("document.body.innerText"), /界面新增资产/);
+      assert.match(
+        await js("document.querySelector('.vault-detail-pane').innerText"),
+        /完整备注第二行/,
+      );
+      await js("document.querySelector('.btn-topbar-add-primary').click()");
+      await visible(".cat-rich-card");
+      await js("document.querySelector('.cat-rich-card').click()");
+      await visible(".modal-window-dialog");
+      await js(
+        `(()=>{const f=document.querySelector('.modal-window-dialog input');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(f,'第二个列表条目');f.dispatchEvent(new Event('input',{bubbles:true}));})()`,
+      );
+      await tick();
+      await js("document.querySelector('.btn-action-submit').click()");
+      await tick();
+      assert.equal(
+        await js("document.querySelectorAll('.vault-list-item').length"),
+        2,
+      );
+      await js(
+        "Array.from(document.querySelectorAll('.vault-list-item')).find(b=>b.textContent.includes('第二个列表条目')).click()",
+      );
+      await tick();
+      assert.match(
+        await js("document.querySelector('.vault-detail-pane').innerText"),
+        /第二个列表条目/,
+      );
+      assert.equal(
+        await js("document.querySelector('.modal-window-dialog')===null"),
+        true,
+      );
+      await js(
+        "Array.from(document.querySelectorAll('.vault-list-item')).find(b=>b.textContent.includes('界面新增资产')).click()",
+      );
+      await tick();
+      assert.match(
+        await js("document.querySelector('.vault-detail-pane').innerText"),
+        /完整备注第二行/,
+      );
+      await js(
+        `(()=>{const f=document.querySelector('.search-input');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(f,'没有匹配信息');f.dispatchEvent(new Event('input',{bubbles:true}));})()`,
+      );
+      await tick();
+      assert.equal(
+        await js("document.querySelector('.vault-detail-pane')===null"),
+        true,
+      );
+      await js(
+        `(()=>{const f=document.querySelector('.search-input');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(f,'');f.dispatchEvent(new Event('input',{bubbles:true}));})()`,
+      );
+      await tick();
+      assert.equal(
+        await js(
+          "(()=>{const list=document.querySelector('.vault-list-pane').getBoundingClientRect(),detail=document.querySelector('.vault-detail-pane').getBoundingClientRect();return list.right<=detail.left+1 && detail.width>200})()",
+        ),
+        true,
+      );
       await screenshot("07-dashboard.png");
+      await js(
+        "document.querySelector('.vault-list-item[aria-selected=\"true\"]').dispatchEvent(new KeyboardEvent('keydown',{key:'End',bubbles:true}))",
+      );
+      await tick();
+      assert.equal(
+        await js(
+          "document.activeElement===document.querySelector('.vault-list-item:last-child')",
+        ),
+        true,
+      );
+      await screenshot("14-selected-details.png");
       // Original theme picker saves through owner-authorized main process preferences.
       await js(
         "document.querySelector('button[title=\"切换渐变主题\"]')?.click()",
@@ -271,6 +392,7 @@ app.on("browser-window-created", (_event, win) => {
         "Array.from(document.querySelectorAll('button')).find(b=>b.textContent.includes('订阅测试')).click()",
       );
       await tick();
+      await visible(".sub-modal-container");
       assert.equal(
         await js(
           "document.querySelector('.sub-modal-container').matches(':modal')",
@@ -311,7 +433,7 @@ app.on("browser-window-created", (_event, win) => {
       await tick();
       // Test real IPC and persisted attachment round trip, using synthetic values only.
       let result = await js(
-        `window.vaultAPI.saveItem({id:'desktop-item',title:'桌面测试资产',category:'login',password:'Synthetic only',createdAt:1,updatedAt:1})`,
+        `window.vaultAPI.saveItem({id:'desktop-item',title:'桌面测试资产',category:'login',password:'Synthetic only',customFields:[{id:'empty',name:'SHOULD_NOT_RENDER',value:'   ',type:'text',isSecret:false},{id:'filled',name:'保留字段',value:'0',type:'text',isSecret:false}],createdAt:1,updatedAt:1})`,
       );
       assert.equal(result.ok, true);
       result = await js(
@@ -355,6 +477,33 @@ app.on("browser-window-created", (_event, win) => {
       await tick();
       assert.match(await js("document.body.innerText"), /继承人 · 只读/);
       assert.match(await js("document.body.innerText"), /桌面测试资产/);
+      await js(
+        "Array.from(document.querySelectorAll('.vault-list-item')).find(b=>b.textContent.includes('桌面测试资产')).click()",
+      );
+      await tick();
+      await js("document.querySelector('button[title=\"显示密码\"]').click()");
+      await tick();
+      assert.match(
+        await js("document.querySelector('.vault-detail-pane').innerText"),
+        /Synthetic only/,
+      );
+      await js(
+        "Array.from(document.querySelectorAll('.vault-list-item')).find(b=>b.textContent.includes('界面新增资产')).click()",
+      );
+      await tick();
+      await js(
+        "Array.from(document.querySelectorAll('.vault-list-item')).find(b=>b.textContent.includes('桌面测试资产')).click()",
+      );
+      await tick();
+      assert.ok(
+        !(
+          await js("document.querySelector('.vault-detail-pane').innerText")
+        ).includes("Synthetic only"),
+      );
+      assert.ok(
+        !(await js("document.body.innerText")).includes("SHOULD_NOT_RENDER"),
+      );
+      assert.ok((await js("document.body.innerText")).includes("保留字段"));
       result = await js(
         `window.vaultAPI.settings({autoLockMinutes:1,heirName:'forged',heirNotes:''})`,
       );
@@ -449,11 +598,19 @@ app.on("browser-window-created", (_event, win) => {
         { code: "ENOENT" },
       );
       await fs.access(path.join(dir, "export.llvault"));
+      closeChoice = 2;
+      win.close();
+      await tick();
+      assert.equal(win.isDestroyed(), false);
+      assert.equal(lastCloseOptions.cancelId, 2);
+      assert.equal(lastCloseOptions.buttons.length, 3);
+      closeChoice = 0;
       win.close();
       await tick();
       assert.equal(win.isDestroyed(), false);
       assert.equal((await js("window.vaultAPI.status()")).value.role, "LOCKED");
       assert.ok(trayMenu.some((entry) => entry.label === "退出应用"));
+      assert.equal(closeDialogs, 2);
       trayController.restore();
       assert.ok(!win.isDestroyed());
       process.stdout.write(

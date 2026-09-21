@@ -28,6 +28,7 @@ test("tray hides only after locking; restore and explicit exit remain available"
   };
   const tray = new VaultTray({
     Tray,
+    nativeImage: { createFromPath: () => ({ isEmpty: () => false }) },
     Menu: { buildFromTemplate: (v) => v },
     icon: "fixture",
     window: () => win,
@@ -46,6 +47,7 @@ test("tray hides only after locking; restore and explicit exit remain available"
 });
 test("unavailable native tray never hides the only window", () => {
   const tray = new VaultTray({
+    nativeImage: { createFromPath: () => ({ isEmpty: () => false }) },
     Tray: class {
       constructor() {
         throw Error("unavailable");
@@ -56,4 +58,19 @@ test("unavailable native tray never hides the only window", () => {
     },
   });
   assert.equal(tray.hide(), false);
+});
+test("invalid tray image is rejected before creating or hiding a native window", () => {
+  const tray = new VaultTray({
+    nativeImage: { createFromPath: () => ({ isEmpty: () => true }) },
+    Tray: class {
+      constructor() {
+        throw Error("must not construct");
+      }
+    },
+    window: () => {
+      throw Error("must not hide");
+    },
+  });
+  assert.equal(tray.hide(), false);
+  assert.equal(tray.lastError, "TRAY_ICON_EMPTY");
 });

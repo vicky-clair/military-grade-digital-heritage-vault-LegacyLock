@@ -10,10 +10,10 @@
 - `src/services/vaultClient.ts`：类型化固定 IPC 调用与三语言错误提示，不读取旧浏览器存储。
 - `electron/vault-preferences.cjs` / `vault-tray.cjs`：本机外观、语言、托盘、演示偏好与可注入测试的托盘生命周期。持久偏好修改必须是所有者；临时显示语言不持久化。
 - `electron/ui-messages.json` / `src/services/messages.ts`：新增流程与原生对话框的中英日文案；原有类别等字典仍在 `src/services/i18n/`。用户内容不参与翻译。
-- `src/App.tsx`：当前界面入口；复用资产编辑器、类别和翻译资源。旧版 UI 组件、cryptoService 是未被新入口引用的历史源码，不能重新接回产品。
+- `src/App.tsx`：当前界面入口；按需加载资产列表、编辑器、类别选择与订阅页。已删除未引用的旧 UI 组件、cryptoService、模拟数据和旧浏览器订阅/剪贴板服务。前端依赖仅在构建时使用，不重复装入发行包。
 - `scripts/recovery-reader.cjs`：使用相同协议代码的独立只读恢复脚本。
 
-桌面不再调用 Rust、启动 HTTP 服务、通过 PATH 发现密码工具，或使用浏览器 localStorage/IndexedDB 保存新密库与密钥。关闭窗口会锁定并等待当前写入队列结束。已经完成替换但无法确认读回的异常会强制锁定，避免继续基于旧内存覆盖磁盘。
+桌面不再调用 Rust、启动 HTTP 服务、通过 PATH 发现密码工具，或使用浏览器 localStorage/IndexedDB 保存新密库与密钥。关闭窗口弹出原生选择：锁定并隐藏至托盘、退出、取消。退出会锁定并等待当前写入队列结束。重复启动通过 Electron 主进程单实例锁恢复已有窗口。已经完成替换但无法确认读回的异常会强制锁定，避免继续基于旧内存覆盖磁盘。
 
 ## 安装和测试
 

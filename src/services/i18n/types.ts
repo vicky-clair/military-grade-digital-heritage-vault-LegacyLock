@@ -4,7 +4,7 @@
  * ============================================================================
  */
 
-export type SupportedLanguage = 'en' | 'zh' | 'ja';
+export type SupportedLanguage = "en" | "zh" | "ja";
 
 export interface LanguageOption {
   code: SupportedLanguage;
@@ -13,9 +13,9 @@ export interface LanguageOption {
 }
 
 export const SUPPORTED_LANGUAGES: LanguageOption[] = [
-  { code: 'en', name: 'English', nativeName: 'English' },
-  { code: 'zh', name: 'Chinese (Simplified)', nativeName: '简体中文' },
-  { code: 'ja', name: 'Japanese', nativeName: '日本語' },
+  { code: "en", name: "English", nativeName: "English" },
+  { code: "zh", name: "Chinese (Simplified)", nativeName: "简体中文" },
+  { code: "ja", name: "Japanese", nativeName: "日本語" },
 ];
 
 export interface TranslationDictionary {
@@ -86,68 +86,6 @@ export interface TranslationDictionary {
     created: string;
     updated: string;
   };
-  lockScreen: {
-    vaultLocked: string;
-    militaryStandard: string;
-    enterPin: string;
-    pinPlaceholder: string;
-    unlockBtn: string;
-    useSecretKey: string;
-    usePin: string;
-    secretKeyPlaceholder: string;
-    dualUsbReady: string;
-    dualUsbDesc: string;
-    heirUnlockBtn: string;
-    invalidPin: string;
-    invalidSecretKey: string;
-    emergencyWipe: string;
-    wipeWarning: string;
-    wipePrompt: string;
-    wipeCancel: string;
-    wipeConfirmBtn: string;
-    wipeError: string;
-    militaryLockSystem: string;
-    idleTimeoutNotice: string;
-    memoryProtected: string;
-    secretKeyInputLabel: string;
-    secretKeyNotice: string;
-    returnToPinBtn: string;
-    masterPinLabel: string;
-    pinHint: string;
-    showHint: string;
-    hideHint: string;
-    forgotPin: string;
-    noPinConfigured: string;
-    verifying: string;
-    verifySecretKey: string;
-    verifyPin: string;
-    resumeAccess: string;
-    dualUsbTitle: string;
-    dualUsbSlotDesc: string;
-    dualUsbReadOnlyWarning: string;
-    dualUsbChannelTitle: string;
-    dualUsbRescanBtn: string;
-    dualUsbChannelDesc: string;
-    masterDriveOnline: string;
-    masterDriveOffline: string;
-    heirDriveOnline: string;
-    heirDriveOffline: string;
-    wipeTrigger: string;
-    wipeStep1Title: string;
-    wipeStep1Sub: string;
-    wipeStep1Desc: string;
-    wipeStep1Cancel: string;
-    wipeStep1Next: string;
-    wipeStep2Title: string;
-    wipeStep2Sub: string;
-    wipeStep2Desc: string;
-    wipeStep2Placeholder: string;
-    wipeStep2Cancel: string;
-    wipeStep2DestroyBtn: string;
-    wipeHardwareBindError: string;
-    emptySecretKeyError: string;
-    emptyPinError: string;
-  };
   categoryPicker: {
     title: string;
     subtitle: string;
@@ -195,200 +133,6 @@ export interface TranslationDictionary {
     createItemBtn: string;
     heirReadOnlyTakeover: string;
     upgradeBtn: string;
-  };
-  usbModal: {
-    title: string;
-    subtitle: string;
-    masterTitle: string;
-    masterDesc: string;
-    heirTitle: string;
-    heirDesc: string;
-    masterPassLabel: string;
-    masterPassPlaceholder: string;
-    confirmMasterPassLabel: string;
-    confirmMasterPassPlaceholder: string;
-    masterHintLabel: string;
-    masterHintPlaceholder: string;
-    heirPassLabel: string;
-    heirPassPlaceholder: string;
-    confirmHeirPassLabel: string;
-    confirmHeirPassPlaceholder: string;
-    heirHintLabel: string;
-    heirHintPlaceholder: string;
-    targetDriveLabel: string;
-    noDriveDetected: string;
-    saveSettingsBtn: string;
-    savingBtn: string;
-    hardwareCryptoStatus: string;
-    masterMismatchError: string;
-    heirMismatchError: string;
-    saveSuccess: string;
-    strengthWeak: string;
-    strengthMedium: string;
-    strengthStrong: string;
-    strengthMilitary: string;
-    strengthNone: string;
-  };
-  settings: {
-    title: string;
-    subtitle: string;
-    languageTitle: string;
-    languageDesc: string;
-    subCardTitle: string;
-    subCardDescSubscribed: string;
-    subCardDescTrial: string;
-    subCardDescExpired: string;
-    drivesTitle: string;
-    drivesDesc: string;
-    drivesWaiting: string;
-    drivesOnline: string;
-    drivesNone: string;
-    drivesNoneDesc: string;
-    recheckBtn: string;
-    aboutTitle: string;
-    aboutDesc: string;
-    warningsTitle: string;
-    warningsDesc: string;
-    securityPrefsTitle: string;
-    autoLockLabel: string;
-    autoLockSub: string;
-    autoLock5m: string;
-    autoLock15m: string;
-    autoLock30m: string;
-    autoLock60m: string;
-    autoLockNever: string;
-    closeActionLabel: string;
-    closeActionSub: string;
-    closeActionAsk: string;
-    closeActionTray: string;
-    closeActionQuit: string;
-    lockOnTrayLabel: string;
-    lockOnTraySub: string;
-    lockOnTrayOn: string;
-    lockOnTrayOff: string;
-    clearClipboardLabel: string;
-    clearClipboardSub: string;
-    maskPasswordLabel: string;
-    maskPasswordSub: string;
-    themeLabel: string;
-    themeSub: string;
-    displayTitle: string;
-    displayDesc: string;
-    windowModeLabel: string;
-    windowModeSub: string;
-    maximizeBtn: string;
-    restoreBtn: string;
-    zoomLabel: string;
-    zoomSub: string;
-    zoomTip: string;
-    emergencySheetTitle: string;
-    emergencySheetDesc: string;
-    viewSheetBtn: string;
-    printSheetBtn: string;
-    dangerZoneTitle: string;
-    dangerZoneDesc: string;
-    wipeVaultBtn: string;
-  };
-  app: {
-    confirmDeleteAsset: string;
-    passwordUpdatedAlert: string;
-    vaultSavedSuccessAlert: string;
-    writeErrorAlert: string;
-    packageDownloadedAlert: string;
-    copyAllSuccessAlert: string;
-    wipeReadOnlyBlockedAlert: string;
-    wipeSuccessAlert: string;
-    confirmReloadMock: string;
-    reloadMockSuccessAlert: string;
-  };
-  changePasswordModal: {
-    title: string;
-    subtitle: string;
-    oldPassLabel: string;
-    oldPassPlaceholder: string;
-    newPassLabel: string;
-    newPassPlaceholder: string;
-    confirmPassLabel: string;
-    confirmPassPlaceholder: string;
-    hintLabel: string;
-    hintPlaceholder: string;
-    saveBtn: string;
-    savingBtn: string;
-    oldPassError: string;
-    newPassLengthError: string;
-    mismatchError: string;
-    samePassError: string;
-    strengthTooShort: string;
-    strengthStrong: string;
-    strengthMedium: string;
-    strengthVeryStrong: string;
-  };
-  setLockPasswordModal: {
-    title: string;
-    subtitle: string;
-    passLabel: string;
-    passPlaceholder: string;
-    confirmPassLabel: string;
-    confirmPassPlaceholder: string;
-    hintLabel: string;
-    hintPlaceholder: string;
-    secretKeyTitle: string;
-    secretKeyNotice: string;
-    copySecretKey: string;
-    copied: string;
-    downloadEmergencyKit: string;
-    backupCheckbox: string;
-    submitBtn: string;
-    submittingBtn: string;
-    emptyPassError: string;
-    lengthError: string;
-    mismatchError: string;
-    backupRequiredError: string;
-  };
-  healthCheckModal: {
-    title: string;
-    subtitle: string;
-    healthyBadge: string;
-    warningBadge: string;
-    dangerBadge: string;
-    recheckBtn: string;
-    checkingBtn: string;
-    closeBtn: string;
-    vaultId: string;
-    checkedAt: string;
-    allPassed: string;
-    issueFound: string;
-  };
-  mediaMigrationModal: {
-    title: string;
-    subtitle: string;
-    selectTargetLabel: string;
-    selectDrivePlaceholder: string;
-    targetTypeLabel: string;
-    startMigrationBtn: string;
-    migratingBtn: string;
-    step1: string;
-    step2: string;
-    step3: string;
-    successAlert: string;
-    noDriveSelectedAlert: string;
-  };
-  heirRecovery: {
-    title: string;
-    subtitle: string;
-    readOnlyBadge: string;
-    takeoverBtn: string;
-    takenOverBadge: string;
-    exportJsonBtn: string;
-    printSheetBtn: string;
-    exitBtn: string;
-    searchPlaceholder: string;
-    totalAssetsPrefix: string;
-    totalAssetsSuffix: string;
-    allCategories: string;
-    copyNotice: string;
-    instructionNotice: string;
-    closeInstruction: string;
   };
   categories: Record<string, { name: string; desc: string }>;
   common: {

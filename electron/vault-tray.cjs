@@ -1,8 +1,17 @@
 "use strict";
 // Inject native adapters so lifecycle tests never create icons on the user's desktop.
 class VaultTray {
-  constructor({ Tray, Menu, icon, window, lock, quit, text }) {
-    Object.assign(this, { Tray, Menu, icon, window, lock, quit, text });
+  constructor({ Tray, Menu, nativeImage, icon, window, lock, quit, text }) {
+    Object.assign(this, {
+      Tray,
+      Menu,
+      nativeImage,
+      icon,
+      window,
+      lock,
+      quit,
+      text,
+    });
   }
   restore() {
     const win = this.window();
@@ -14,12 +23,17 @@ class VaultTray {
   ensure() {
     if (this.tray && !this.tray.isDestroyed()) return true;
     try {
-      this.tray = new this.Tray(this.icon);
+      const image = this.nativeImage.createFromPath(this.icon);
+      if (image.isEmpty()) throw new Error("TRAY_ICON_EMPTY");
+      this.tray = new this.Tray(image);
       this.tray.setToolTip("LegacyLock");
       this.tray.on("double-click", () => this.restore());
       this.refresh();
+      this.lastError = null;
       return true;
-    } catch {
+    } catch (error) {
+      this.lastError =
+        error instanceof Error ? error.message : "TRAY_INITIALIZATION_FAILED";
       this.destroy();
       return false;
     }

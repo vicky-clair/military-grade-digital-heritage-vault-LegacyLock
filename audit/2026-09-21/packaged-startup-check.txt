@@ -1,0 +1,2 @@
+{"label":"previous","ms":[616,577,532],"medianMs":577}
+{"label":"current","ms":[635,616,553],"medianMs":616}

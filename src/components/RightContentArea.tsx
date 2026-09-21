@@ -1,23 +1,7 @@
 import { m } from "../services/messages";
-/**
- * ============================================================================
- * LegacyLock 军规遗产密钥库 — 主工作区与顶部平衡工具栏组件 (RightContentArea)
- * ============================================================================
- *
- * 界面交互职责：
- * 1. 顶部紧凑平衡工具栏：
- *    - [+ 添加新资产 / 密钥] 主行动按钮与实时模糊搜索框；
- *    - 快捷工具群：[渐变主题切换]、[U盘密码配置]、[密库健康自检]、[一键立即锁屏]；
- * 2. 资产列表渲染工作区：
- *    - 军规级规格的卡片式凭证布局，默认密码掩码隐藏防偷窥；
- *    - 集成 30 秒自动清空的军规安全剪贴板复制；
- *    - 资产单项快速编辑、自定义字段展开与删除防误触确认；
- * 3. 视图无缝切换路由：
- *    - 导航选中 'import_export' 时渲染军规加密备份导入导出视图 (ImportExportView)；
- *    - 导航选中 'settings' 时渲染系统设置与安全控制中心视图 (SettingsView)。
- */
+/** 主工作区：公共工具栏、信息列表与详情，以及设置和备份内容插槽。 */
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   KeyRound,
   Copy,
@@ -117,6 +101,8 @@ export const RightContentArea: React.FC<RightContentAreaProps> = ({
     Record<string, boolean>
   >({});
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const detailRef = useRef<HTMLElement>(null);
   const [isThemeMenuOpen, setIsThemeMenuOpen] = useState(false);
 
   const [copyError, setCopyError] = useState("");
@@ -180,6 +166,17 @@ export const RightContentArea: React.FC<RightContentAreaProps> = ({
       setCopyError(e instanceof Error ? e.message : m("复制失败"));
     }
   };
+  const selectedItem =
+    filteredItems.find((item) => item.id === selectedItemId) ||
+    filteredItems[0];
+  useEffect(() => {
+    setSelectedItemId(selectedItem?.id ?? null);
+    setRevealedIds({});
+    setRevealedCustomFieldIds({});
+    setCopiedId(null);
+    setCopyError("");
+    detailRef.current?.scrollTo(0, 0);
+  }, [selectedItem?.id, selectedNav, searchQuery]);
   const toggleReveal = (id: string) => {
     setRevealedIds((prev) => ({ ...prev, [id]: !prev[id] }));
   };
@@ -187,12 +184,6 @@ export const RightContentArea: React.FC<RightContentAreaProps> = ({
   const toggleCustomFieldReveal = (key: string) => {
     setRevealedCustomFieldIds((prev) => ({ ...prev, [key]: !prev[key] }));
   };
-
-  // 切换分类或搜索时，自动重置明文暴露状态，防范驻留泄露
-  useEffect(() => {
-    setRevealedIds({});
-    setRevealedCustomFieldIds({});
-  }, [selectedNav, searchQuery]);
 
   const getNavInfo = () => {
     switch (selectedNav) {
@@ -467,7 +458,9 @@ export const RightContentArea: React.FC<RightContentAreaProps> = ({
       </header>
 
       {/* 主工作滚动区域 */}
-      <div className="main-scroll-content">
+      <div
+        className={`main-scroll-content ${selectedNav !== "settings" && selectedNav !== "import_export" ? "master-detail-content" : ""}`}
+      >
         {banner}
         {copyError && <p role="alert">{copyError}</p>}
         {/* 顶部横幅 */}
@@ -583,310 +576,396 @@ export const RightContentArea: React.FC<RightContentAreaProps> = ({
             </button>
           </div>
         ) : (
-          <div className="vault-items-grid">
-            {filteredItems.map((item) => {
-              const catDef = getCategoryDef(item.category);
-              const isRevealed = revealedIds[item.id];
-
-              return (
-                <div key={item.id} className="vault-item-card">
-                  <div className="card-top-row">
-                    <div className="card-title-group">
-                      <div
+          <div className="vault-master-detail">
+            <section className="vault-list-pane" aria-label={m("信息列表")}>
+              <div className="vault-list-heading">
+                <span>{m("信息列表")}</span>
+                <span>{m("{0} 项资产", filteredItems.length)}</span>
+              </div>
+              <div
+                className="vault-list"
+                role="listbox"
+                aria-label={m("信息列表")}
+              >
+                {filteredItems.map((item, index) => {
+                  const cat = getCategoryDef(item.category);
+                  return (
+                    <button
+                      type="button"
+                      key={item.id}
+                      role="option"
+                      aria-selected={selectedItem?.id === item.id}
+                      tabIndex={selectedItem?.id === item.id ? 0 : -1}
+                      className="vault-list-item"
+                      onClick={() => setSelectedItemId(item.id)}
+                      onKeyDown={(event) => {
+                        const target =
+                          event.key === "ArrowDown"
+                            ? Math.min(index + 1, filteredItems.length - 1)
+                            : event.key === "ArrowUp"
+                              ? Math.max(index - 1, 0)
+                              : event.key === "Home"
+                                ? 0
+                                : event.key === "End"
+                                  ? filteredItems.length - 1
+                                  : -1;
+                        if (target < 0) return;
+                        event.preventDefault();
+                        setSelectedItemId(filteredItems[target].id);
+                        const button = event.currentTarget.parentElement
+                          ?.children[target] as HTMLElement;
+                        button?.focus();
+                      }}
+                    >
+                      <span
                         className="card-category-badge"
-                        style={{
-                          background: catDef.bgColor,
-                          color: catDef.color,
-                        }}
+                        style={{ background: cat.bgColor, color: cat.color }}
                       >
-                        <catDef.icon />
-                      </div>
-                      <div>
-                        <h3 className="card-title-text">{item.title}</h3>
-                        <span className="card-cat-label">
-                          {t(`categories.${catDef.id}.name`) || catDef.name}
-                        </span>
-                      </div>
-                    </div>
+                        <cat.icon />
+                      </span>
+                      <span className="vault-list-summary">
+                        <strong>{item.title}</strong>
+                        <span>{t(`categories.${cat.id}.name`)}</span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+            <section
+              ref={detailRef}
+              className="vault-detail-pane"
+              aria-label={m("详细信息")}
+            >
+              {selectedItem &&
+                [selectedItem].map((item) => {
+                  const catDef = getCategoryDef(item.category);
+                  const isRevealed = revealedIds[item.id];
 
-                    <div className="card-actions">
-                      <button
-                        onClick={() => onEditItem(item)}
-                        className="btn-card-action"
-                        title={
-                          effectiveReadOnly
-                            ? "View Details"
-                            : t("itemCard.edit")
-                        }
-                      >
-                        <Edit style={{ width: 14, height: 14 }} />
-                      </button>
-                      <button
-                        onClick={() => {
-                          if (effectiveReadOnly) {
-                            if (!canModify && onRequestTakeover) {
-                              onRequestTakeover();
-                            } else if (onOpenSubscription) {
-                              onOpenSubscription();
-                            }
-                          } else {
-                            onDeleteItem(item.id);
-                          }
-                        }}
-                        className="btn-card-action danger"
-                        title={t("itemCard.delete")}
-                      >
-                        <Trash2 style={{ width: 14, height: 14 }} />
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="card-fields-box">
-                    {item.username && (
-                      <div className="card-field-row">
-                        <span className="card-field-label">ID:</span>
-                        <div className="card-field-value-group">
-                          <span className="card-field-value">
-                            {item.username}
-                          </span>
-                          <button
-                            onClick={() =>
-                              handleCopy(item.username!, `u-${item.id}`)
-                            }
-                            className="btn-mini-copy"
-                            title={t("itemCard.copyUser")}
+                  return (
+                    <div key={item.id} className="vault-item-card">
+                      <div className="card-top-row">
+                        <div className="card-title-group">
+                          <div
+                            className="card-category-badge"
+                            style={{
+                              background: catDef.bgColor,
+                              color: catDef.color,
+                            }}
                           >
-                            {copiedId === `u-${item.id}` ? (
-                              <Check
-                                style={{
-                                  width: 12,
-                                  height: 12,
-                                  color: "#34D399",
-                                }}
-                              />
-                            ) : (
-                              <Copy style={{ width: 12, height: 12 }} />
-                            )}
-                          </button>
+                            <catDef.icon />
+                          </div>
+                          <div>
+                            <h3 className="card-title-text">{item.title}</h3>
+                            <span className="card-cat-label">
+                              {t(`categories.${catDef.id}.name`) || catDef.name}
+                            </span>
+                          </div>
                         </div>
-                      </div>
-                    )}
 
-                    {item.password && (
-                      <div className="card-field-row">
-                        <span className="card-field-label">PW:</span>
-                        <div className="card-field-value-group">
-                          <span className="card-field-value">
-                            {isRevealed ? item.password : "••••••••••••"}
-                          </span>
+                        <div className="card-actions">
                           <button
-                            onClick={() => toggleReveal(item.id)}
-                            className="btn-mini-copy"
-                            title={isRevealed ? m("隐藏密码") : m("显示密码")}
-                          >
-                            {isRevealed ? (
-                              <EyeOff style={{ width: 12, height: 12 }} />
-                            ) : (
-                              <Eye style={{ width: 12, height: 12 }} />
-                            )}
-                          </button>
-                          <button
-                            onClick={() =>
-                              handleCopy(item.password!, `p-${item.id}`)
+                            onClick={() => onEditItem(item)}
+                            className="btn-card-action"
+                            title={
+                              effectiveReadOnly
+                                ? m("详细信息")
+                                : t("itemCard.edit")
                             }
-                            className="btn-mini-copy"
-                            title={m("复制密码")}
                           >
-                            {copiedId === `p-${item.id}` ? (
-                              <Check
-                                style={{
-                                  width: 12,
-                                  height: 12,
-                                  color: "#34D399",
-                                }}
-                              />
+                            {effectiveReadOnly ? (
+                              <Eye size={14} />
                             ) : (
-                              <Copy style={{ width: 12, height: 12 }} />
+                              <Edit size={14} />
                             )}
+                            <span>
+                              {effectiveReadOnly
+                                ? m("详细信息")
+                                : t("itemCard.edit")}
+                            </span>
                           </button>
-                        </div>
-                      </div>
-                    )}
-
-                    {item.url && (
-                      <div className="card-field-row">
-                        <span className="card-field-label">{m("网址:")}</span>
-                        <div className="card-field-value-group">
-                          <span className="card-field-value font-mono">
-                            {item.url}
-                          </span>
-                          <button
-                            onClick={() =>
-                              handleCopy(item.url!, `url-${item.id}`)
-                            }
-                            className="btn-mini-copy"
-                            title={m("复制网址")}
-                          >
-                            {copiedId === `url-${item.id}` ? (
-                              <Check
-                                style={{
-                                  width: 12,
-                                  height: 12,
-                                  color: "#34D399",
-                                }}
-                              />
-                            ) : (
-                              <Copy style={{ width: 12, height: 12 }} />
-                            )}
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* 自定义扩展选项 (自定义标题与内容) */}
-                    {item.customFields && item.customFields.length > 0 && (
-                      <div className="card-custom-fields-box">
-                        {item.customFields.map((cf) => {
-                          const fieldKey = `${item.id}-${cf.id}`;
-                          const isSecret = cf.isSecret;
-                          const isFieldRevealed =
-                            revealedCustomFieldIds[fieldKey] || isRevealed;
-                          const displayVal =
-                            isSecret && !isFieldRevealed
-                              ? "••••••••••••"
-                              : cf.value;
-
-                          return (
-                            <div key={cf.id} className="card-field-row custom">
-                              <span className="card-field-label">
-                                {cf.name}:
-                              </span>
-                              <div className="card-field-value-group">
-                                <span
-                                  className={`card-field-value ${cf.type === "url" || isSecret ? "font-mono" : ""}`}
-                                >
-                                  {displayVal || m("(空)")}
-                                </span>
-                                {isSecret && (
-                                  <button
-                                    onClick={() =>
-                                      toggleCustomFieldReveal(fieldKey)
-                                    }
-                                    className="btn-mini-copy"
-                                    title={
-                                      isFieldRevealed
-                                        ? m("隐藏明文")
-                                        : m("显示明文")
-                                    }
-                                  >
-                                    {isFieldRevealed ? (
-                                      <EyeOff
-                                        style={{ width: 12, height: 12 }}
-                                      />
-                                    ) : (
-                                      <Eye style={{ width: 12, height: 12 }} />
-                                    )}
-                                  </button>
-                                )}
-                                <button
-                                  onClick={() =>
-                                    handleCopy(cf.value, `cf-${fieldKey}`)
-                                  }
-                                  className="btn-mini-copy"
-                                  title={m("复制 {0}", cf.name)}
-                                >
-                                  {copiedId === `cf-${fieldKey}` ? (
-                                    <Check
-                                      style={{
-                                        width: 12,
-                                        height: 12,
-                                        color: "#34D399",
-                                      }}
-                                    />
-                                  ) : (
-                                    <Copy style={{ width: 12, height: 12 }} />
-                                  )}
-                                </button>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-
-                    {/* 加密附件展示与一键导出 (Attachments) */}
-                    {item.attachments && item.attachments.length > 0 && (
-                      <div className="card-attachments-box">
-                        <div className="card-attachments-header">
-                          <Paperclip
-                            style={{ width: 12, height: 12, color: "#00D4FF" }}
-                          />
-                          <span>
-                            {m("加密附件 (")}
-                            {item.attachments.length})
-                          </span>
-                        </div>
-                        {item.attachments.map((att) => (
-                          <div key={att.id} className="card-attachment-pill">
-                            <div className="card-attachment-name-group">
-                              <Paperclip
-                                style={{
-                                  width: 12,
-                                  height: 12,
-                                  color: "#38BDF8",
-                                  flexShrink: 0,
-                                }}
-                              />
-                              <span
-                                className="card-attachment-name"
-                                title={att.name}
-                              >
-                                {att.name}
-                              </span>
-                              <span className="card-attachment-size">
-                                ({formatAttachmentSize(att.size)})
-                              </span>
-                            </div>
+                          {!effectiveReadOnly && (
                             <button
-                              type="button"
-                              onClick={() => handleDownloadAttachment(att)}
-                              className="btn-mini-copy"
-                              title={m("下载/导出附件: {0}", att.name)}
+                              onClick={() => onDeleteItem(item.id)}
+                              className="btn-card-action danger"
+                              title={t("itemCard.delete")}
                             >
-                              <Download
+                              <Trash2 style={{ width: 14, height: 14 }} />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="card-fields-box">
+                        {item.username?.trim() && (
+                          <div className="card-field-row">
+                            <span className="card-field-label">ID:</span>
+                            <div className="card-field-value-group">
+                              <span className="card-field-value">
+                                {item.username}
+                              </span>
+                              <button
+                                onClick={() =>
+                                  handleCopy(item.username!, `u-${item.id}`)
+                                }
+                                className="btn-mini-copy"
+                                title={t("itemCard.copyUser")}
+                              >
+                                {copiedId === `u-${item.id}` ? (
+                                  <Check
+                                    style={{
+                                      width: 12,
+                                      height: 12,
+                                      color: "#34D399",
+                                    }}
+                                  />
+                                ) : (
+                                  <Copy style={{ width: 12, height: 12 }} />
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {item.password?.trim() && (
+                          <div className="card-field-row">
+                            <span className="card-field-label">PW:</span>
+                            <div className="card-field-value-group">
+                              <span className="card-field-value">
+                                {isRevealed ? item.password : "••••••••••••"}
+                              </span>
+                              <button
+                                onClick={() => toggleReveal(item.id)}
+                                className="btn-mini-copy"
+                                title={
+                                  isRevealed ? m("隐藏密码") : m("显示密码")
+                                }
+                              >
+                                {isRevealed ? (
+                                  <EyeOff style={{ width: 12, height: 12 }} />
+                                ) : (
+                                  <Eye style={{ width: 12, height: 12 }} />
+                                )}
+                              </button>
+                              <button
+                                onClick={() =>
+                                  handleCopy(item.password!, `p-${item.id}`)
+                                }
+                                className="btn-mini-copy"
+                                title={m("复制密码")}
+                              >
+                                {copiedId === `p-${item.id}` ? (
+                                  <Check
+                                    style={{
+                                      width: 12,
+                                      height: 12,
+                                      color: "#34D399",
+                                    }}
+                                  />
+                                ) : (
+                                  <Copy style={{ width: 12, height: 12 }} />
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {item.url?.trim() && (
+                          <div className="card-field-row">
+                            <span className="card-field-label">
+                              {m("网址:")}
+                            </span>
+                            <div className="card-field-value-group">
+                              <span className="card-field-value font-mono">
+                                {item.url}
+                              </span>
+                              <button
+                                onClick={() =>
+                                  handleCopy(item.url!, `url-${item.id}`)
+                                }
+                                className="btn-mini-copy"
+                                title={m("复制网址")}
+                              >
+                                {copiedId === `url-${item.id}` ? (
+                                  <Check
+                                    style={{
+                                      width: 12,
+                                      height: 12,
+                                      color: "#34D399",
+                                    }}
+                                  />
+                                ) : (
+                                  <Copy style={{ width: 12, height: 12 }} />
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {item.notes?.trim() && (
+                          <div className="detail-notes">
+                            <h4>{m("备注")}</h4>
+                            <p>{item.notes}</p>
+                          </div>
+                        )}
+
+                        {/* 自定义扩展选项 (自定义标题与内容) */}
+                        {item.customFields?.some(
+                          (cf) => cf.value.trim().length > 0,
+                        ) && (
+                          <div className="card-custom-fields-box">
+                            {item.customFields
+                              .filter((cf) => cf.value.trim().length > 0)
+                              .map((cf) => {
+                                const fieldKey = `${item.id}-${cf.id}`;
+                                const isSecret = cf.isSecret;
+                                const isFieldRevealed =
+                                  revealedCustomFieldIds[fieldKey];
+                                const displayVal =
+                                  isSecret && !isFieldRevealed
+                                    ? "••••••••••••"
+                                    : cf.value;
+
+                                return (
+                                  <div
+                                    key={cf.id}
+                                    className="card-field-row custom"
+                                  >
+                                    <span className="card-field-label">
+                                      {cf.name}:
+                                    </span>
+                                    <div className="card-field-value-group">
+                                      <span
+                                        className={`card-field-value ${cf.type === "url" || isSecret ? "font-mono" : ""}`}
+                                      >
+                                        {displayVal}
+                                      </span>
+                                      {isSecret && (
+                                        <button
+                                          onClick={() =>
+                                            toggleCustomFieldReveal(fieldKey)
+                                          }
+                                          className="btn-mini-copy"
+                                          title={
+                                            isFieldRevealed
+                                              ? m("隐藏明文")
+                                              : m("显示明文")
+                                          }
+                                        >
+                                          {isFieldRevealed ? (
+                                            <EyeOff
+                                              style={{ width: 12, height: 12 }}
+                                            />
+                                          ) : (
+                                            <Eye
+                                              style={{ width: 12, height: 12 }}
+                                            />
+                                          )}
+                                        </button>
+                                      )}
+                                      <button
+                                        onClick={() =>
+                                          handleCopy(cf.value, `cf-${fieldKey}`)
+                                        }
+                                        className="btn-mini-copy"
+                                        title={m("复制 {0}", cf.name)}
+                                      >
+                                        {copiedId === `cf-${fieldKey}` ? (
+                                          <Check
+                                            style={{
+                                              width: 12,
+                                              height: 12,
+                                              color: "#34D399",
+                                            }}
+                                          />
+                                        ) : (
+                                          <Copy
+                                            style={{ width: 12, height: 12 }}
+                                          />
+                                        )}
+                                      </button>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                          </div>
+                        )}
+
+                        {/* 加密附件展示与一键导出 (Attachments) */}
+                        {item.attachments && item.attachments.length > 0 && (
+                          <div className="card-attachments-box">
+                            <div className="card-attachments-header">
+                              <Paperclip
                                 style={{
                                   width: 12,
                                   height: 12,
                                   color: "#00D4FF",
                                 }}
                               />
-                            </button>
+                              <span>
+                                {m("加密附件 (")}
+                                {item.attachments.length})
+                              </span>
+                            </div>
+                            {item.attachments.map((att) => (
+                              <div
+                                key={att.id}
+                                className="card-attachment-pill"
+                              >
+                                <div className="card-attachment-name-group">
+                                  <Paperclip
+                                    style={{
+                                      width: 12,
+                                      height: 12,
+                                      color: "#38BDF8",
+                                      flexShrink: 0,
+                                    }}
+                                  />
+                                  <span
+                                    className="card-attachment-name"
+                                    title={att.name}
+                                  >
+                                    {att.name}
+                                  </span>
+                                  <span className="card-attachment-size">
+                                    ({formatAttachmentSize(att.size)})
+                                  </span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDownloadAttachment(att)}
+                                  className="btn-mini-copy"
+                                  title={m("下载/导出附件: {0}", att.name)}
+                                >
+                                  <Download
+                                    style={{
+                                      width: 12,
+                                      height: 12,
+                                      color: "#00D4FF",
+                                    }}
+                                  />
+                                </button>
+                              </div>
+                            ))}
                           </div>
-                        ))}
+                        )}
                       </div>
-                    )}
-                  </div>
 
-                  {item.inheritanceInstructions && (
-                    <div className="takeover-badge">
-                      <Compass
-                        style={{ width: 14, height: 14, flexShrink: 0 }}
-                      />
-                      <span
-                        style={{
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {m("接管指引:")}
-                        {item.inheritanceInstructions}
-                      </span>
+                      {item.inheritanceInstructions && (
+                        <div className="takeover-badge">
+                          <Compass
+                            style={{ width: 14, height: 14, flexShrink: 0 }}
+                          />
+                          <span className="detail-inheritance">
+                            {m("接管指引:")}
+                            {item.inheritanceInstructions}
+                          </span>
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-              );
-            })}
+                  );
+                })}
+            </section>
           </div>
         )}
       </div>

@@ -1,12 +1,28 @@
 import { m } from "./services/messages";
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { LockKeyhole, ShieldCheck, Usb } from "lucide-react";
-import { ItemModal } from "./components/ItemModal";
+const ItemModal = lazy(() =>
+  import("./components/ItemModal").then((module) => ({
+    default: module.ItemModal,
+  })),
+);
 import { Sidebar } from "./components/Sidebar";
-import { RightContentArea } from "./components/RightContentArea";
-import { CategoryPickerModal } from "./components/CategoryPickerModal";
+const RightContentArea = lazy(() =>
+  import("./components/RightContentArea").then((module) => ({
+    default: module.RightContentArea,
+  })),
+);
+const CategoryPickerModal = lazy(() =>
+  import("./components/CategoryPickerModal").then((module) => ({
+    default: module.CategoryPickerModal,
+  })),
+);
 import { BackupImport } from "./components/BackupImport";
-import { SubscriptionModal } from "./components/SubscriptionModal";
+const SubscriptionModal = lazy(() =>
+  import("./components/SubscriptionModal").then((module) => ({
+    default: module.SubscriptionModal,
+  })),
+);
 import { THEMES, getTheme } from "./services/themes";
 import { useI18n } from "./services/i18n";
 import {
@@ -29,7 +45,8 @@ type Result = {
   paths?: string[];
   revision?: number;
 };
-export default function App() {
+export default function App() { return <VaultApp />; }
+function VaultApp() {
   const { language, setLanguage } = useI18n();
   const [status, setStatus] = useState<Status | null>(null),
     [view, setView] = useState<View | null>(null);
@@ -426,7 +443,7 @@ export default function App() {
             })
           }
         />
-        {m("关闭窗口后锁定并常驻托盘")}
+        {m("关闭提示默认选择托盘")}
       </label>
       <p>{m("托盘菜单可以重新打开或彻底退出。隐藏到托盘会立即锁定密库。")}</p>
       <div className="secure-row">
@@ -849,7 +866,7 @@ export default function App() {
             {informationImport}
           </div>
         ) : (
-          <RightContentArea
+          <Suspense fallback={<div className="panel-loading" role="status">{m("正在加载界面…")}</div>}><RightContentArea
             selectedNav={nav}
             items={view.items}
             currentTheme={currentTheme}
@@ -924,7 +941,7 @@ export default function App() {
                 )}
               </div>
             }
-          />
+          /></Suspense>
         )}
       </div>
       {!owner && (
@@ -946,7 +963,7 @@ export default function App() {
         </label>
       )}
       {owner && subscription && (
-        <SubscriptionModal
+        <Suspense fallback={<div className="panel-loading" role="status">{m("正在加载界面…")}</div>}><SubscriptionModal
           mode={preferences.subscriptionDemo}
           busy={busy}
           onClose={() => {
@@ -955,20 +972,20 @@ export default function App() {
           onChange={(subscriptionDemo) =>
             updatePreferences({ ...preferences, subscriptionDemo })
           }
-        />
+        /></Suspense>
       )}
       {owner && picker && (
-        <CategoryPickerModal
+        <Suspense fallback={<div className="panel-loading" role="status">{m("正在加载界面…")}</div>}><CategoryPickerModal
           isOpen
           onClose={() => setPicker(false)}
           onSelectCategory={(c) => {
             setCategory(c);
             setEditor(null);
           }}
-        />
+        /></Suspense>
       )}
       {view && editor !== undefined && (
-        <ItemModal
+        <Suspense fallback={<div className="panel-loading" role="status">{m("正在加载界面…")}</div>}><ItemModal
           isOpen
           initialItem={editor}
           defaultCategory={category || "login"}
@@ -1006,7 +1023,7 @@ export default function App() {
             )
               throw new Error(lastError.current || m("删除未完成。"));
           }}
-        />
+        /></Suspense>
       )}
       {action && (
         <dialog
@@ -1037,7 +1054,9 @@ export default function App() {
                 }[action]
               }
             </h2>
-            {!destroyToken && <p>{m("请同时填写密码和安全密钥。凭据不会写入浏览器存储。")}</p>}
+            {!destroyToken && (
+              <p>{m("请同时填写密码和安全密钥。凭据不会写入浏览器存储。")}</p>
+            )}
             {action === "provision" && (
               <p>
                 {m(

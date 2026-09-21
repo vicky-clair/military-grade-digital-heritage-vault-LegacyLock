@@ -40,6 +40,10 @@ jobs:
         if: runner.os == 'Linux'
         run: xvfb-run --auto-servernum node tests/run-desktop.cjs
 
+      - name: Native Windows tray regression
+        if: runner.os == 'Windows'
+        run: node tests/run-tray-native.cjs electron/tray-icon.png --create
+
       - name: Package Windows (Installer & Portable)
         if: runner.os == 'Windows'
         run: npx electron-builder --win
