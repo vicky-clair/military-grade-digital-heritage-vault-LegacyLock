@@ -1,0 +1,77 @@
+{
+  "generatedAt": "2026-09-20T05:17:57.318Z",
+  "sourceCommit": "6da8a19b07efa5a3f66eed5fa988ec7dee5c8900",
+  "note": "PASS means insecure observation reproduced. No user vault, real USB, or OS settings accessed.",
+  "results": [
+    {
+      "name": "A01 exported package decrypts without password, secret key, or USB",
+      "observationReproduced": true,
+      "details": "Real export/import service; no USB API or credential supplied to import."
+    },
+    {
+      "name": "A02 local data decrypts from stored metadata without user input",
+      "observationReproduced": true,
+      "details": "Fresh service invocation needs only the saved plan and ciphertext, no password input."
+    },
+    {
+      "name": "A03 encryption failure writes plaintext fallback",
+      "observationReproduced": true,
+      "details": "Injected CSPRNG failure; plaintext persisted in legacylock_items."
+    },
+    {
+      "name": "A04 absent takeover factors accepted",
+      "observationReproduced": true,
+      "details": "Both factors disabled: any nonempty UI password can pass service verification."
+    },
+    {
+      "name": "A05 fabricated container passes all six health checks",
+      "observationReproduced": true,
+      "details": "Invalid signature, ciphertext, and key data reported Healthy / 100; rescue assumed present."
+    },
+    {
+      "name": "A06 browser dual USB fallback reports success without decryption",
+      "observationReproduced": true,
+      "details": "Same path used for both drives; no key bytes read."
+    },
+    {
+      "name": "A07 lock-screen USB action calls unlock without cryptographic verification",
+      "observationReproduced": true,
+      "details": "Actual click handler has no master key read, CLI unlock, password, or ciphertext verification."
+    },
+    {
+      "name": "A08 read-only import persists data but restart defaults to owner",
+      "observationReproduced": true,
+      "details": "Actual import handler + real storage, with source-verified nonpersistent role initializers; not a desktop restart test."
+    },
+    {
+      "name": "A09 failed native backup response still reports success",
+      "observationReproduced": true,
+      "details": "Actual UI handler consumes resolved success:false as success."
+    },
+    {
+      "name": "A10 migration reports success with only timers and no file operations",
+      "observationReproduced": true,
+      "details": "Actual handler runs in a context with no filesystem or IPC APIs."
+    },
+    {
+      "name": "A11 normal import discards original plan and read-only result",
+      "observationReproduced": true,
+      "details": "Actual handler forwards items and overwrite only; original authentication configuration is dropped."
+    },
+    {
+      "name": "A12 deleting binding file bypasses anti-clone check",
+      "observationReproduced": true,
+      "details": "Real IPC handler, in-memory filesystem reports binding file absent."
+    },
+    {
+      "name": "A13 privileged IPC accepts untrusted sender and caller-selected path",
+      "observationReproduced": true,
+      "details": "Direct IPC unit invocation, stubbed filesystem; demonstrates absent guards, not a demonstrated remote exploit."
+    },
+    {
+      "name": "A14 plaintext import needs no authentication and returns writable",
+      "observationReproduced": true,
+      "details": "JSON compatibility channel is accepted without password/secret; UI labels it double verification."
+    }
+  ]
+}

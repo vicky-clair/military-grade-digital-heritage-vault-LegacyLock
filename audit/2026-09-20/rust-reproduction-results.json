@@ -1,0 +1,27 @@
+{
+  "generatedAt": "2026-09-20T05:19:41.994Z",
+  "note": "PASS means insecure observation reproduced; fixtures are synthetic and kept in gitignored runtime/.",
+  "baseline": "Native generate/encrypt/unlock round trip passed.",
+  "results": [
+    {
+      "name": "R01 one heir private key plus public container decrypts Rust vault",
+      "observationReproduced": true,
+      "details": "Native Rust-generated vault decrypted using only heir-key.bin and public data in vault; CLI argument guards are bypassed by independent decryption."
+    },
+    {
+      "name": "R02 mutable config expiry controls decryption without authentication",
+      "observationReproduced": true,
+      "details": "Same ciphertext rejected/accepted solely by editing eight unauthenticated expiry bytes."
+    },
+    {
+      "name": "R03 malformed nonce panics instead of returning a validation error",
+      "observationReproduced": true,
+      "details": "Actual debug CLI panics on 1-byte nonce; release panic=abort makes this a process termination."
+    },
+    {
+      "name": "R04 Web writer output cannot be read by native Rust unlock",
+      "observationReproduced": true,
+      "details": "Current App.tsx writer encryptVaultWeb with genuine key metadata produces ciphertext native unlock cannot decrypt."
+    }
+  ]
+}

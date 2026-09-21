@@ -2,8 +2,8 @@ import { TranslationDictionary } from '../types';
 
 export const zh: TranslationDictionary = {
   brand: {
-    title: 'LegacyLock 军规遗产密钥库',
-    sub: '军规级双U盘数字遗产保险箱',
+    title: 'LegacyLock',
+    sub: '双 U 盘数字遗产保险箱',
     coldStorage: '离线冷存储',
   },
   nav: {
@@ -12,7 +12,7 @@ export const zh: TranslationDictionary = {
     infraGroup: '基础设施与硬件',
     personalGroup: '个人与家庭服务',
     sysGroup: '系统与安全管理',
-    all: '所有密鑰',
+    all: '所有密钥',
     login: '登录信息',
     note: '安全备注',
     identity: '身份标识',
@@ -26,7 +26,7 @@ export const zh: TranslationDictionary = {
     router: 'Wi-Fi 与路由器',
     email: '电子邮箱',
     membership: '会员与卡券',
-    importExport: '军规导入导出',
+    importExport: '加密导入导出',
     settings: '系统设置与安全',
   },
   topBar: {
@@ -50,7 +50,7 @@ export const zh: TranslationDictionary = {
   },
   itemCard: {
     emptyTitle: '当前分类下暂无资产',
-    emptyDesc: '点击右上角「+ 添加新资产」或在「军规导入导出」中导入现有备份。',
+    emptyDesc: '点击顶部「+ 添加新资产」或在「加密导入导出」中导入现有备份。',
     emptyBtn: '添加首个资产',
     copyUser: '复制账号',
     copyPass: '复制密码',
@@ -132,7 +132,7 @@ export const zh: TranslationDictionary = {
   },
   categoryPicker: {
     title: '选择要添加的资产类型',
-    subtitle: '采用军规零知识加密模板，为不同数据形态预设专属安全字段与防护',
+    subtitle: '选择资产类型，使用对应字段录入；保存后加密存储在本机密库',
     searchPlaceholder: '搜索资产类型、凭据用途或字段 (如: 助记词、SSH、2FA、密码、信用卡、PIN)...',
     allAssets: '🌐 全部资产',
     popularTab: '⭐ 常用推荐',
@@ -159,7 +159,7 @@ export const zh: TranslationDictionary = {
     usernamePlaceholder: '例如：admin@organization.com 或账户账号',
     passwordLabel: '主密码 / 私密口令 / 凭据',
     passwordPlaceholder: '输入高强度主密码或机密 Token',
-    generatePassBtn: '生成军规高强度密码',
+    generatePassBtn: '生成随机高强度密码',
     urlLabel: '网站入口 / 登录网址 / 节点',
     urlPlaceholder: 'https://...',
     notesLabel: '私密安全备注 (支持 Markdown)',

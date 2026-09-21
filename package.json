@@ -2,7 +2,7 @@
   "name": "legacylock",
   "version": "1.0.0",
   "private": true,
-  "description": "LegacyLock - Military-grade Digital Heritage Vault (Dual-USB)",
+  "description": "LegacyLock - Local encrypted heritage vault with dual-USB read-only recovery",
   "author": "LegacyLock Core Architecture <support@legacylock.vault>",
   "main": "electron/main.cjs",
   "scripts": {
@@ -10,9 +10,10 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "electron": "electron .",
-    "electron:dev": "vite --port 5173",
-    "rust:build": "cd crypt && cargo build --release",
-    "rust:test": "cd crypt && cargo test",
+    "electron:dev": "npm run build && electron .",
+    "test": "node --test tests/*.test.cjs",
+    "test:desktop": "npm run build && node tests/run-desktop.cjs",
+    "reader": "node scripts/recovery-reader.cjs",
     "dist:win": "npm run build && electron-builder --win",
     "dist:linux": "npm run build && electron-builder --linux",
     "dist:all": "npm run build && electron-builder --win --linux"
@@ -28,8 +29,9 @@
     "@types/react": "^19.0.10",
     "@types/react-dom": "^19.0.4",
     "@vitejs/plugin-react": "^4.3.4",
-    "electron": "^32.3.3",
+    "electron": "44.4.3",
     "electron-builder": "^26.15.3",
+    "prettier": "3.9.8",
     "typescript": "^5.7.3",
     "vite": "^6.1.0"
   },
@@ -53,8 +55,24 @@
     ],
     "extraResources": [
       {
-        "from": "crypt/target/release/vault-cli.exe",
-        "to": "bin/vault-cli.exe"
+        "from": "scripts/recovery-reader.cjs",
+        "to": "reader/scripts/recovery-reader.cjs"
+      },
+      {
+        "from": "electron/vault-core.cjs",
+        "to": "reader/electron/vault-core.cjs"
+      },
+      {
+        "from": "electron/vault-store.cjs",
+        "to": "reader/electron/vault-store.cjs"
+      },
+      {
+        "from": "LVCF3_PROTOCOL.md",
+        "to": "reader/LVCF3_PROTOCOL.md"
+      },
+      {
+        "from": "HEIR_MANUAL.md",
+        "to": "reader/HEIR_MANUAL.md"
       }
     ],
     "win": {
@@ -80,7 +98,7 @@
       ],
       "maintainer": "LegacyLock Core Architecture <support@legacylock.vault>",
       "category": "Utility",
-      "description": "LegacyLock - Military-Grade Digital Heritage Vault",
+      "description": "LegacyLock - Local encrypted digital heritage vault",
       "artifactName": "${productName}-v${version}-Linux-${arch}.${ext}"
     }
   }

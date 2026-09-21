@@ -1,0 +1,34 @@
+
+> legacylock@1.0.0 test
+> node --test tests/*.test.cjs
+
+✔ both owner factors are required; signature and payload tampering fail closed (289.7741ms)
+✔ recovery needs two independently signed shares and cannot sign writes (72.0838ms)
+✔ reconfiguration rotates data key; old pair cannot open current or future data (263.939ms)
+✔ credential changes preserve items; previous factors fail against new envelope (273.4297ms)
+✔ serialized item writes survive restart and restart is always locked (274.0327ms)
+✔ lock invalidates queued writes and in-flight authentication (144.4078ms)
+✔ write failure keeps prior disk and in-memory data and does not report success (95.2972ms)
+✔ corrupt or oversized local data is not replaced with an empty vault (6.7899ms)
+✔ distinct partitions on the same physical disk cannot qualify as a pair (0.351ms)
+✔ real controller provisions, syncs and restores read-only on a different computer (433.9043ms)
+✔ partial two-device provisioning failure leaves original local generation usable (491.7496ms)
+✔ stale and foreign backups cannot replace the local vault; canceled export creates nothing (273.6414ms)
+✔ attachment sizes, types and parser work limits are enforced (0.3457ms)
+✔ legacy migration refuses unauthenticated metadata and excessive KDF work (1.2303ms)
+✔ legacy authenticated export imports assets only, without retaining old plan secrets (49.9035ms)
+✔ atomic writes retain a complete previous version (91.7815ms)
+已验证签名并恢复全部数据（含附件）。输出为明文，请妥善保管。原密库未修改。
+✔ offline reader recovers attachments and refuses to overwrite an existing output (341.3064ms)
+✔ uncertain post-rename failure locks the session rather than continuing with stale data (106.8904ms)
+✔ locking while the export chooser is open prevents the subsequent write (191.1107ms)
+✔ checked-in LVCF 3 golden files stay readable by both authorized paths (81.6685ms)
+✔ lock during initial disk check does not resurrect an initialized owner session (1.9583ms)
+ℹ tests 21
+ℹ suites 0
+ℹ pass 21
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3599.113

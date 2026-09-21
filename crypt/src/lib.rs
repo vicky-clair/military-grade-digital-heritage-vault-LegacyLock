@@ -61,7 +61,7 @@ mod tests {
     }
 
     #[test]
-    fn test_expired_plan_rejected() {
+    fn test_expired_legacy_plan_remains_recoverable() {
         let (user_sec, user_pub) = generate_keypair();
         let (heir_sec, heir_pub) = generate_keypair();
 
@@ -87,9 +87,7 @@ mod tests {
             &container,
         );
 
-        assert!(result.is_err(), "已过期的继承计划必须拒绝解锁");
-        let err_msg = result.unwrap_err().to_string();
-        assert!(err_msg.contains("失效") || err_msg.contains("超过"));
+        assert_eq!(result.expect("历史日期不应阻止抢救数据"), secret_message);
     }
 
     #[test]
@@ -122,5 +120,15 @@ mod tests {
         );
 
         assert!(result.is_err(), "非授权继承人U盘必须被拦截拒绝");
+    }
+
+    #[test]
+    fn malformed_nonce_returns_error_without_panic() {
+        let (us,up)=generate_keypair();let (hs,hp)=generate_keypair();let hash=sha256(&hp);
+        let mut container=encrypt_vault_data(b"fixture",&us,&hp,1,hash).unwrap();
+        for nonce in ["", "01", "not-hex", "00000000000000000000000000"] {
+            container.nonce_hex=nonce.into();
+            assert!(unlock_and_decrypt(&us,&up,&hs,&hp,1,hash,&container).is_err());
+        }
     }
 }

@@ -1,0 +1,11 @@
+  • electron-builder  version=26.15.3 os=10.0.26200
+  • loaded configuration  file=package.json ("build" field)
+  • executing @electron/rebuild  electronVersion=44.4.3 arch=x64 buildFromSource=false workspaceRoot=C:\XMWJJ\xr-LegacyLock projectDir=./ appDir=./
+  • installing native dependencies  arch=x64
+  • completed installing native dependencies
+  • packaging       platform=win32 arch=x64 electron=44.4.3 appOutDir=scratch\package-check\win-unpacked
+  • using custom unpacked Electron distribution  electronDist=node_modules\electron\dist
+  • copying unpacked Electron  source=C:\XMWJJ\xr-LegacyLock\node_modules\electron\dist destination=C:\XMWJJ\xr-LegacyLock\scratch\package-check\win-unpacked
+  • searching for node modules  pm=npm searchDir=C:\XMWJJ\xr-LegacyLock
+  • updating asar integrity executable resource  executablePath=scratch\package-check\win-unpacked\LegacyLock.exe
+  • executable resource editing and code signing skipped — signAndEditExecutable is false. To skip only code signing while keeping icon and metadata applied, use signExecutable: false instead.  exe=scratch\package-check\win-unpacked\LegacyLock.exe

@@ -14,7 +14,21 @@ import react from '@vitejs/plugin-react';
 import path from 'path';
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), {
+    name: 'legacylock-security-boundaries',
+    generateBundle() {
+      for (const id of this.getModuleIds()) {
+        if (/\/src\/services\/(cryptoService|mockData)\.ts$/.test(id.replace(/\\/g, '/'))) {
+          this.error('Retired cryptography and demo data must not enter the production bundle: ' + id);
+        }
+      }
+    },
+    transformIndexHtml(html, context) {
+      // Browser-only development has no preload/capabilities. Desktop never loads this server.
+      if (!context.server) return html;
+      return html.replace("script-src 'self';", "script-src 'self' 'unsafe-inline';").replace("connect-src 'none';", "connect-src 'self' ws://127.0.0.1:5173;");
+    },
+  }],
   // 相对路径基准，保证打包后在 Electron 内以 file:// 协议直接安全加载
   base: './',
   resolve: {
@@ -23,8 +37,10 @@ export default defineConfig({
     },
   },
   server: {
+    host: '127.0.0.1',
     port: 5173,
     strictPort: true,
+    watch: { ignored: ['**/crypt/target/**', '**/audit/**', '**/scratch/**', '**/release/**'] },
   },
   build: {
     outDir: 'dist',

@@ -1,0 +1,35 @@
+
+> legacylock@1.0.0 test
+> node --test tests/*.test.cjs
+
+✔ appearance preferences persist; demo cannot authorize heirs or bypass queued writes (177.2127ms)
+✔ both owner factors are required; signature and payload tampering fail closed (348.0218ms)
+✔ recovery needs two independently signed shares and cannot sign writes (94.4917ms)
+✔ reconfiguration rotates data key; old pair cannot open current or future data (360.7632ms)
+✔ credential changes preserve items; previous factors fail against new envelope (323.1945ms)
+✔ serialized item writes survive restart and restart is always locked (369.5364ms)
+✔ lock invalidates queued writes and in-flight authentication (147.9911ms)
+✔ write failure keeps prior disk and in-memory data and does not report success (102.6957ms)
+✔ corrupt or oversized local data is not replaced with an empty vault (10.3239ms)
+✔ distinct partitions on the same physical disk cannot qualify as a pair (0.4253ms)
+✔ real controller provisions, syncs and restores read-only on a different computer (528.0293ms)
+✔ partial two-device provisioning failure leaves original local generation usable (556.084ms)
+✔ stale and foreign backups cannot replace the local vault; canceled export creates nothing (294.7817ms)
+✔ attachment sizes, types and parser work limits are enforced (0.719ms)
+✔ legacy migration refuses unauthenticated metadata and excessive KDF work (0.8624ms)
+✔ legacy authenticated export imports assets only, without retaining old plan secrets (70.796ms)
+✔ atomic writes retain a complete previous version (140.9408ms)
+已验证签名并恢复全部数据（含附件）。输出为明文，请妥善保管。原密库未修改。
+✔ offline reader recovers attachments and refuses to overwrite an existing output (365.3167ms)
+✔ uncertain post-rename failure locks the session rather than continuing with stale data (108.7679ms)
+✔ locking while the export chooser is open prevents the subsequent write (185.9251ms)
+✔ checked-in LVCF 3 golden files stay readable by both authorized paths (80.1086ms)
+✔ lock during initial disk check does not resurrect an initialized owner session (3.6638ms)
+ℹ tests 22
+ℹ suites 0
+ℹ pass 22
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4410.2028

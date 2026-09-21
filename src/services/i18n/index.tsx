@@ -87,28 +87,14 @@ export const I18nProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('legacylock:language-changed', { detail: lang }));
-        if (window.legacyLockAPI?.saveAppSettings) {
-          window.legacyLockAPI.saveAppSettings({ language: lang }).catch(() => {});
-        }
       }
     } catch (_) {}
   };
 
-  // 启动时与 Electron 主进程设置对齐
+  // Language is a non-sensitive presentation preference, not vault authorization.
   useEffect(() => {
     if (typeof document !== 'undefined') {
       document.documentElement.lang = language === 'zh' ? 'zh-CN' : language === 'ja' ? 'ja' : 'en';
-    }
-    if (typeof window !== 'undefined' && window.legacyLockAPI?.getAppSettings) {
-      window.legacyLockAPI.getAppSettings().then((res) => {
-        if (res.success && res.settings?.language) {
-          const remoteLang = res.settings.language;
-          if (remoteLang === 'en' || remoteLang === 'zh' || remoteLang === 'ja') {
-            setLanguageState(remoteLang);
-            localStorage.setItem(STORAGE_KEY, remoteLang);
-          }
-        }
-      }).catch(() => {});
     }
   }, []);
 

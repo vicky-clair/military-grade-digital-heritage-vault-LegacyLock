@@ -1,0 +1,16 @@
+MATCH dist\assets\index-CjX-90W9.css
+MATCH dist\assets\index-DY7PYg-s.js
+MATCH dist\index.html
+MATCH electron\main.cjs
+MATCH electron\preload.cjs
+MATCH electron\tray-icon.png
+MATCH electron\vault-controller.cjs
+MATCH electron\vault-core.cjs
+MATCH electron\vault-media.cjs
+MATCH electron\vault-migrate.cjs
+MATCH electron\vault-store.cjs
+MATCH reader/scripts/recovery-reader.cjs
+MATCH reader/electron/vault-core.cjs
+MATCH reader/electron/vault-store.cjs
+MATCH reader/HEIR_MANUAL.md
+MATCH reader/LVCF3_PROTOCOL.md

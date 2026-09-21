@@ -119,9 +119,9 @@ interface ItemModalProps {
   /** 关闭弹窗回调 */
   onClose: () => void;
   /** 保存提交回调 */
-  onSave: (item: VaultItem) => void;
+  onSave: (item: VaultItem) => void | Promise<void>;
   /** 删除资产回调 (处于编辑模式时提供) */
-  onDelete?: (id: string) => void;
+  onDelete?: (id: string) => void | Promise<void>;
   /** 正在编辑的历史资产对象 (为空时代表新建录入) */
   initialItem?: VaultItem | null;
   /** 默认初始分类 */
@@ -148,6 +148,10 @@ export const ItemModal: React.FC<ItemModalProps> = ({
   onUpgrade,
   onRequestTakeover,
 }) => {
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
+  const modalRef = useRef<HTMLDialogElement>(null);
+  useEffect(() => { if (isOpen && modalRef.current && !modalRef.current.open) modalRef.current.showModal(); }, [isOpen]);
   const { t, language } = useI18n();
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState<VaultCategory>(defaultCategory);
@@ -390,8 +394,9 @@ export const ItemModal: React.FC<ItemModalProps> = ({
     document.body.removeChild(link);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (saving || isReadOnly || isHeirReadOnly) return;
     if (!title.trim()) {
       alert(
         language === 'zh'
@@ -404,7 +409,7 @@ export const ItemModal: React.FC<ItemModalProps> = ({
     }
 
     const item: VaultItem = {
-      id: initialItem?.id || `item-${Date.now()}`,
+      id: initialItem?.id || crypto.randomUUID(),
       title,
       category,
       username: username || undefined,
@@ -424,12 +429,14 @@ export const ItemModal: React.FC<ItemModalProps> = ({
       return;
     }
 
-    onSave(item);
-    onClose();
+    setSaving(true);setSaveError('');
+    try { await onSave(item); onClose(); }
+    catch(e) { setSaveError(e instanceof Error ? e.message : '保存失败，请重试。'); }
+    finally { setSaving(false); }
   };
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
+    <dialog ref={modalRef} className="modal-backdrop" aria-label={isReadOnly ? '查看资产' : '编辑资产'} onCancel={e=>{e.preventDefault();if(!saving)onClose();}} onClick={() => { if (!saving) onClose(); }}>
       <div
         className="modal-window-dialog"
         onClick={(e) => e.stopPropagation()}
@@ -458,7 +465,7 @@ export const ItemModal: React.FC<ItemModalProps> = ({
                   {initialItem ? (isReadOnly ? `${t('itemModal.viewTitlePrefix')} · ${title || getCategoryName(category)}` : t('itemModal.editTitle')) : `${t('itemModal.newTitlePrefix')} · ${getCategoryName(category)}`}
                 </span>
                 <span className="modal-badge-cat">
-                  {language === 'en' ? currentCategoryDef.name : currentCategoryDef.englishName}
+                  {getCategoryName(category)}
                 </span>
                 {isReadOnly && (
                   <span
@@ -477,12 +484,12 @@ export const ItemModal: React.FC<ItemModalProps> = ({
                 )}
               </div>
               <p style={{ fontSize: 11, color: '#8EA4D4', marginTop: 2 }}>
-                {isReadOnly ? t('itemModal.readOnlyBanner') : getCategoryDescription(category)}
+                {isReadOnly ? (isHeirReadOnly ? '只读访问；修改需要所有者密码和安全密钥。' : '订阅测试：模拟试用到期，可在订阅测试中恢复试用。') : getCategoryDescription(category)}
               </p>
             </div>
           </div>
 
-          <button onClick={onClose} className="modal-window-close" title={t('common.close')}>
+          <button disabled={saving} onClick={onClose} className="modal-window-close" title={t('common.close')}>
             <X style={{ width: 16, height: 16 }} />
           </button>
         </div>
@@ -505,7 +512,7 @@ export const ItemModal: React.FC<ItemModalProps> = ({
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <AlertTriangle style={{ width: 18, height: 18, color: '#F59E0B', flexShrink: 0 }} />
               <span style={{ fontSize: 12.5, color: '#FDE68A', lineHeight: 1.4 }}>
-                <strong>{language === 'zh' ? '只读保护中' : language === 'ja' ? '読み取り専用保護' : 'Read-Only Protected'}</strong>: {t('itemModal.readOnlyBanner')}
+                <strong>只读保护中</strong>：{isHeirReadOnly ? '您可以查看和下载附件，修改资产需要验证所有者凭据。' : '当前模拟试用到期。可在订阅测试中恢复试用或模拟开通，不会扣费。'}
               </span>
             </div>
             {onUpgrade && (
@@ -1179,7 +1186,8 @@ export const ItemModal: React.FC<ItemModalProps> = ({
             {initialItem && onDelete && !isReadOnly && (
               <button
                 type="button"
-                onClick={() => {
+                disabled={saving}
+                onClick={async () => {
                   const confirmMsg =
                     language === 'zh'
                       ? `确定要从遗产密库中永久删除“${initialItem.title}”吗？此操作不可恢复。`
@@ -1187,8 +1195,10 @@ export const ItemModal: React.FC<ItemModalProps> = ({
                       ? `「${initialItem.title}」を金庫から完全に削除してもよろしいですか？この操作は取り消せません。`
                       : `Are you sure you want to permanently delete "${initialItem.title}" from the vault? This cannot be undone.`;
                   if (window.confirm(confirmMsg)) {
-                    onDelete(initialItem.id);
-                    onClose();
+                    setSaving(true);setSaveError('');
+                    try { await onDelete(initialItem.id); onClose(); }
+                    catch(e) { setSaveError(e instanceof Error ? e.message : '删除失败，请重试。'); }
+                    finally { setSaving(false); }
                   }
                 }}
                 className="btn-action-cancel"
@@ -1209,15 +1219,17 @@ export const ItemModal: React.FC<ItemModalProps> = ({
             )}
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#8EA4D4' }}>
               <ShieldCheck style={{ width: 16, height: 16, color: '#34D399' }} />
-              <span>{language === 'zh' ? '军规加密：全字段本地 AES-256-GCM 零知识保护' : language === 'ja' ? '軍用規格暗号化: 完全ローカル AES-256-GCM ゼロ知識保護' : 'Military Encryption: Local AES-256-GCM Zero-Knowledge'}</span>
+              <span>本机加密保存 · AES-256-GCM</span>
             </div>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            {saveError && <span role="alert" style={{color:'#fda4af'}}>{saveError}</span>}
             <button
               type="button"
               onClick={onClose}
               className="btn-action-cancel"
+              disabled={saving}
             >
               {isReadOnly ? t('itemModal.closeViewBtn') : t('itemModal.cancelBtn')}
             </button>
@@ -1267,6 +1279,7 @@ export const ItemModal: React.FC<ItemModalProps> = ({
                 type="button"
                 onClick={handleSubmit}
                 className="btn-action-submit"
+                disabled={saving}
               >
                 {initialItem ? t('itemModal.saveChangesBtn') : t('itemModal.createItemBtn')}
               </button>
@@ -1274,6 +1287,6 @@ export const ItemModal: React.FC<ItemModalProps> = ({
           </div>
         </div>
       </div>
-    </div>
+    </dialog>
   );
 };

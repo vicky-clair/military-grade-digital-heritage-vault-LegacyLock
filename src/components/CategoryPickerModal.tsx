@@ -2,7 +2,7 @@
  * ============================================================================
  * LegacyLock 军规遗产密钥库 — 资产分类选择弹窗组件 (CategoryPickerModal)
  * ============================================================================
- * 
+ *
  * 界面交互设计 (Human-Centric & Modern Glassmorphism Redesign)：
  * 1. 响应「+ 添加新资产 / 密钥」或主界面行动按钮，唤起结构化资产分类选择面板；
  * 2. 宽幅 720px 奢华军规暗黑毛玻璃容器，告别拥挤局促，层级清晰舒适；
@@ -12,7 +12,7 @@
  * 6. 支持键盘 ESC 快速退出，点击卡片即刻加载对应结构化资产模板并唤起录入弹窗。
  */
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   X,
   Search,
@@ -20,10 +20,10 @@ import {
   ShieldCheck,
   FolderOpen,
   Sparkles,
-} from 'lucide-react';
-import { VaultCategory } from '../types';
-import { CATEGORIES, CategoryDefinition } from '../services/categories';
-import { useI18n } from '../services/i18n';
+} from "lucide-react";
+import { VaultCategory } from "../types";
+import { CATEGORIES, CategoryDefinition } from "../services/categories";
+import { useI18n } from "../services/i18n";
 
 /**
  * 分类选择弹窗属性接口
@@ -54,58 +54,87 @@ export const CategoryPickerModal: React.FC<CategoryPickerModalProps> = ({
   onSelectCategory,
 }) => {
   const { t } = useI18n();
-  const [search, setSearch] = useState('');
-  const [activeTab, setActiveTab] = useState<string>('all');
+  const [search, setSearch] = useState("");
+  const [activeTab, setActiveTab] = useState<string>("all");
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    if (isOpen && !dialogRef.current?.open) dialogRef.current?.showModal();
+  }, [isOpen]);
 
-  const categoryGroups: CategoryGroup[] = useMemo(() => [
-    {
-      id: 'popular',
-      name: t('categoryPicker.popularTab'),
-      badge: t('categoryPicker.popularTab'),
-      categoryIds: ['login', 'note', 'card', 'identity', 'password', 'document'],
-      description: t('categories.login.desc'),
-    },
-    {
-      id: 'tech',
-      name: t('categoryPicker.techTab'),
-      badge: t('categoryPicker.techTab'),
-      categoryIds: ['sshKey', 'apiCredential', 'server', 'database', 'router', 'softwareLicense', 'email'],
-      description: t('categories.sshKey.desc'),
-    },
-    {
-      id: 'finance',
-      name: t('categoryPicker.financeTab'),
-      badge: t('categoryPicker.financeTab'),
-      categoryIds: ['cryptoWallet', 'bankAccount', 'membership', 'reward'],
-      description: t('categories.cryptoWallet.desc'),
-    },
-    {
-      id: 'docs',
-      name: t('categoryPicker.docsTab'),
-      badge: t('categoryPicker.docsTab'),
-      categoryIds: ['passport', 'driverLicense', 'ssn', 'medical', 'outdoorLicense', 'game'],
-      description: t('categories.identity.desc'),
-    },
-  ], [t]);
+  const categoryGroups: CategoryGroup[] = useMemo(
+    () => [
+      {
+        id: "popular",
+        name: t("categoryPicker.popularTab"),
+        badge: t("categoryPicker.popularTab"),
+        categoryIds: [
+          "login",
+          "note",
+          "card",
+          "identity",
+          "password",
+          "document",
+        ],
+        description: t("categories.login.desc"),
+      },
+      {
+        id: "tech",
+        name: t("categoryPicker.techTab"),
+        badge: t("categoryPicker.techTab"),
+        categoryIds: [
+          "sshKey",
+          "apiCredential",
+          "server",
+          "database",
+          "router",
+          "softwareLicense",
+          "email",
+        ],
+        description: t("categories.sshKey.desc"),
+      },
+      {
+        id: "finance",
+        name: t("categoryPicker.financeTab"),
+        badge: t("categoryPicker.financeTab"),
+        categoryIds: ["cryptoWallet", "bankAccount", "membership", "reward"],
+        description: t("categories.cryptoWallet.desc"),
+      },
+      {
+        id: "docs",
+        name: t("categoryPicker.docsTab"),
+        badge: t("categoryPicker.docsTab"),
+        categoryIds: [
+          "passport",
+          "driverLicense",
+          "ssn",
+          "medical",
+          "outdoorLicense",
+          "game",
+        ],
+        description: t("categories.identity.desc"),
+      },
+    ],
+    [t],
+  );
 
   // 监听 ESC 键关闭
   useEffect(() => {
     if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+      if (e.key === "Escape") {
         onClose();
       }
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, onClose]);
 
   // 打开弹窗时重置并聚焦搜索框
   useEffect(() => {
     if (isOpen) {
-      setSearch('');
-      setActiveTab('all');
+      setSearch("");
+      setActiveTab("all");
       setTimeout(() => {
         searchInputRef.current?.focus();
       }, 80);
@@ -123,7 +152,7 @@ export const CategoryPickerModal: React.FC<CategoryPickerModalProps> = ({
   const filteredCategories = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) {
-      if (activeTab === 'all') {
+      if (activeTab === "all") {
         return CATEGORIES;
       }
       const group = categoryGroups.find((g) => g.id === activeTab);
@@ -136,11 +165,15 @@ export const CategoryPickerModal: React.FC<CategoryPickerModalProps> = ({
     return CATEGORIES.filter((cat) => {
       const localizedName = t(`categories.${cat.id}.name`) || cat.name;
       const localizedDesc = t(`categories.${cat.id}.desc`) || cat.description;
-      const matchName = localizedName.toLowerCase().includes(q) || cat.name.toLowerCase().includes(q);
+      const matchName =
+        localizedName.toLowerCase().includes(q) ||
+        cat.name.toLowerCase().includes(q);
       const matchEng = cat.englishName.toLowerCase().includes(q);
-      const matchDesc = localizedDesc.toLowerCase().includes(q) || cat.description.toLowerCase().includes(q);
+      const matchDesc =
+        localizedDesc.toLowerCase().includes(q) ||
+        cat.description.toLowerCase().includes(q);
       const matchFields = cat.defaultFields?.some((f) =>
-        f.name.toLowerCase().includes(q)
+        f.name.toLowerCase().includes(q),
       );
       return matchName || matchEng || matchDesc || matchFields;
     });
@@ -160,7 +193,15 @@ export const CategoryPickerModal: React.FC<CategoryPickerModalProps> = ({
   const isSearching = !!search.trim();
 
   return (
-    <div className="modal-backdrop cat-modal-backdrop" onClick={onClose}>
+    <dialog
+      ref={dialogRef}
+      className="restored-dialog restored-category-dialog"
+      onCancel={(e) => {
+        e.preventDefault();
+        onClose();
+      }}
+      aria-labelledby="cat-picker-title"
+    >
       <div
         className="cat-modern-modal"
         onClick={(e) => e.stopPropagation()}
@@ -177,10 +218,10 @@ export const CategoryPickerModal: React.FC<CategoryPickerModalProps> = ({
               </div>
               <div>
                 <h2 id="cat-picker-title" className="cat-header-title">
-                  {t('categoryPicker.title')}
+                  {t("categoryPicker.title")}
                 </h2>
                 <p className="cat-header-subtitle">
-                  {t('categoryPicker.subtitle')}
+                  {t("categoryPicker.subtitle")}
                 </p>
               </div>
             </div>
@@ -205,7 +246,7 @@ export const CategoryPickerModal: React.FC<CategoryPickerModalProps> = ({
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder={t('categoryPicker.searchPlaceholder')}
+                placeholder={t("categoryPicker.searchPlaceholder")}
                 className="cat-modern-search-input"
               />
               {search && (
@@ -213,7 +254,7 @@ export const CategoryPickerModal: React.FC<CategoryPickerModalProps> = ({
                   type="button"
                   className="cat-search-clear-btn"
                   onClick={() => {
-                    setSearch('');
+                    setSearch("");
                     searchInputRef.current?.focus();
                   }}
                   title="Clear search"
@@ -229,17 +270,17 @@ export const CategoryPickerModal: React.FC<CategoryPickerModalProps> = ({
             <div className="cat-tab-pills-bar">
               <button
                 type="button"
-                className={`cat-tab-pill ${activeTab === 'all' ? 'active' : ''}`}
-                onClick={() => setActiveTab('all')}
+                className={`cat-tab-pill ${activeTab === "all" ? "active" : ""}`}
+                onClick={() => setActiveTab("all")}
               >
-                <span>{t('categoryPicker.allAssets')}</span>
+                <span>{t("categoryPicker.allAssets")}</span>
                 <span className="cat-tab-badge">{groupCounts.all}</span>
               </button>
               {categoryGroups.map((group) => (
                 <button
                   key={group.id}
                   type="button"
-                  className={`cat-tab-pill ${activeTab === group.id ? 'active' : ''}`}
+                  className={`cat-tab-pill ${activeTab === group.id ? "active" : ""}`}
                   onClick={() => setActiveTab(group.id)}
                 >
                   <span>{group.name}</span>
@@ -250,15 +291,19 @@ export const CategoryPickerModal: React.FC<CategoryPickerModalProps> = ({
           ) : (
             <div className="cat-search-status-bar">
               <span>
-                {t('categoryPicker.searchFoundPrefix')}<strong className="text-[#00D4FF]">{search}</strong>{t('categoryPicker.searchFoundSuffix')}:{' '}
-                <strong className="text-white">{filteredCategories.length}</strong>
+                {t("categoryPicker.searchFoundPrefix")}
+                <strong className="text-[#00D4FF]">{search}</strong>
+                {t("categoryPicker.searchFoundSuffix")}:{" "}
+                <strong className="text-white">
+                  {filteredCategories.length}
+                </strong>
               </span>
               <button
                 type="button"
                 className="cat-reset-search-link"
-                onClick={() => setSearch('')}
+                onClick={() => setSearch("")}
               >
-                {t('categoryPicker.returnAll')}
+                {t("categoryPicker.returnAll")}
               </button>
             </div>
           )}
@@ -271,23 +316,23 @@ export const CategoryPickerModal: React.FC<CategoryPickerModalProps> = ({
               <div className="cat-empty-icon-circle">
                 <FolderOpen className="w-8 h-8 text-[#7E92C4]" />
               </div>
-              <h3 className="cat-empty-title">{t('categoryPicker.emptyTitle')}</h3>
-              <p className="cat-empty-desc">
-                {t('categoryPicker.emptyDesc')}
-              </p>
+              <h3 className="cat-empty-title">
+                {t("categoryPicker.emptyTitle")}
+              </h3>
+              <p className="cat-empty-desc">{t("categoryPicker.emptyDesc")}</p>
               <button
                 type="button"
                 className="cat-empty-reset-btn"
                 onClick={() => {
-                  setSearch('');
-                  setActiveTab('all');
+                  setSearch("");
+                  setActiveTab("all");
                   searchInputRef.current?.focus();
                 }}
               >
-                {t('categoryPicker.resetBtn')}
+                {t("categoryPicker.resetBtn")}
               </button>
             </div>
-          ) : !isSearching && activeTab === 'all' ? (
+          ) : !isSearching && activeTab === "all" ? (
             // 全部模式：按人性化分组渲染优雅的区块，避免一盘散沙
             <div className="cat-grouped-sections">
               {categoryGroups.map((group) => {
@@ -299,7 +344,9 @@ export const CategoryPickerModal: React.FC<CategoryPickerModalProps> = ({
                   <div key={group.id} className="cat-group-section">
                     <div className="cat-group-section-header">
                       <div className="cat-group-tag">{group.badge}</div>
-                      <span className="cat-group-desc">{group.description}</span>
+                      <span className="cat-group-desc">
+                        {group.description}
+                      </span>
                     </div>
 
                     <div className="cat-cards-grid">
@@ -348,11 +395,11 @@ export const CategoryPickerModal: React.FC<CategoryPickerModalProps> = ({
             className="cat-footer-cancel-btn"
             onClick={onClose}
           >
-            {t('common.cancel')}
+            {t("common.cancel")}
           </button>
         </div>
       </div>
-    </div>
+    </dialog>
   );
 };
 
@@ -376,14 +423,14 @@ const CategoryCard: React.FC<CategoryCardProps> = ({ cat, onSelect }) => {
       onClick={onSelect}
       style={
         {
-          '--cat-accent': cat.color,
-          '--cat-accent-bg': cat.bgColor,
+          "--cat-accent": cat.color,
+          "--cat-accent-bg": cat.bgColor,
         } as React.CSSProperties
       }
       role="button"
       tabIndex={0}
       onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
+        if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
           onSelect();
         }
@@ -405,7 +452,9 @@ const CategoryCard: React.FC<CategoryCardProps> = ({ cat, onSelect }) => {
         <div className="cat-card-header-row">
           <div className="cat-card-title-wrap">
             <span className="cat-card-name">{displayName}</span>
-            {language !== 'en' && <span className="cat-card-english-badge">{cat.englishName}</span>}
+            {language !== "en" && (
+              <span className="cat-card-english-badge">{cat.englishName}</span>
+            )}
           </div>
           <div className="cat-card-arrow-box">
             <ArrowRight className="w-3.5 h-3.5 cat-card-arrow" />

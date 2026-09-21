@@ -1,944 +1,1060 @@
-/**
- * ============================================================================
- * LegacyLock 军规遗产密钥库 — 顶层应用组件与状态编排中心 (App Root Controller)
- * ============================================================================
- * 
- * 核心架构职责：
- * 1. 顶层状态调度：资产数据列表 (items)、继承计划配置 (plan)、主题偏好 (themeId)、运行模式 (OWNER / HEIR_RECOVERY)；
- * 2. 密码学与安全响应：
- *    - 自动将资产列表经 AES-256-GCM 本地加密固化，杜绝明文写入 LevelDB；
- *    - 定期或在资产变动时驱动 6 项健康与完整性自检 (runHealthCheck)；
- *    - 军规级防暂离空闲锁屏监听 (5~60 分钟无操作自动唤起高斯模糊锁屏 LockScreen)；
- * 3. 硬件外部设备感知：
- *    - 启动时自动通过 IPC 扫描物理总线连接的 USB 移动硬盘、闪存盘与 SSD；
- * 4. 模态窗口状态调度：
- *    - 分类选择面板 (CategoryPickerModal)、资产录入表单 (ItemModal)、双钥匙 PIN 配置 (UsbPasswordModal)、
- *      密库健康体检 (HealthCheckModal)、介质无损升级迁移 (MediaMigrationModal)。
- */
-import React, { useState, useEffect, useCallback } from 'react';
-import { Sidebar } from './components/Sidebar';
-import { RightContentArea } from './components/RightContentArea';
-import { CategoryPickerModal } from './components/CategoryPickerModal';
-import { ItemModal } from './components/ItemModal';
-import { UsbPasswordModal } from './components/UsbPasswordModal';
-import { HealthCheckModal } from './components/HealthCheckModal';
-import { MediaMigrationModal } from './components/MediaMigrationModal';
-import { HeirRecoveryView } from './components/HeirRecoveryView';
-import { LockScreen } from './components/LockScreen';
-import { CloseConfirmModal } from './components/CloseConfirmModal';
-import { SetLockPasswordModal } from './components/SetLockPasswordModal';
-import { ChangePasswordModal } from './components/ChangePasswordModal';
-import { SubscriptionModal } from './components/SubscriptionModal';
-import { TakeoverControlModal } from './components/TakeoverControlModal';
-import { useI18n } from './services/i18n';
-import { INITIAL_VAULT_ITEMS } from './services/mockData';
-import { canModifyVault } from './services/subscriptionService';
+import { useEffect, useRef, useState } from "react";
+import { LockKeyhole, ShieldCheck, Usb } from "lucide-react";
+import { ItemModal } from "./components/ItemModal";
+import { Sidebar } from "./components/Sidebar";
+import { RightContentArea } from "./components/RightContentArea";
+import { CategoryPickerModal } from "./components/CategoryPickerModal";
+import { SubscriptionModal } from "./components/SubscriptionModal";
+import { THEMES, getTheme } from "./services/themes";
+import { useI18n } from "./services/i18n";
 import {
-  EncryptedContainer,
-  HeritagePlanConfig,
-  NavCategoryType,
-  OperatingMode,
-  UsbDrive,
-  UsbPasswordConfig,
-  VaultCategory,
-  VaultHealthReport,
-  VaultItem,
-} from './types';
-import {
-  encryptVaultWeb,
-  isElectronApp,
-  performVaultHealthCheck,
-  saveSecureLocalItems,
-  loadSecureLocalItems,
-} from './services/cryptoService';
-import { getTheme, DEFAULT_THEME_ID } from './services/themes';
+  call,
+  legacySnapshot,
+  type Preferences,
+  type Drive,
+  type Settings,
+  type Status,
+  type View,
+} from "./services/vaultClient";
+import type { NavCategoryType, VaultCategory, VaultItem } from "./types";
+import "./secure-app.css";
+import "./restored-app.css";
 
-export const App: React.FC = () => {
-  const { t } = useI18n();
-  const [items, setItems] = useState<VaultItem[]>([]);
-  const [isStorageLoaded, setIsStorageLoaded] = useState<boolean>(false);
-
-  // 军规级防暂离锁屏状态
-  const [isLocked, setIsLocked] = useState<boolean>(() => {
-    const savedPlan = localStorage.getItem('legacylock_plan');
-    if (savedPlan) {
-      try {
-        const p = JSON.parse(savedPlan);
-        return Boolean(p.usbPasswordConfig?.hasMasterPassword && p.usbPasswordConfig?.masterPasswordHash);
-      } catch (_) {}
-    }
-    return false;
+type Action =
+  | "unlock"
+  | "export"
+  | "provision"
+  | "credentials"
+  | "migrate-file"
+  | "migrate-local";
+type Result = {
+  view?: View;
+  canceled?: boolean;
+  path?: string;
+  paths?: string[];
+  revision?: number;
+};
+export default function App() {
+  const { setLanguage } = useI18n();
+  const [status, setStatus] = useState<Status | null>(null),
+    [view, setView] = useState<View | null>(null);
+  const [busy, setBusy] = useState(false),
+    [error, setError] = useState(""),
+    [notice, setNotice] = useState("");
+  const [nav, setNav] = useState<NavCategoryType>("all");
+  const [category, setCategory] = useState<VaultCategory>("login");
+  const [picker, setPicker] = useState(false),
+    [subscription, setSubscription] = useState(false);
+  const [preferences, setPreferences] = useState<Preferences>({
+    theme: "royal_violet",
+    zoom: 1,
+    subscriptionDemo: "trial",
   });
-
-  const [plan, setPlan] = useState<HeritagePlanConfig>(() => {
-    const saved = localStorage.getItem('legacylock_plan');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (_) {}
-    }
-    return {
-      heirName: '李华 (长子/法定继承人)',
-      heirContact: 'lihua_heir@family.org / 138-8888-9999',
-      heirNotes:
-        '在收到继承生效通知后，请携带专用继承人移动存储介质，前往书房保险箱获取主介质，同时插入电脑解锁全部数字资产。',
-      expiryDays: 365,
-      expiryTimestamp: Math.floor(Date.now() / 1000) + 365 * 86400,
-      isConfigured: true,
-    };
-  });
-
-  // 渐变主题配色状态
-  const [themeId, setThemeId] = useState<string>(() => {
-    return localStorage.getItem('legacylock_theme') || DEFAULT_THEME_ID;
-  });
-
-  const currentTheme = getTheme(themeId);
-
-  const handleSelectTheme = (id: string) => {
-    setThemeId(id);
-    localStorage.setItem('legacylock_theme', id);
-    if (isElectronApp() && window.legacyLockAPI?.saveAppSettings) {
-      window.legacyLockAPI.saveAppSettings({ theme: id }).catch(() => {});
-    }
+  const currentTheme = getTheme(preferences.theme);
+  const [editor, setEditor] = useState<VaultItem | null | undefined>(undefined);
+  const [drives, setDrives] = useState<Drive[]>([]),
+    [primary, setPrimary] = useState(""),
+    [secondary, setSecondary] = useState("");
+  const [password, setPassword] = useState(""),
+    [secret, setSecret] = useState(""),
+    [repeat, setRepeat] = useState(""),
+    [backed, setBacked] = useState(false);
+  const [newPassword, setNewPassword] = useState(""),
+    [newSecret, setNewSecret] = useState(""),
+    [newRepeat, setNewRepeat] = useState("");
+  const [action, setAction] = useState<Action | null>(null),
+    [settings, setSettings] = useState<Settings>({
+      autoLockMinutes: 15,
+      heirName: "",
+      heirNotes: "",
+    });
+  const [importMode, setImportMode] = useState(false),
+    [backupRevision, setBackupRevision] = useState<number | null>(null);
+  const epoch = useRef(0),
+    pending = useRef(false);
+  const lastError = useRef("");
+  const credentialDialog = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    if (action && !credentialDialog.current?.open)
+      credentialDialog.current?.showModal();
+  }, [action]);
+  const owner = view?.role === "OWNER",
+    ready = !!primary && !!secondary && primary !== secondary;
+  const clearCredentials = () => {
+    setPassword("");
+    setSecret("");
+    setRepeat("");
+    setNewPassword("");
+    setNewSecret("");
+    setNewRepeat("");
+    setBacked(false);
   };
-
-  // 确保背景颜色实时与持久化主题严格同步
+  const clear = () => {
+    epoch.current++;
+    setView(null);
+    setEditor(undefined);
+    setAction(null);
+    setNav("all");
+    setPicker(false);
+    setSubscription(false);
+    setNotice("");
+    setError("");
+    setSettings({ autoLockMinutes: 15, heirName: "", heirNotes: "" });
+    clearCredentials();
+  };
   useEffect(() => {
-    if (typeof document !== 'undefined') {
-      document.documentElement.style.background = currentTheme.mainStyle.background;
-      document.body.style.background = currentTheme.mainStyle.background;
-    }
-  }, [currentTheme]);
-
-  // 全局界面缩放状态管理 (支持 Ctrl + / Ctrl - / Ctrl 0 适配高分屏或超小笔记本)
-  const [zoomLevel, setZoomLevel] = useState<number>(() => {
-    try {
-      const saved = localStorage.getItem('legacylock_ui_zoom');
-      if (saved) {
-        const val = parseFloat(saved);
-        if (!isNaN(val) && val >= 0.6 && val <= 2.0) return val;
-      }
-    } catch (_) {}
-    return 1.0;
-  });
-
-  const applyZoom = useCallback((newZoom: number) => {
-    const clamped = Math.round(Math.max(0.6, Math.min(2.0, newZoom)) * 100) / 100;
-    setZoomLevel(clamped);
-    try {
-      localStorage.setItem('legacylock_ui_zoom', String(clamped));
-      if (typeof document !== 'undefined') {
-        (document.body.style as any).zoom = `${clamped * 100}%`;
-      }
-      if (isElectronApp() && window.legacyLockAPI?.setZoom) {
-        window.legacyLockAPI.setZoom(clamped);
-      }
-    } catch (_) {}
-  }, []);
-
-  // 监听初始 zoom 配置
-  useEffect(() => {
-    if (typeof document !== 'undefined') {
-      (document.body.style as any).zoom = `${zoomLevel * 100}%`;
-    }
-    if (isElectronApp() && window.legacyLockAPI?.getZoom) {
-      window.legacyLockAPI.getZoom().then((res) => {
-        if (res?.success && typeof res.zoom === 'number') {
-          setZoomLevel(res.zoom);
-          (document.body.style as any).zoom = `${res.zoom * 100}%`;
-        }
-      });
-    }
-  }, []);
-
-  // 监听全局 Ctrl + / Ctrl - / Ctrl 0 快捷键与滚轮缩放
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.ctrlKey || e.metaKey) {
-        if (e.key === '=' || e.key === '+') {
-          e.preventDefault();
-          setZoomLevel((prev) => {
-            const next = Math.min(2.0, prev + 0.05);
-            applyZoom(next);
-            return next;
-          });
-        } else if (e.key === '-' || e.key === '_') {
-          e.preventDefault();
-          setZoomLevel((prev) => {
-            const next = Math.max(0.6, prev - 0.05);
-            applyZoom(next);
-            return next;
-          });
-        } else if (e.key === '0') {
-          e.preventDefault();
-          applyZoom(1.0);
-        }
+    setLanguage("zh");
+    if (!window.vaultAPI) return;
+    void call<Preferences>("preferences")
+      .then(setPreferences)
+      .catch((e) => setError(e.message));
+    const off = window.vaultAPI.onLocked(() => {
+      clear();
+      void call<Status>("status")
+        .then(setStatus)
+        .catch((e) => setError(e.message));
+    });
+    void call<Status>("status")
+      .then(setStatus)
+      .catch((e) => setError(e.message));
+    let last = 0;
+    const activity = () => {
+      if (Date.now() - last > 5000) {
+        window.vaultAPI?.activity();
+        last = Date.now();
       }
     };
-
-    const handleWheel = (e: WheelEvent) => {
-      if (e.ctrlKey || e.metaKey) {
-        e.preventDefault();
-        const delta = e.deltaY < 0 ? 0.05 : -0.05;
-        setZoomLevel((prev) => {
-          const next = Math.max(0.6, Math.min(2.0, prev + delta));
-          applyZoom(next);
-          return next;
-        });
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('wheel', handleWheel, { passive: false });
+    window.addEventListener("pointerdown", activity);
+    window.addEventListener("keydown", activity);
     return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('wheel', handleWheel);
+      off();
+      window.removeEventListener("pointerdown", activity);
+      window.removeEventListener("keydown", activity);
     };
-  }, [applyZoom]);
-
-  // 当前选中的左侧分类导航：默认选中「all (所有密鑰)」展示核心密匙资产
-  const [selectedNav, setSelectedNav] = useState<NavCategoryType>('all');
-
-  // 运行模式：所有者模式 (OWNER) vs 继承人只读接管模式 (HEIR_RECOVERY)
-  const [operatingMode, setOperatingMode] = useState<OperatingMode>('OWNER');
-
-  // 驱动器扫描状态
-  const [isScanningDrives, setIsScanningDrives] = useState(false);
-  const [drives, setDrives] = useState<UsbDrive[]>([]);
-
-  // 弹窗状态：分类选择弹窗 (参考图1) + 资产详细表单弹窗
-  const [isCategoryPickerOpen, setIsCategoryPickerOpen] = useState(false);
-  const [isItemModalOpen, setIsItemModalOpen] = useState(false);
-  const [targetCategory, setTargetCategory] = useState<VaultCategory>('login');
-  const [editingItem, setEditingItem] = useState<VaultItem | null>(null);
-
-  // 用户专门要求的核心功能：U盘密码弹窗
-  const [isUsbPasswordModalOpen, setIsUsbPasswordModalOpen] = useState(false);
-
-  // 密库健康自检状态 (Doc v2 规范)
-  const [isHealthCheckOpen, setIsHealthCheckOpen] = useState(false);
-  const [isCheckingHealth, setIsCheckingHealth] = useState(false);
-  const [healthReport, setHealthReport] = useState<VaultHealthReport | null>(null);
-
-  // 介质平滑升级与迁移弹窗 (Doc v2 Section 38)
-  const [isMigrationOpen, setIsMigrationOpen] = useState(false);
-
-  // 关闭应用拦截提示弹窗
-  const [isCloseModalOpen, setIsCloseModalOpen] = useState(false);
-
-  // 锁屏密码弹窗：首次设置与日常修改
-  const [isSetPasswordModalOpen, setIsSetPasswordModalOpen] = useState(false);
-  const [isChangePasswordModalOpen, setIsChangePasswordModalOpen] = useState(false);
-
-  // 商业订阅与 3 个月试用权益弹窗状态
-  const [isSubscriptionModalOpen, setIsSubscriptionModalOpen] = useState(false);
-  const [subscriptionReason, setSubscriptionReason] = useState<'expired_add' | 'expired_edit' | 'expired_delete' | 'manual'>('manual');
-  const [canModify, setCanModify] = useState<boolean>(() => canModifyVault());
-
-  // 继承人双 U 盘只读模式控制状态
-  const [heirCanModify, setHeirCanModify] = useState<boolean>(true);
-  const [showTakeoverModal, setShowTakeoverModal] = useState(false);
-
-  useEffect(() => {
-    const handleSubChange = () => {
-      setCanModify(canModifyVault());
-    };
-    window.addEventListener('legacylock:subscription-changed', handleSubChange);
-    return () => window.removeEventListener('legacylock:subscription-changed', handleSubChange);
   }, []);
-
-  const [container, setContainer] = useState<EncryptedContainer>({
-    version: 1,
-    nonce_hex: '00112233445566778899aabb',
-    ciphertext_hex: 'aabbccddeeff',
-    config: {
-      expiry_timestamp: plan.expiryTimestamp,
-      server_hash_hex: plan.serverHashHex || '',
-      created_at: Math.floor(Date.now() / 1000),
-    },
-    user_public_hex: plan.userPublicHex || '',
-    heir_public_hex: plan.heirPublicHex || '',
-  });
-
-  // 执行密库 6 项健康与完整性自检
-  const runHealthCheck = async (targetContainer = container, targetItems = items) => {
-    setIsCheckingHealth(true);
+  async function perform<T>(
+    fn: () => Promise<T>,
+    message?: string,
+  ): Promise<boolean> {
+    if (pending.current) return false;
+    pending.current = true;
+    setBusy(true);
+    setError("");
+    setNotice("");
+    const started = epoch.current;
     try {
-      const report = await performVaultHealthCheck(targetContainer, targetItems);
-      setHealthReport(report);
-    } catch (_) {
+      const value = await fn();
+      if (started !== epoch.current) return false;
+      const r = value as Result & Partial<View>;
+      if (r?.canceled) return false;
+      const next = r?.view || (r?.role && r?.items ? (r as View) : null);
+      if (next) {
+        setView(next);
+        setSettings(next.settings);
+        setStatus({ exists: true, recovery: next.recovery });
+        setImportMode(false);
+      }
+      if (message)
+        setNotice(
+          message +
+            (r?.path ? " " + r.path : r?.paths ? " " + r.paths.join("；") : ""),
+        );
+      return true;
+    } catch (e) {
+      if (started === epoch.current) {
+        lastError.current = e instanceof Error ? e.message : "操作失败";
+        setError(lastError.current);
+      }
+      return false;
     } finally {
-      setIsCheckingHealth(false);
+      pending.current = false;
+      setBusy(false);
     }
-  };
-
-  // 扫描硬件存储驱动器 (支持 Windows/macOS/Linux 外部硬盘与 U 盘)
-  const handleRefreshDrives = useCallback(async () => {
-    setIsScanningDrives(true);
-    if (isElectronApp() && window.legacyLockAPI) {
-      try {
-        const res = await window.legacyLockAPI.scanUsbDrives();
-        if (res.success && res.drives) {
-          setDrives(res.drives);
-        }
-      } catch (err) {
-        console.error('[扫描外部驱动器失败]', err);
-      } finally {
-        setIsScanningDrives(false);
-      }
-    } else {
-      // 浏览器环境仿真与降级
-      setTimeout(() => {
-        setDrives([
-          {
-            name: 'TOSHIBA EXT (D:) - 移动硬盘',
-            volumeLabel: 'TOSHIBA EXT',
-            driveLetter: 'D:',
-            mountPath: 'D:\\',
-            size: 2000396832768,
-            freeSpace: 151085887488,
-            fileSystem: 'NTFS',
-            isRemovable: false,
-            isExternal: true,
-            hasUserKey: false,
-            hasHeirKey: false,
-            hasConfig: false,
-            mediaType: 'UsbHDD',
-          },
-          {
-            name: 'SanDisk Ultra (E:) - U盘',
-            volumeLabel: 'SanDisk',
-            driveLetter: 'E:',
-            mountPath: 'E:\\',
-            size: 32000000000,
-            freeSpace: 28000000000,
-            fileSystem: 'FAT32',
-            isRemovable: true,
-            isExternal: true,
-            hasUserKey: true,
-            hasHeirKey: false,
-            hasConfig: true,
-            hasPasswordProtected: true,
-            mediaType: 'UsbFlash',
-          },
-        ]);
-        setIsScanningDrives(false);
-      }, 300);
-    }
-  }, []);
-
-  // 启动即刻自动执行：恢复最后保存的主题配色 + 加密加载资产 + 自动识别外部存储介质
-  useEffect(() => {
-    // 异步加载 AES-256 加密的本地资产
-    loadSecureLocalItems()
-      .then((loaded) => {
-        const hasSeeded = localStorage.getItem('legacylock_seeded') === 'true';
-        if (loaded !== null) {
-          // 用户已有已保存的资产（可能是已删除干净的空数组 []，或保存的真实资产），严格遵从用户数据
-          setItems(loaded);
-          if (!hasSeeded) {
-            localStorage.setItem('legacylock_seeded', 'true');
-          }
-        } else if (!hasSeeded) {
-          // 全新设备首次启动且从未保存过：导入开箱示例供用户体验探索
-          setItems(INITIAL_VAULT_ITEMS);
-          localStorage.setItem('legacylock_seeded', 'true');
-          saveSecureLocalItems(INITIAL_VAULT_ITEMS).catch(() => {});
-        } else {
-          // 之前已初始化过但返回 null（如被清空），保持空状态
-          setItems([]);
-        }
-        setIsStorageLoaded(true);
-      })
-      .catch((err) => {
-        console.error('[加载本地加密资产失败]', err);
-        setIsStorageLoaded(true);
-      });
-
-    if (isElectronApp() && window.legacyLockAPI?.getAppSettings) {
-      window.legacyLockAPI.getAppSettings().then((res) => {
-        if (res.success && res.settings) {
-          if (res.settings.theme) {
-            setThemeId(res.settings.theme);
-            localStorage.setItem('legacylock_theme', res.settings.theme);
-          }
-          if (res.settings.closeAction) {
-            localStorage.setItem('legacylock_close_action', res.settings.closeAction);
-          }
-        }
-      }).catch(() => {});
-    }
-    handleRefreshDrives();
-  }, []);
-
-  // 军规级防暂离空闲自动锁屏监听 (加入 1000ms 节流与配置缓存，杜绝鼠标高频移动时的 I/O 阻塞)
-  useEffect(() => {
-    let timeoutId: any = null;
-    let lastActivityTime = 0;
-    // 闭包缓存配置，彻底杜绝每次 mousemove 触发同步阻塞式 localStorage.getItem()
-    const autoLockMin = Number(localStorage.getItem('legacylock_autolock') || '15');
-
-    const resetIdleTimer = () => {
-      const now = Date.now();
-      // 节流：1000ms 内最多重置一次计时器
-      if (now - lastActivityTime < 1000) return;
-      lastActivityTime = now;
-
-      if (timeoutId) clearTimeout(timeoutId);
-      if (autoLockMin > 0 && !isLocked) {
-        timeoutId = setTimeout(() => {
-          setIsLocked(true);
-        }, autoLockMin * 60 * 1000);
-      }
-    };
-
-    const events = ['mousemove', 'keydown', 'touchstart', 'scroll', 'click'];
-    events.forEach((ev) => window.addEventListener(ev, resetIdleTimer, { passive: true }));
-    resetIdleTimer();
-
-    return () => {
-      if (timeoutId) clearTimeout(timeoutId);
-      events.forEach((ev) => window.removeEventListener(ev, resetIdleTimer));
-    };
-  }, [isLocked]);
-
-  useEffect(() => {
-    // 关键生命周期守卫：在存储尚未完成加载时，绝对禁止自动回写覆盖用户数据！
-    if (!isStorageLoaded) return;
-
-    // 1. 本地持久化存储立即安全写入
-    saveSecureLocalItems(items);
-
-    // 2. 导出容器重加密与健康体检加入 500ms 防抖，杜绝快速连续输入时的密集 PBKDF2/AES 计算
-    const debounceTimer = setTimeout(() => {
-      encryptVaultWeb(items, plan).then((c) => {
-        setContainer(c);
-        if (isElectronApp() && window.legacyLockAPI) {
-          window.legacyLockAPI.saveVaultContainer(c).catch(() => {});
-        }
-        runHealthCheck(c, items);
-      });
-    }, 500);
-
-    return () => clearTimeout(debounceTimer);
-  }, [items, plan, isStorageLoaded]);
-
-  useEffect(() => {
-    localStorage.setItem('legacylock_plan', JSON.stringify(plan));
-  }, [plan]);
-
-  // 打开添加模态窗：先弹出分类选择面板 (对齐参考图1)
-  const handleAddNew = (cat?: VaultCategory) => {
-    if (!heirCanModify) {
-      setShowTakeoverModal(true);
+  }
+  async function updatePreferences(next: Preferences) {
+    const started = epoch.current;
+    return perform(async () => {
+      const saved = await call<Preferences>("setPreferences", next);
+      if (started === epoch.current) setPreferences(saved);
+      return {};
+    }, "界面设置已保存。");
+  }
+  const selectNav = (next: NavCategoryType) => {
+    if (!owner && (next === "settings" || next === "import_export")) {
+      openAction("unlock");
       return;
     }
-    if (!canModifyVault()) {
-      setSubscriptionReason('expired_add');
-      setIsSubscriptionModalOpen(true);
+    setNav(next);
+  };
+  const add = (c?: VaultCategory) => {
+    if (busy) return;
+    if (!owner) {
+      openAction("unlock");
       return;
     }
-    if (cat) {
-      setTargetCategory(cat);
-      setEditingItem(null);
-      setIsItemModalOpen(true);
-    } else {
-      setIsCategoryPickerOpen(true);
-    }
-  };
-
-  const handleSelectCategoryFromPicker = (cat: VaultCategory) => {
-    if (!heirCanModify) {
-      setIsCategoryPickerOpen(false);
-      setShowTakeoverModal(true);
+    if (preferences.subscriptionDemo === "expired") {
+      setSubscription(true);
       return;
     }
-    if (!canModifyVault()) {
-      setIsCategoryPickerOpen(false);
-      setSubscriptionReason('expired_add');
-      setIsSubscriptionModalOpen(true);
-      return;
-    }
-    setTargetCategory(cat);
-    setEditingItem(null);
-    setIsItemModalOpen(true);
+    if (c) {
+      setCategory(c);
+      setEditor(null);
+    } else setPicker(true);
   };
-
-  const handleEditItem = (item: VaultItem) => {
-    setEditingItem(item);
-    setTargetCategory(item.category);
-    setIsItemModalOpen(true);
+  const lock = () => {
+    clear();
+    void call("lock").catch((e) => setError(e.message));
   };
-
-  const handleDeleteItem = (id: string) => {
-    if (!heirCanModify) {
-      setShowTakeoverModal(true);
-      return;
-    }
-    if (!canModifyVault()) {
-      setSubscriptionReason('expired_delete');
-      setIsSubscriptionModalOpen(true);
-      return;
-    }
-    if (window.confirm(t('app.confirmDeleteAsset'))) {
-      setItems((prev) => prev.filter((i) => i.id !== id));
-    }
+  const openAction = (a: Action) => {
+    clearCredentials();
+    setEditor(undefined);
+    setError("");
+    setAction(a);
   };
-
-  const handleSaveItem = (item: VaultItem) => {
-    if (!heirCanModify) {
-      setShowTakeoverModal(true);
-      return;
-    }
-    if (!canModifyVault()) {
-      setSubscriptionReason('expired_edit');
-      setIsSubscriptionModalOpen(true);
-      return;
-    }
-    if (editingItem) {
-      setItems((prev) => prev.map((i) => (i.id === item.id ? item : i)));
-    } else {
-      setItems((prev) => [item, ...prev]);
-    }
+  const generate = async (newValue = false) => {
+    await perform(async () => {
+      const s = await call<string>("newSecret");
+      if (newValue) setNewSecret(s);
+      else setSecret(s);
+      setBacked(false);
+      return {};
+    });
   };
-
-  // 保存 U 盘密码配置
-  const handleSaveUsbPassword = async (config: UsbPasswordConfig, targetDrive: string) => {
-    const updatedPlan: HeritagePlanConfig = {
-      ...plan,
-      usbPasswordConfig: config,
-    };
-    setPlan(updatedPlan);
-    localStorage.setItem('legacylock_plan', JSON.stringify(updatedPlan));
-
-    // 标记介质已受密码保护
-    setDrives((prev) =>
-      prev.map((d) =>
-        d.mountPath === targetDrive ? { ...d, hasPasswordProtected: true } : d
-      )
-    );
-  };
-
-  // 请求关闭主窗口 (检查用户保存的默认行为：每次询问 / 最小化到托盘 / 直接退出)
-  const handleCloseRequest = () => {
-    const savedAction = localStorage.getItem('legacylock_close_action') || 'ask';
-    if (savedAction === 'minimize_to_tray') {
-      const shouldLock = localStorage.getItem('legacylock_lock_on_tray') !== 'false';
-      if (shouldLock) {
-        setIsLocked(true);
-      }
-      if (isElectronApp() && window.legacyLockAPI?.minimizeToTray) {
-        window.legacyLockAPI.minimizeToTray();
-      }
-    } else if (savedAction === 'quit') {
-      if (isElectronApp() && window.legacyLockAPI?.quitApp) {
-        window.legacyLockAPI.quitApp();
-      } else {
-        window.close();
-      }
-    } else {
-      setIsCloseModalOpen(true);
-    }
-  };
-
-  // 确认关闭弹窗提交
-  const handleConfirmClose = (action: 'minimize_to_tray' | 'quit', remember: boolean) => {
-    if (remember) {
-      localStorage.setItem('legacylock_close_action', action);
-      if (isElectronApp() && window.legacyLockAPI?.saveAppSettings) {
-        window.legacyLockAPI.saveAppSettings({ closeAction: action }).catch(() => {});
-      }
-    }
-    setIsCloseModalOpen(false);
-    if (action === 'minimize_to_tray') {
-      const shouldLock = localStorage.getItem('legacylock_lock_on_tray') !== 'false';
-      if (shouldLock) {
-        setIsLocked(true);
-      }
-      if (isElectronApp() && window.legacyLockAPI?.minimizeToTray) {
-        window.legacyLockAPI.minimizeToTray();
-      }
-    } else {
-      if (isElectronApp() && window.legacyLockAPI?.quitApp) {
-        window.legacyLockAPI.quitApp();
-      } else {
-        window.close();
-      }
-    }
-  };
-
-  // 锁屏请求处理：直接锁定；若需初始化或修改密码在系统设置中进行即可
-  const handleRequestLock = () => {
-    setIsLocked(true);
-  };
-
-  // 首次设置锁屏密码成功：保存配置（包含军规级 Secret Key）并立即锁屏
-  const handleSaveInitialLockPassword = (
-    hashHex: string,
-    saltHex: string,
-    hint: string,
-    secretKey?: string,
-    secretKeyHash?: string
-  ) => {
-    const updatedConfig: UsbPasswordConfig = {
-      ...(plan.usbPasswordConfig || {
-        hasHeirPassword: false,
-        autoLockMinutes: 15,
-        isHardwareEncrypted: true,
-      }),
-      hasMasterPassword: true,
-      masterPasswordHash: hashHex,
-      masterPasswordSalt: saltHex,
-      masterPasswordHint: hint,
-      hasSecretKey: Boolean(secretKey),
-      secretKey: secretKey,
-      secretKeyHash: secretKeyHash,
-      secretKeyCreatedAt: secretKey ? Date.now() : undefined,
-      lastChangedAt: Date.now(),
-    };
-    const updatedPlan: HeritagePlanConfig = {
-      ...plan,
-      usbPasswordConfig: updatedConfig,
-    };
-    setPlan(updatedPlan);
-    localStorage.setItem('legacylock_plan', JSON.stringify(updatedPlan));
-    setIsSetPasswordModalOpen(false);
-    setIsLocked(true);
-  };
-
-  // 在系统设置中修改/重置锁屏主密码
-  const handleChangeLockPassword = (newHashHex: string, newSaltHex: string, newHint: string) => {
-    const updatedConfig: UsbPasswordConfig = {
-      ...(plan.usbPasswordConfig || {
-        hasHeirPassword: false,
-        autoLockMinutes: 15,
-        isHardwareEncrypted: true,
-      }),
-      hasMasterPassword: true,
-      masterPasswordHash: newHashHex,
-      masterPasswordSalt: newSaltHex,
-      masterPasswordHint: newHint,
-      lastChangedAt: Date.now(),
-    };
-    const updatedPlan: HeritagePlanConfig = {
-      ...plan,
-      usbPasswordConfig: updatedConfig,
-    };
-    setPlan(updatedPlan);
-    localStorage.setItem('legacylock_plan', JSON.stringify(updatedPlan));
-    setIsChangePasswordModalOpen(false);
-    alert(t('app.passwordUpdatedAlert'));
-  };
-
-  // 监听桌面端托盘与主进程事件 (关闭拦截与托盘一键锁库)
-  useEffect(() => {
-    if (isElectronApp() && window.legacyLockAPI) {
-      if (window.legacyLockAPI.onRequestClose) {
-        window.legacyLockAPI.onRequestClose(() => {
-          handleCloseRequest();
-        });
-      }
-      if (window.legacyLockAPI.onLockVault) {
-        window.legacyLockAPI.onLockVault(() => {
-          handleRequestLock();
-        });
-      }
-    }
-  }, [plan]);
-
-  // 儲存按钮：同步至主盘或导出密包
-  const handleSaveToDrive = async () => {
-    if (isElectronApp() && window.legacyLockAPI) {
-      try {
-        await window.legacyLockAPI.saveVaultContainer(container);
-        alert(t('app.vaultSavedSuccessAlert'));
-      } catch (err: any) {
-        alert(`${t('app.writeErrorAlert')}${err.message}`);
-      }
-    } else {
-      const blob = new Blob([JSON.stringify(container, null, 2)], {
-        type: 'application/json',
-      });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `LegacyLock_LVCF2_Vault_${Date.now()}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
-      alert(t('app.packageDownloadedAlert'));
-    }
-  };
-
-  // 處理加密導入恢復完成
-  const handleImportSuccess = (newItems: VaultItem[], isOverwrite: boolean, isReadOnly?: boolean) => {
-    if (isReadOnly) {
-      setOperatingMode('HEIR_RECOVERY');
-      setHeirCanModify(false);
-    }
-    if (isOverwrite) {
-      setItems(newItems);
-    } else {
-      // 增量合併：依據 id 去重
-      setItems((prev) => {
-        const existingIds = new Set(prev.map((i) => i.id));
-        const added = newItems.filter((i) => !existingIds.has(i.id));
-        return [...added, ...prev];
-      });
-    }
-  };
-
-  // 複製按钮：一键复制当前密匙列表
-  const handleCopyAll = () => {
-    const text = items
-      .map(
-        (i, idx) =>
-          `[${idx + 1}] ${i.title} (${i.category}) | 账号: ${i.username || '无'} | 密码: ${i.password || '无'}`
-      )
-      .join('\n');
-    navigator.clipboard.writeText(text);
-    alert(t('app.copyAllSuccessAlert'));
-  };
-
-  // 军规级安全紧急销毁
-  const handleEmergencyWipe = () => {
-    if (!heirCanModify) {
-      alert(t('app.wipeReadOnlyBlockedAlert'));
-      return;
-    }
-    localStorage.removeItem('legacylock_items_enc');
-    localStorage.removeItem('legacylock_items');
-    localStorage.removeItem('legacylock_plan');
-    localStorage.removeItem('legacylock_seeded');
-    setItems([]);
-    alert(t('app.wipeSuccessAlert'));
-  };
-
-  // 重新导入官方开箱示例
-  const handleReloadMockData = () => {
-    if (window.confirm(t('app.confirmReloadMock'))) {
-      setItems((prev) => {
-        const existingIds = new Set(prev.map((i) => i.id));
-        const toAdd = INITIAL_VAULT_ITEMS.filter((i) => !existingIds.has(i.id));
-        return [...prev, ...toAdd];
-      });
-      localStorage.setItem('legacylock_seeded', 'true');
-      alert(t('app.reloadMockSuccessAlert'));
-    }
-  };
-
-  // 计算各分类数量
-  const categoryCounts = items.reduce<Record<string, number>>((acc, item) => {
-    acc[item.category] = (acc[item.category] || 0) + 1;
-    return acc;
-  }, {});
-
-  return (
-    <div
-      className="app-shell"
-      style={{ background: currentTheme.mainStyle.background }}
-    >
-      {operatingMode === 'HEIR_RECOVERY' ? (
-        /* 继承人只读接管模式视图 (严格单向只读) */
-        <main style={{ flex: 1, overflowY: 'auto' }}>
-          <HeirRecoveryView
-            items={items}
-            heirName={plan.heirName || '法定继承人'}
-            vaultId={healthReport?.vaultId || 'LVCF-2026-X892'}
-            onExitRecovery={() => {
-              setOperatingMode('OWNER');
-              setHeirCanModify(true);
-              setIsLocked(true);
-            }}
-            canModify={heirCanModify}
-            onRequestTakeover={() => setShowTakeoverModal(true)}
-          />
-        </main>
-      ) : (
-        /* 核心所有者模式：左边显示各种分类功能，右面显示已添加内容（完全对齐用户参考截图） */
-        <>
-          {/* 左侧边栏导航 */}
-          <Sidebar
-            selectedNav={selectedNav}
-            onSelectNav={setSelectedNav}
-            categoryCounts={categoryCounts}
-            totalCount={items.length}
-            detectedDrivesCount={drives.length}
-            onAddNew={() => handleAddNew()}
-            theme={currentTheme}
-          />
-
-          {/* 右侧主工作内容区 */}
-          <RightContentArea
-            selectedNav={selectedNav}
-            items={items}
-            drives={drives}
-            plan={plan}
-            isReadOnly={!canModify}
-            onOpenSubscription={() => {
-              setSubscriptionReason('manual');
-              setIsSubscriptionModalOpen(true);
-            }}
-            onAddNew={handleAddNew}
-            onEditItem={handleEditItem}
-            onDeleteItem={handleDeleteItem}
-            onOpenUsbPassword={() => setIsUsbPasswordModalOpen(true)}
-            onSaveToDrive={handleSaveToDrive}
-            onCopyAll={handleCopyAll}
-            onImportSuccess={handleImportSuccess}
-            onRescanDrives={handleRefreshDrives}
-            isScanningDrives={isScanningDrives}
-            onOpenHealthCheck={() => {
-              runHealthCheck();
-              setIsHealthCheckOpen(true);
-            }}
-            onOpenMigration={() => setIsMigrationOpen(true)}
-            onSwitchToHeirMode={() => setOperatingMode('HEIR_RECOVERY')}
-            currentTheme={currentTheme}
-            onSelectTheme={handleSelectTheme}
-            onEmergencyWipe={handleEmergencyWipe}
-            onLock={handleRequestLock}
-            onCloseRequest={handleCloseRequest}
-            onOpenChangePassword={() => {
-              const hasConfiguredMaster = Boolean(
-                plan.usbPasswordConfig?.hasMasterPassword &&
-                plan.usbPasswordConfig?.masterPasswordHash &&
-                plan.usbPasswordConfig?.masterPasswordSalt
-              );
-              if (hasConfiguredMaster) {
-                setIsChangePasswordModalOpen(true);
-              } else {
-                setIsSetPasswordModalOpen(true);
-              }
-            }}
-            onReloadMockData={handleReloadMockData}
-            canModify={heirCanModify}
-            onRequestTakeover={() => setShowTakeoverModal(true)}
-            zoomLevel={zoomLevel}
-            onSetZoom={applyZoom}
-          />
-        </>
+  const scan = () =>
+    perform(async () => {
+      const d = await call<Drive[]>("scan");
+      setDrives(d);
+      if (!d.some((x) => x.token === primary)) setPrimary("");
+      if (!d.some((x) => x.token === secondary)) setSecondary("");
+      return {};
+    }, "已扫描实际 USB 设备。");
+  const usbControls = (
+    <div className="secure-usb">
+      <div className="secure-row">
+        <h3>
+          <Usb size={18} />双 U 盘
+        </h3>
+        <button disabled={busy} onClick={() => void scan()}>
+          扫描设备
+        </button>
+      </div>
+      <p>
+        请选择两个不同的物理 USB
+        设备。密钥文件可复制，不具备不可克隆的硬件保护。
+      </p>
+      <div className="secure-two">
+        {(["主盘 A", "副盘 B"] as const).map((label, i) => (
+          <label key={label}>
+            {label}
+            <select
+              disabled={busy}
+              value={i ? secondary : primary}
+              onChange={(e) => (i ? setSecondary : setPrimary)(e.target.value)}
+            >
+              <option value="">请选择已扫描的设备</option>
+              {drives.map((d) => (
+                <option key={d.token} value={d.token}>
+                  {d.label || "USB"} · {d.root}
+                </option>
+              ))}
+            </select>
+          </label>
+        ))}
+      </div>
+      {!drives.length && (
+        <p className="secure-hint">
+          尚无设备列表。插入 U 盘后点击“扫描设备”；不会显示模拟设备。
+        </p>
       )}
-
-      {/* 军规级防暂离锁屏全屏遮罩 */}
-      <LockScreen
-        isOpen={isLocked}
-        config={plan.usbPasswordConfig}
-        onUnlock={() => setIsLocked(false)}
-        onEmergencyWipe={handleEmergencyWipe}
-        drives={drives}
-        onHeirReadOnlyUnlock={() => {
-          setOperatingMode('HEIR_RECOVERY');
-          setHeirCanModify(false);
-          setIsLocked(false);
-        }}
-        onRescanDrives={handleRefreshDrives}
-      />
-
-      {/* 关闭应用拦截提示弹窗 (支持最小化到托盘/彻底退出与记住选择) */}
-      <CloseConfirmModal
-        isOpen={isCloseModalOpen}
-        onClose={() => setIsCloseModalOpen(false)}
-        onConfirm={handleConfirmClose}
-      />
-
-      {/* 首次使用设置锁屏密码弹窗 */}
-      <SetLockPasswordModal
-        isOpen={isSetPasswordModalOpen}
-        onClose={() => setIsSetPasswordModalOpen(false)}
-        onSuccess={handleSaveInitialLockPassword}
-      />
-
-      {/* 系统设置修改锁屏主密码弹窗 */}
-      <ChangePasswordModal
-        isOpen={isChangePasswordModalOpen}
-        onClose={() => setIsChangePasswordModalOpen(false)}
-        config={plan.usbPasswordConfig}
-        onSuccess={handleChangeLockPassword}
-      />
-
-      {/* 分类选择弹窗（严格对齐用户参考图 1: 你想要添加什么？） */}
-      <CategoryPickerModal
-        isOpen={isCategoryPickerOpen}
-        onClose={() => setIsCategoryPickerOpen(false)}
-        onSelectCategory={handleSelectCategoryFromPicker}
-      />
-
-      {/* 资产表单详细填写弹窗 */}
-      <ItemModal
-        isOpen={isItemModalOpen}
-        onClose={() => setIsItemModalOpen(false)}
-        onSave={handleSaveItem}
-        onDelete={handleDeleteItem}
-        initialItem={editingItem}
-        defaultCategory={targetCategory}
-        isReadOnly={!canModify || !heirCanModify}
-        isHeirReadOnly={!heirCanModify}
-        onRequestTakeover={() => {
-          setIsItemModalOpen(false);
-          setShowTakeoverModal(true);
-        }}
-        onUpgrade={() => {
-          setIsItemModalOpen(false);
-          if (!heirCanModify) {
-            setShowTakeoverModal(true);
-          } else {
-            setSubscriptionReason('expired_edit');
-            setIsSubscriptionModalOpen(true);
-          }
-        }}
-      />
-
-      {/* 用户专门要求的核心功能：U盘密码与硬件保护弹窗 */}
-      <UsbPasswordModal
-        isOpen={isUsbPasswordModalOpen}
-        onClose={() => setIsUsbPasswordModalOpen(false)}
-        drives={drives}
-        config={plan.usbPasswordConfig}
-        onSaveConfig={handleSaveUsbPassword}
-      />
-
-      {/* 密库 6 项健康与密码学自检弹窗 (Doc v2 规范) */}
-      <HealthCheckModal
-        isOpen={isHealthCheckOpen}
-        onClose={() => setIsHealthCheckOpen(false)}
-        report={healthReport}
-        onRecheck={runHealthCheck}
-        isChecking={isCheckingHealth}
-      />
-
-      {/* 存储介质平滑迁移升级弹窗 (Doc v2 Section 38: U盘到移动固态硬盘/机械硬盘) */}
-      <MediaMigrationModal
-        isOpen={isMigrationOpen}
-        onClose={() => setIsMigrationOpen(false)}
-        drives={drives}
-        onMigrateSuccess={(target) => {
-          setIsMigrationOpen(false);
-          alert(`✅ 介质平滑迁移完成！已将所有权与数据安全迁移至目标介质: ${target}`);
-        }}
-      />
-
-      {/* 商业订阅与 3 个月试用权益管理弹窗 */}
-      <SubscriptionModal
-        isOpen={isSubscriptionModalOpen}
-        onClose={() => setIsSubscriptionModalOpen(false)}
-        reason={subscriptionReason}
-      />
-
-      {/* 继承人接管控制权认证弹窗 (主密码 + 128位紧急安全密钥) */}
-      <TakeoverControlModal
-        isOpen={showTakeoverModal}
-        onClose={() => setShowTakeoverModal(false)}
-        passwordConfig={plan.usbPasswordConfig}
-        onSuccess={() => {
-          setHeirCanModify(true);
-          setOperatingMode('OWNER');
-          setShowTakeoverModal(false);
-          alert('✅ 接管控制权成功！已切换至所有者完全读写模式。');
-        }}
-      />
     </div>
   );
-};
-
-export default App;
+  const secretInput = (
+    value: string,
+    set: (s: string) => void,
+    label = "安全密钥",
+  ) => (
+    <label>
+      {label}
+      <input
+        type="password"
+        autoComplete="off"
+        spellCheck={false}
+        value={value}
+        onChange={(e) => set(e.target.value)}
+        placeholder="LL3-…（密码与密钥必须同时提供）"
+      />
+    </label>
+  );
+  const newFields = (
+    <>
+      <label>
+        新密码（至少 12 位）
+        <input
+          type="password"
+          autoComplete="new-password"
+          value={newPassword}
+          onChange={(e) => setNewPassword(e.target.value)}
+        />
+      </label>
+      <label>
+        再次输入新密码
+        <input
+          type="password"
+          autoComplete="new-password"
+          value={newRepeat}
+          onChange={(e) => setNewRepeat(e.target.value)}
+        />
+      </label>
+      <label>
+        新安全密钥
+        <textarea readOnly value={newSecret} rows={3} />
+      </label>
+      <button type="button" disabled={busy} onClick={() => void generate(true)}>
+        生成新的随机安全密钥
+      </button>
+      <label className="secure-check">
+        <input
+          type="checkbox"
+          checked={backed}
+          onChange={(e) => setBacked(e.target.checked)}
+        />
+        我已将新安全密钥保存到独立安全位置。重新生成后须重新备份。
+      </label>
+    </>
+  );
+  async function submitAction() {
+    let success = false;
+    if (action === "unlock")
+      success = await perform(
+        () => call("unlock", password, secret),
+        "已验证两项凭据，进入所有者会话。",
+      );
+    if (action === "export")
+      success = await perform(
+        () => call("export", password, secret),
+        "已写入并校验加密备份：",
+      );
+    if (action === "provision")
+      success = await perform(
+        () => call("provision", primary, secondary, password, secret),
+        "两盘密钥和密库备份已写入并校验：",
+      );
+    if (action === "credentials" || action?.startsWith("migrate-")) {
+      if (
+        newPassword.length < 12 ||
+        newPassword !== newRepeat ||
+        !newSecret ||
+        !backed
+      ) {
+        setError("请确认新密码一致且至少 12 位，并备份新密钥。");
+        return;
+      }
+      if (action === "credentials")
+        success = await perform(
+          () => call("credentials", password, secret, newPassword, newSecret),
+          "本机凭据已更新。请重新导出备份并同步两盘；旧备份仍使用旧凭据。",
+        );
+      else
+        success = await perform(
+          async () =>
+            call(
+              "migrate",
+              action === "migrate-file" ? "file" : "local",
+              password,
+              secret,
+              newPassword,
+              newSecret,
+              action === "migrate-local" ? await legacySnapshot() : undefined,
+            ),
+          "旧资产已迁移为新的 LVCF 3 密库，原数据保留；请重新配置两盘。",
+        );
+    }
+    if (success) {
+      setAction(null);
+      clearCredentials();
+    }
+  }
+  const appearancePanel = (
+    <section className="secure-card appearance-panel">
+      <h2>外观与背景</h2>
+      <p>保留原来的五套渐变背景；保存后下次启动继续使用。</p>
+      <div className="appearance-themes">
+        {THEMES.map((theme) => (
+          <button
+            key={theme.id}
+            disabled={busy}
+            aria-pressed={preferences.theme === theme.id}
+            onClick={() =>
+              void updatePreferences({ ...preferences, theme: theme.id })
+            }
+            style={{ background: theme.previewGradient }}
+          >
+            {theme.name}
+          </button>
+        ))}
+      </div>
+      <label>
+        界面缩放
+        <select
+          value={preferences.zoom}
+          disabled={busy}
+          onChange={(e) =>
+            void updatePreferences({
+              ...preferences,
+              zoom: Number(e.target.value),
+            })
+          }
+        >
+          {[0.85, 1, 1.15, 1.25].map((z) => (
+            <option key={z} value={z}>
+              {Math.round(z * 100)}%
+            </option>
+          ))}
+        </select>
+      </label>
+      <button disabled={busy} onClick={() => setSubscription(true)}>
+        付费订阅 · 测试体验
+      </button>
+    </section>
+  );
+  const settingsPanel = owner && view && (
+    <div className="secure-controls restored-settings">
+      {appearancePanel}
+      <section className="secure-card">
+        <h2>应用与继承设置</h2>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            void perform(() => call("settings", settings), "设置已加密保存。");
+          }}
+        >
+          <label>
+            无操作自动锁定
+            <select
+              value={settings.autoLockMinutes}
+              onChange={(e) =>
+                setSettings({
+                  ...settings,
+                  autoLockMinutes: Number(e.target.value),
+                })
+              }
+            >
+              {[1, 5, 15, 30, 60].map((n) => (
+                <option key={n} value={n}>
+                  {n} 分钟
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            继承人姓名
+            <input
+              maxLength={200}
+              value={settings.heirName}
+              onChange={(e) =>
+                setSettings({
+                  ...settings,
+                  heirName: e.target.value,
+                })
+              }
+            />
+          </label>
+          <label>
+            继承说明
+            <textarea
+              maxLength={10000}
+              rows={4}
+              value={settings.heirNotes}
+              onChange={(e) =>
+                setSettings({
+                  ...settings,
+                  heirNotes: e.target.value,
+                })
+              }
+            />
+          </label>
+          <button className="primary" disabled={busy}>
+            保存设置
+          </button>
+        </form>
+        <hr />
+        <h3>密码、密钥与导出</h3>
+        <p>
+          加密备份使用本机的密码和安全密钥。更新凭据后，需要重新导出；旧备份不会自动改变。
+        </p>
+        <button disabled={busy} onClick={() => openAction("export")}>
+          验证凭据并导出加密备份
+        </button>
+        <button disabled={busy} onClick={() => openAction("credentials")}>
+          更换密码和安全密钥
+        </button>
+        <button
+          disabled={busy}
+          onClick={() =>
+            void perform(
+              () => call("health"),
+              "当前磁盘签名及会话完整性校验通过。此结果不代表离线 U 盘已更新。",
+            )
+          }
+        >
+          校验本机密库
+        </button>
+      </section>
+    </div>
+  );
+  const backupPanel = owner && view && (
+    <div className="secure-controls restored-settings">
+      <section className="secure-card">
+        <h2>双 U 盘配置与备份</h2>
+        {usbControls}
+        <p>
+          {view.recovery
+            ? "已配置恢复密钥。重新配置会生成新代次并更换数据密钥；新数据需用新两盘恢复。"
+            : "尚未配置。两盘配置成功后，继承人才具备只读恢复能力。"}
+        </p>
+        <button
+          disabled={busy || !ready}
+          onClick={() => openAction("provision")}
+        >
+          {view.recovery ? "重新配置 / 更换两盘" : "配置主、副 U 盘"}
+        </button>
+        <button
+          className="primary"
+          disabled={busy || !ready || !view.recovery}
+          onClick={() =>
+            void perform(async () => {
+              const r = await call<Result>("sync", primary, secondary);
+              setBackupRevision(r.revision || null);
+              return r;
+            }, "当前密库已同步到两盘：")
+          }
+        >
+          同步当前密库到两盘
+        </button>
+        <p className="secure-hint">
+          本机版本 {view.revision}；
+          {backupRevision === view.revision
+            ? "本次会话已确认两盘同步此版本。"
+            : "未确认两盘包含此版本，请点击同步。"}{" "}
+          数据编辑只保存本机，离线 U 盘不会自动更新。
+        </p>
+        <p>
+          请分开保管两盘。更换设备不需要格式化：选择两块新设备重新配置即可；旧副本仍可能打开历史数据。
+        </p>
+      </section>
+      <section className="secure-card">
+        <h2>加密备份导入与导出</h2>
+        <p>
+          备份使用当前密码与安全密钥；在其他电脑上可用所有者凭据导入，或用两盘只读恢复。
+        </p>
+        <button disabled={busy} onClick={() => openAction("export")}>
+          验证凭据并导出加密备份
+        </button>
+        <button
+          disabled={busy}
+          onClick={() => {
+            lock();
+            setImportMode(true);
+          }}
+        >
+          锁定并进入导入
+        </button>
+      </section>
+    </div>
+  );
+  if (!window.vaultAPI)
+    return (
+      <main className="secure-app">
+        <section className="secure-card secure-welcome">
+          <LockKeyhole />
+          <h1>LegacyLock 桌面密库</h1>
+          <p>
+            浏览器模式只用于界面开发。真实密库、导入、U
+            盘和加密设置仅在桌面应用中可用。
+          </p>
+          <p>运行 npm run build，再运行 npm run electron。</p>
+        </section>
+      </main>
+    );
+  return (
+    <main
+      className={view ? "restored-app app-shell" : "secure-app restored-lock"}
+      aria-busy={busy}
+      style={
+        {
+          background: currentTheme.mainStyle.background,
+          "--vault-card-bg": currentTheme.mainStyle.cardBg,
+          "--vault-accent": currentTheme.primaryAccent,
+        } as React.CSSProperties
+      }
+    >
+      {view && (
+        <Sidebar
+          selectedNav={nav}
+          onSelectNav={selectNav}
+          totalCount={view.items.length}
+          theme={currentTheme}
+          categoryCounts={view.items.reduce<Record<string, number>>(
+            (counts, item) => {
+              counts[item.category] = (counts[item.category] || 0) + 1;
+              return counts;
+            },
+            {},
+          )}
+        />
+      )}
+      {!view && (
+        <header className="secure-header">
+          <div className="secure-brand">
+            <ShieldCheck />
+            <div>
+              <strong>LegacyLock</strong>
+              <small>数字遗产密库 · LVCF 3</small>
+            </div>
+          </div>
+          <div className="secure-row">
+            <span className="secure-badge">
+              {view ? (owner ? "所有者 · 可管理" : "继承人 · 只读") : "已锁定"}
+            </span>
+            {view && (
+              <button onClick={lock}>
+                <LockKeyhole size={16} />
+                立即锁定
+              </button>
+            )}
+          </div>
+        </header>
+      )}
+      <div
+        className={view ? "restored-workspace" : "secure-shell"}
+        style={view ? { zoom: preferences.zoom } : undefined}
+      >
+        {error && (
+          <div className="secure-message error" role="alert">
+            {error}
+          </div>
+        )}
+        {status?.preferencesWarning && (
+          <div className="secure-message" role="status">
+            外观配置无法读取，暂用默认主题。密库不受影响；所有者解锁后可重新保存界面设置。
+          </div>
+        )}
+        {notice && (
+          <div className="secure-message" role="status">
+            {notice}
+          </div>
+        )}
+        {busy && <p role="status">正在验证或保存，请等待完成…</p>}
+        {!status ? (
+          <p>正在检查本机密库…</p>
+        ) : !view ? (
+          <div className="secure-grid">
+            <section className="secure-card">
+              <h1>
+                {status.exists
+                  ? importMode
+                    ? "导入所有者备份"
+                    : "解锁本机密库"
+                  : importMode
+                    ? "导入所有者备份"
+                    : "创建本机密库"}
+              </h1>
+              {status.damaged && (
+                <p className="secure-message error">
+                  本机文件未通过校验。不会自动清空或覆盖，请保全文件并参考恢复文档。
+                </p>
+              )}
+              <p>
+                所有者解锁需要同时提供密码和安全密钥。继承人可通过双 U
+                盘入口只读访问。
+              </p>
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (
+                    !status.exists &&
+                    !importMode &&
+                    (password.length < 12 || password !== repeat || !backed)
+                  ) {
+                    setError("密码须至少 12 位且两次一致；请先备份安全密钥。");
+                    return;
+                  }
+                  void perform(
+                    () =>
+                      call(
+                        status.exists && !importMode
+                          ? "unlock"
+                          : importMode
+                            ? "importOwner"
+                            : "initialize",
+                        password,
+                        secret,
+                      ),
+                    "密库已解锁。",
+                  ).then((ok) => {
+                    if (ok) clearCredentials();
+                  });
+                }}
+              >
+                <label>
+                  {!status.exists && !importMode
+                    ? "设置密码（至少 12 位）"
+                    : "密码"}
+                  <input
+                    required
+                    type="password"
+                    autoComplete="off"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                </label>
+                {!status.exists && !importMode && (
+                  <label>
+                    再次输入密码
+                    <input
+                      required
+                      type="password"
+                      autoComplete="new-password"
+                      value={repeat}
+                      onChange={(e) => setRepeat(e.target.value)}
+                    />
+                  </label>
+                )}
+                {!status.exists && !importMode ? (
+                  <>
+                    <label>
+                      安全密钥（请抄录或保存）
+                      <textarea readOnly rows={3} value={secret} />
+                    </label>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => void generate()}
+                    >
+                      生成随机安全密钥
+                    </button>
+                    <label className="secure-check">
+                      <input
+                        type="checkbox"
+                        checked={backed}
+                        onChange={(e) => setBacked(e.target.checked)}
+                      />
+                      已在独立安全位置备份此密钥
+                    </label>
+                  </>
+                ) : (
+                  secretInput(secret, setSecret)
+                )}
+                <button
+                  className="primary"
+                  disabled={
+                    busy ||
+                    status.damaged ||
+                    (!status.exists && !importMode && !secret)
+                  }
+                >
+                  {importMode
+                    ? "选择备份并验证导入"
+                    : status.exists
+                      ? "解锁为所有者"
+                      : "创建加密密库"}
+                </button>
+              </form>
+              <button
+                disabled={busy}
+                onClick={() => {
+                  clearCredentials();
+                  setImportMode(!importMode);
+                }}
+              >
+                {importMode ? "返回本机密库" : "从加密备份导入（需要两项凭据）"}
+              </button>
+              {!status.exists && (
+                <details>
+                  <summary>旧版数据迁移</summary>
+                  <p>
+                    仅迁移资产，保留原文件，不沿用旧版密钥和授权状态。旧副本的安全缺陷不会随迁移消失。
+                  </p>
+                  <button
+                    disabled={busy}
+                    onClick={() => openAction("migrate-file")}
+                  >
+                    迁移旧版加密导出包
+                  </button>
+                  <button
+                    disabled={busy}
+                    onClick={() => openAction("migrate-local")}
+                  >
+                    迁移此安装中的旧数据
+                  </button>
+                </details>
+              )}
+            </section>
+            <section className="secure-card">
+              <h2>继承人只读访问</h2>
+              {usbControls}
+              <p>
+                两盘只解密数据，不授予修改、设置或导出管理权限。拔出任一盘会自动锁定。
+              </p>
+              <div className="secure-stack">
+                <button
+                  disabled={
+                    busy ||
+                    !ready ||
+                    !status.exists ||
+                    !status.recovery ||
+                    status.damaged
+                  }
+                  onClick={() =>
+                    void perform(
+                      () => call("recover", primary, secondary, false),
+                      "双盘验证完成，当前为只读会话。",
+                    )
+                  }
+                >
+                  用双盘打开本机密库
+                </button>
+                <button
+                  disabled={busy || !ready || status.damaged}
+                  onClick={() =>
+                    void perform(
+                      () => call("recover", primary, secondary, true),
+                      "已导入签名密库，当前为只读会话。",
+                    )
+                  }
+                >
+                  选择备份导入并只读访问
+                </button>
+              </div>
+              <p className="secure-hint">
+                在另一台电脑上，选择任一盘 LegacyLock 目录中的
+                vault.llvault。重启应用后仍需重新解锁。
+              </p>
+            </section>
+          </div>
+        ) : (
+          <RightContentArea
+            selectedNav={nav}
+            items={view.items}
+            currentTheme={currentTheme}
+            busy={busy}
+            canModify={owner}
+            isReadOnly={preferences.subscriptionDemo === "expired"}
+            demo={preferences.subscriptionDemo}
+            onAddNew={add}
+            onEditItem={(item) => {
+              if (!busy) setEditor(item);
+            }}
+            onDeleteItem={(id) => {
+              if (
+                !busy &&
+                owner &&
+                window.confirm(
+                  `删除“${view.items.find((i) => i.id === id)?.title || "此资产"}”？删除后请同步两盘备份。`,
+                )
+              ) {
+                void perform(
+                  () => call("deleteItem", id),
+                  "资产已删除，请同步两盘备份。",
+                );
+              }
+            }}
+            onSelectTheme={(theme) =>
+              void updatePreferences({ ...preferences, theme })
+            }
+            onOpenUsbPassword={() => openAction("credentials")}
+            onOpenHealthCheck={() =>
+              void perform(
+                () => call("health"),
+                "当前磁盘签名及会话完整性校验通过。此结果不代表离线 U 盘已更新。",
+              )
+            }
+            onOpenSubscription={owner ? () => setSubscription(true) : undefined}
+            onRequestTakeover={() => openAction("unlock")}
+            onLock={lock}
+            settingsContent={settingsPanel}
+            backupContent={backupPanel}
+            banner={
+              <div className="workspace-status">
+                <span className="secure-badge">
+                  {owner ? "所有者 · 可管理" : "继承人 · 只读"}
+                </span>
+                <span>
+                  资产 {view.items.length} · 版本 {view.revision} ·
+                  本机保存后请同步两盘
+                </span>
+                {!owner && (
+                  <>
+                    <button onClick={() => openAction("unlock")}>
+                      输入密码和密钥，接管管理权限
+                    </button>
+                    <p>
+                      {view.settings.heirName} {view.settings.heirNotes}
+                    </p>
+                  </>
+                )}
+                {owner && preferences.subscriptionDemo === "expired" && (
+                  <p>
+                    订阅测试：模拟试用到期，资产只读。可在订阅测试中恢复试用，不会扣费。
+                  </p>
+                )}
+              </div>
+            }
+          />
+        )}
+      </div>
+      {owner && subscription && (
+        <SubscriptionModal
+          mode={preferences.subscriptionDemo}
+          busy={busy}
+          onClose={() => {
+            if (!busy) setSubscription(false);
+          }}
+          onChange={(subscriptionDemo) =>
+            updatePreferences({ ...preferences, subscriptionDemo })
+          }
+        />
+      )}
+      {owner && picker && (
+        <CategoryPickerModal
+          isOpen
+          onClose={() => setPicker(false)}
+          onSelectCategory={(c) => {
+            setCategory(c);
+            setEditor(null);
+          }}
+        />
+      )}
+      {view && editor !== undefined && (
+        <ItemModal
+          isOpen
+          initialItem={editor}
+          defaultCategory={category || "login"}
+          isReadOnly={!owner || preferences.subscriptionDemo === "expired"}
+          isHeirReadOnly={!owner}
+          onUpgrade={owner ? () => {
+            setEditor(undefined);
+            setSubscription(true);
+          } : undefined}
+          onClose={() => {
+            if (!busy) setEditor(undefined);
+          }}
+          onRequestTakeover={() =>
+            owner ? setSubscription(true) : openAction("unlock")
+          }
+          onSave={async (item) => {
+            if (
+              !(await perform(
+                () => call("saveItem", item),
+                "资产已加密保存，请同步两盘备份。",
+              ))
+            )
+              throw new Error(lastError.current || "保存未完成，请重试。");
+          }}
+          onDelete={async (id) => {
+            if (
+              !(await perform(
+                () => call("deleteItem", id),
+                "资产已删除，请同步两盘备份。",
+              ))
+            )
+              throw new Error(lastError.current || "删除未完成。");
+          }}
+        />
+      )}
+      {action && (
+        <dialog
+          ref={credentialDialog}
+          className="secure-overlay secure-controls"
+          onCancel={(e) => {
+            e.preventDefault();
+            if (!busy) {
+              setAction(null);
+              clearCredentials();
+            }
+          }}
+        >
+          <section
+            className="secure-card secure-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="credential-title"
+          >
+            <h2 id="credential-title">
+              {
+                {
+                  unlock: "验证所有者凭据",
+                  export: "验证并导出备份",
+                  provision: "验证并配置两盘",
+                  credentials: "更换所有者凭据",
+                  "migrate-file": "迁移旧版加密包",
+                  "migrate-local": "迁移旧版本机数据",
+                }[action]
+              }
+            </h2>
+            <p>请同时填写密码和安全密钥。凭据不会写入浏览器存储。</p>
+            {action === "provision" && (
+              <p>
+                此操作写入所选两盘的独立 LegacyLock
+                目录，不格式化设备。成功后仍需妥善保管旧版备份。
+              </p>
+            )}
+            {action.startsWith("migrate-") && (
+              <p>
+                以下先填写旧凭据，再设置全新的 LVCF 3
+                凭据。旧版本机数据必须具有完整的两项认证信息。
+              </p>
+            )}
+            {error && (
+              <p className="secure-message error" role="alert">
+                {error}
+              </p>
+            )}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                void submitAction();
+              }}
+            >
+              <label>
+                {action.startsWith("migrate-") ? "旧密码" : "当前密码"}
+                <input
+                  autoFocus
+                  required
+                  type="password"
+                  autoComplete="off"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+              </label>
+              {secretInput(
+                secret,
+                setSecret,
+                action.startsWith("migrate-")
+                  ? "旧安全密钥（旧包未设置密钥时可留空）"
+                  : "当前安全密钥",
+              )}
+              {(action === "credentials" || action.startsWith("migrate-")) &&
+                newFields}
+              <div className="secure-row">
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => {
+                    setAction(null);
+                    clearCredentials();
+                  }}
+                >
+                  取消
+                </button>
+                <button className="primary" disabled={busy}>
+                  验证并执行
+                </button>
+              </div>
+            </form>
+          </section>
+        </dialog>
+      )}
+    </main>
+  );
+}

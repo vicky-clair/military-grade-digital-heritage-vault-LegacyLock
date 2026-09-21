@@ -3,14 +3,14 @@ name: Build & Release LegacyLock
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
   workflow_dispatch:
 
 jobs:
   build-and-release:
     strategy:
       matrix:
-        os: [windows-latest, ubuntu-latest]
+        os: [windows-latest, ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -20,14 +20,25 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: 'npm'
+          node-version: 24
+          cache: "npm"
 
       - name: Install dependencies
         run: npm ci
 
       - name: Build Web Assets
         run: npm run build
+
+      - name: Security and persistence regression tests
+        run: npm test
+
+      - name: Desktop integration smoke test
+        if: runner.os != 'Linux'
+        run: node tests/run-desktop.cjs
+
+      - name: Desktop integration smoke test (Linux)
+        if: runner.os == 'Linux'
+        run: xvfb-run --auto-servernum node tests/run-desktop.cjs
 
       - name: Package Windows (Installer & Portable)
         if: runner.os == 'Windows'
@@ -36,6 +47,10 @@ jobs:
       - name: Package Linux (AppImage, deb, tar.gz)
         if: runner.os == 'Linux'
         run: npx electron-builder --linux AppImage deb tar.gz
+
+      - name: Package macOS
+        if: runner.os == 'macOS'
+        run: npx electron-builder --mac zip
 
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4

@@ -1,3 +1,6 @@
+/** @deprecated Historical implementation for audit reference only.
+ * LVCF 3 uses electron/vault-core.cjs; Vite rejects importing this module into the product.
+ */
 /**
  * ============================================================================
  * LegacyLock 军规遗产密钥库 — 密码学核心服务层 (Cryptographic Core Services)
@@ -1350,4 +1353,3 @@ export async function decryptWithDualUsb(options: {
     isReadOnly: true,
   };
 }
-

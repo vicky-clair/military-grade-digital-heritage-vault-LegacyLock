@@ -333,7 +333,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <Settings className="settings-btn-icon" style={{ width: 17, height: 17 }} />
             <span style={{ fontWeight: 600, fontSize: 13 }}>{t('nav.settings')}</span>
           </div>
-          <span className="settings-version-tag">v2.5.0</span>
+          <span className="settings-version-tag">LVCF 3</span>
         </button>
       </div>
     </aside>

@@ -1,0 +1,19 @@
+
+> legacylock@1.0.0 test:desktop
+> npm run build && node tests/run-desktop.cjs
+
+
+> legacylock@1.0.0 build
+> tsc -b && vite build
+
+vite v6.4.3 building for production...
+transforming...
+✓ 1606 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   1.22 kB │ gzip:   0.77 kB
+dist/assets/index-D_jTco1Q.css   69.52 kB │ gzip:  13.20 kB
+dist/assets/index-DFf-oAxK.js   415.13 kB │ gzip: 127.91 kB
+✓ built in 3.19s
+
+Desktop smoke passed: sandbox, real form create, disk save, USB fixture provisioning, owner export, theme persistence, subscription demo, lock despite clipboard failure, heir UI, IPC denial, settings bounds and 800x500 layout.

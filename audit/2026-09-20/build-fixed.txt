@@ -1,0 +1,13 @@
+
+> legacylock@1.0.0 build
+> tsc -b && vite build
+
+vite v6.4.3 building for production...
+transforming...
+✓ 1600 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   1.22 kB │ gzip:   0.77 kB
+dist/assets/index-Bh6ZWtXQ.css   64.43 kB │ gzip:  12.34 kB
+dist/assets/index-Brho_yiN.js   373.46 kB │ gzip: 117.57 kB
+✓ built in 3.30s

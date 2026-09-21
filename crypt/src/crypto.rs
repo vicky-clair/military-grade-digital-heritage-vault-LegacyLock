@@ -6,19 +6,21 @@
 //! 1. 2-of-2 硬件物理钥匙隔离：
 //!    - 主盘 (user-key.bin): 存放所有者 X25519 私钥与公钥 (64 字节)
 //!    - 副盘 (heir-key.bin): 存放继承人 X25519 私钥与公钥 (64 字节)
-//! 2. 非对称密钥协商 (Diffie-Hellman Key Exchange):
+//! 2. 历史非对称密钥协商 (不再用于新密库):
 //!    - 会话根密钥 = SHA256(X25519(user_sec, heir_pub)) == SHA256(X25519(heir_sec, user_pub))
-//!    - 任何单盘无法解密，两盘缺一不可
+//!    - 此历史协议仅凭一份私钥和对方公钥即可解密，不是真正 2-of-2。
 //! 3. AES-256-GCM 对称认证加密与防篡改标签
-//! 4. 离线时间戳继承时效强校验 (防提前激活或过期篡改)
+//! 4. 仅供历史恢复，不再生成新容器，不使用失效日期阻止数据抢救。
 
 use aes_gcm::{
     aead::{Aead, KeyInit},
     Aes256Gcm, Nonce,
 };
 use anyhow::{bail, Context, Result};
+#[cfg(test)]
 use chrono::Utc;
 use rand::rngs::OsRng;
+#[cfg(test)]
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -85,6 +87,7 @@ pub fn write_heir_usb(secret: X25519Secret, public: X25519Public, path: &Path) -
 pub fn read_key_file(path: &Path) -> Result<(X25519Secret, X25519Public)> {
     let mut file = File::open(path)
         .with_context(|| format!("无法读取密钥文件: {:?}", path))?;
+    if file.metadata()?.len() != 64 { bail!("密钥文件必须恰好为 64 字节"); }
     let mut buf = [0u8; 64];
     file.read_exact(&mut buf)
         .with_context(|| format!("密钥文件长度不足 64 字节: {:?}", path))?;
@@ -112,6 +115,7 @@ pub fn write_config(expiry_timestamp: i64, server_hash: [u8; 32], path: &Path) -
 pub fn read_config(path: &Path) -> Result<(i64, [u8; 32])> {
     let mut file = File::open(path)
         .with_context(|| format!("无法读取配置文件: {:?}", path))?;
+    if file.metadata()?.len() != 40 { bail!("配置文件必须恰好为 40 字节"); }
     let mut buf = [0u8; 40];
     file.read_exact(&mut buf)
         .with_context(|| format!("配置文件长度不足 40 字节: {:?}", path))?;
@@ -138,7 +142,8 @@ pub fn derive_shared_encryption_key(
     sha256(dh_shared.as_bytes())
 }
 
-/// 加密数字资产库 (AES-256-GCM)
+/// 仅生成旧协议测试夹具。生产库不导出此写入函数。
+#[cfg(test)]
 pub fn encrypt_vault_data(
     plaintext: &[u8],
     user_secret: &X25519Secret,
@@ -175,19 +180,21 @@ pub fn encrypt_vault_data(
     })
 }
 
-/// 5. 解锁验证并解密数字资产 (必须同时插上两个U盘)
+/// 5. 只读抢救旧数据；旧协议不具备 2-of-2 保密性和所有者签名。
 pub fn unlock_and_decrypt(
     user_secret: &X25519Secret,
     user_public: &X25519Public,
     heir_secret: &X25519Secret,
     heir_public: &X25519Public,
-    expiry_timestamp: i64,
+    _expiry_timestamp: i64,
     server_hash: [u8; 32],
     container: &EncryptedVaultContainer,
 ) -> Result<Vec<u8>> {
-    let now = Utc::now().timestamp();
-    if now > expiry_timestamp {
-        bail!("【安全拦截】继承计划已失效！当前时间戳 ({}) 已超过有效截止时间 ({})", now, expiry_timestamp);
+    if container.version != 1 || container.nonce_hex.len() != 24 || container.ciphertext_hex.len() > 64*1024*1024 {
+        bail!("历史容器版本、Nonce 长度或密文大小无效");
+    }
+    if container.user_public_hex != hex::encode(user_public) || container.heir_public_hex != hex::encode(heir_public) {
+        bail!("历史容器与所选密钥不匹配");
     }
     
     // 验证继承人公钥哈希与服务器/配置哈希是否匹配

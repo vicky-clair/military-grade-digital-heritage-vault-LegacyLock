@@ -1,0 +1,44 @@
+
+7-Zip 25.01 (x64) : Copyright (c) 1999-2025 Igor Pavlov : 2025-08-03
+
+Scanning the drive for archives:
+1 file, 94051672 bytes (90 MiB)
+
+Testing archive: release\LegacyLock Setup 1.0.0.exe
+--
+Path = release\LegacyLock Setup 1.0.0.exe
+Type = Nsis
+Physical Size = 94051672
+Method = Deflate
+Solid = -
+Headers Size = 214006
+Embedded Stub Size = 59904
+SubType = NSIS-3 Unicode
+
+Everything is Ok
+
+Files: 10
+Size:       93483195
+Compressed: 94051672
+
+7-Zip 25.01 (x64) : Copyright (c) 1999-2025 Igor Pavlov : 2025-08-03
+
+Scanning the drive for archives:
+1 file, 93821684 bytes (90 MiB)
+
+Testing archive: release\LegacyLock-v1.0.0-Windows-Portable.exe
+--
+Path = release\LegacyLock-v1.0.0-Windows-Portable.exe
+Type = Nsis
+Physical Size = 93821684
+Method = Deflate
+Solid = -
+Headers Size = 39790
+Embedded Stub Size = 38400
+SubType = NSIS-3 Unicode
+
+Everything is Ok
+
+Files: 4
+Size:       93483195
+Compressed: 93821684

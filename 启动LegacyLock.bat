@@ -1,20 +1,20 @@
 @echo off
 chcp 65001 >nul
 cd /d "%~dp0"
-title LegacyLock 遗产保险锁 [军规数字遗产箱]
+title LegacyLock 数字遗产密库 [LVCF 3]
 
 echo =========================================================
-echo    LegacyLock 遗产保险锁 - 军规级数字遗产保险箱
+echo    LegacyLock 数字遗产密库 - LVCF 3
 echo =========================================================
 echo.
-echo 正在启动 LegacyLock 桌面应用与本地服务...
-echo 本地访问地址: http://127.0.0.1:5173
+echo 正在启动 LegacyLock 桌面应用（加载本机静态文件）...
 echo.
 
 REM 1. 检查前端静态资源
 if not exist "%~dp0dist\index.html" (
     echo [提示] 正在构建前端界面，请稍候...
     call npm run build
+    if errorlevel 1 exit /b 1
 )
 
 REM 2. 启动 Electron 原生桌面客户端
