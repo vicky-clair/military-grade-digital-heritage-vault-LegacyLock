@@ -1,11 +1,25 @@
 "use strict";
 const core = require("./vault-core.cjs");
 const { read, atomicWrite } = require("./vault-store.cjs");
-const defaults = { theme: "royal_violet", zoom: 1, subscriptionDemo: "trial" };
+const defaults = {
+  theme: "royal_violet",
+  zoom: 1,
+  subscriptionDemo: "trial",
+  language: "zh",
+  closeToTray: false,
+};
 function validate(value) {
   if (
+    value &&
+    Object.keys(value).sort().join(",") === "subscriptionDemo,theme,zoom"
+  )
+    value = { ...defaults, ...value };
+  if (
     !value ||
-    Object.keys(value).sort().join(",") !== "subscriptionDemo,theme,zoom" ||
+    Object.keys(value).sort().join(",") !==
+      "closeToTray,language,subscriptionDemo,theme,zoom" ||
+    !["zh", "en", "ja"].includes(value.language) ||
+    typeof value.closeToTray !== "boolean" ||
     ![
       "royal_violet",
       "cyber_cyan",

@@ -22,7 +22,14 @@ test("appearance preferences persist; demo cannot authorize heirs or bypass queu
     code: "OWNER_REQUIRED",
   });
   await store.initialize(password, secret);
-  await prefs.set({ ...prefs.value, theme: "cyber_cyan", zoom: 1.15 });
+  await prefs.set({ ...prefs.value, theme: "cyber_cyan", zoom: 1.15, language: 'ja', closeToTray: true });
+  const restarted = await new Preferences(prefs.file,store).load();
+  assert.equal(restarted.language,'ja');
+  assert.equal(restarted.closeToTray,true);
+  await assert.rejects(prefs.set({...prefs.value,language:'invalid'}),{code:'INVALID_SETTINGS'});
+  const oldPrefs = path.join(dir,'old-appearance.json');
+  await fs.writeFile(oldPrefs,JSON.stringify({theme:'royal_violet',zoom:1,subscriptionDemo:'trial'}));
+  assert.equal((await new Preferences(oldPrefs,store).load()).language,'zh');
   assert.equal(
     (await new Preferences(prefs.file, store).load()).theme,
     "cyber_cyan",
@@ -304,7 +311,8 @@ test("real controller provisions, syncs and restores read-only on a different co
   f.remove();
   assert.equal(await reader.checkDevices(), false);
   assert.equal(other.session, null);
-  await other.unlock(password, secret);
+  await assert.rejects(fs.access(other.file), { code: "ENOENT" });
+  await reader.importOwner(password, secret);
   await other.saveItem(item("authorized"));
   assert.equal(other.view().items.length, 3);
   other.lock();
@@ -330,6 +338,14 @@ test("partial two-device provisioning failure leaves original local generation u
   assert.equal(core.canonical(f.store.session.envelope), before);
   assert.equal(core.canonical(await read(f.store.file)), before);
   f.controller.lock();
+  f.dialog.open = async () =>
+    (
+      await media.location(
+        (await f.devices.scan())[0],
+        await read(f.store.file),
+        "PRIMARY",
+      )
+    ).vault;
   assert.equal((await f.controller.recover("a", "b")).view.role, "HEIR");
   f.controller.lock();
 });

@@ -3,7 +3,7 @@ import { TranslationDictionary } from '../types';
 export const ja: TranslationDictionary = {
   brand: {
     title: 'LegacyLock 遺産金庫',
-    sub: '軍用級デュアルUSBデジタル遺産金庫',
+    sub: '暗号化保管庫・LVCF 3',
     coldStorage: 'オフラインコールドストレージ',
   },
   nav: {

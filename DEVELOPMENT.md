@@ -7,7 +7,9 @@
 - `electron/vault-controller.cjs`：设备配置、异机恢复、导出、凭据轮换；设备与对话框适配器支持故障测试。
 - `electron/vault-media.cjs`：主进程枚举真实 USB 设备，同一物理盘不能担任两个角色，不使用渲染进程提供的路径或指纹。
 - `electron/main.cjs` / `preload.cjs`：沙箱、上下文隔离、主 frame 来源校验、固定 IPC 方法、外部请求及导航阻断、系统锁屏和休眠响应。
-- `src/services/vaultClient.ts`：类型化调用与错误提示；只在用户主动迁移时读取旧浏览器存储。
+- `src/services/vaultClient.ts`：类型化固定 IPC 调用与三语言错误提示，不读取旧浏览器存储。
+- `electron/vault-preferences.cjs` / `vault-tray.cjs`：本机外观、语言、托盘、演示偏好与可注入测试的托盘生命周期。持久偏好修改必须是所有者；临时显示语言不持久化。
+- `electron/ui-messages.json` / `src/services/messages.ts`：新增流程与原生对话框的中英日文案；原有类别等字典仍在 `src/services/i18n/`。用户内容不参与翻译。
 - `src/App.tsx`：当前界面入口；复用资产编辑器、类别和翻译资源。旧版 UI 组件、cryptoService 是未被新入口引用的历史源码，不能重新接回产品。
 - `scripts/recovery-reader.cjs`：使用相同协议代码的独立只读恢复脚本。
 
@@ -25,17 +27,17 @@
 
 新密库为 Electron `app.getPath('userData')` 下的 `vault-v3.llvault`；上一份已保存的加密快照为 `.previous` 后缀。常见默认位置为 Windows `%APPDATA%/legacylock`、Linux `~/.config/legacylock`、macOS `~/Library/Application Support/legacylock`；以实际应用的 userData 目录为准。
 
-两盘副本位于 `LegacyLock/<id>/<generation>/vault.llvault`。主、副秘密文件分别为 `primary.llkey` / `secondary.llkey`。备份与本机使用同一格式，没有通过公开 header 派生的恢复通道。
+主盘副本位于 `LegacyLock/<id>/<generation>/vault.llvault`。主、副秘密文件分别为 `primary.llkey` / `secondary.llkey`；新配置副盘不写信息备份。日常更新只验证主份额并写主盘。备份与本机使用同一格式，没有通过公开 header 派生的恢复通道。双盘只读导入不落盘，所有者接管写入才执行本机身份和回滚检查。
 
 ## 旧版迁移
 
-在尚未创建 LVCF 3 密库的安装上，锁定页展开“旧版数据迁移”：
+2026-09-21 起，应用移除了旧版迁移 UI、IPC 和旧浏览器存储读取，统一为密码＋安全密钥、双 USB 两种认证方式。以下保留的是 `vault-migrate.cjs` 的维护者离线恢复说明，并非当前产品入口；不得重新接入缺少双凭据的解锁流程。
 
 1. **旧加密导出包**：选择 `LEGACYLOCK_ENCRYPTED_CONTAINER` v2 包，提供原导出密码及原密钥（包未启用密钥时可留空）。迁移只使用原密码认证加密通道，不使用公开参数恢复后门。固定验证算法标识、nonce、salt、大小及 KDF 迭代上限。
 2. **同一安装的旧本机数据**：主动读取旧 IndexedDB / localStorage。必须有完整的密码哈希、盐和密钥哈希，并核验输入。缺失认证元数据时拒绝将其视为自动认证成功；保留数据并使用已知凭据的加密导出包。旧数据库读取失败不会伪装成空数据。
 3. 设置新的至少 12 位密码和新 LL3 密钥。迁移建立新的签名身份，仅转换合法资产及附件，不复制原 plan、明文密钥、订阅和所有者标志。原文件/存储保持不变；完成后重新配置两盘。
 
-“旧本机数据”仅能访问同一系统账户、同一 userData 和同一文件来源的旧存储。曾经在浏览器或开发服务器地址下使用的数据不属于该来源，应在原环境保全并导出后迁移。
+“旧本机数据”需要在原系统账户、原 userData 和原文件来源中保全。当前应用不会主动扫描这些数据。曾经在浏览器或开发服务器地址下使用的数据不属于桌面来源，应在原环境保全并导出，由维护者核验后恢复。
 
 旧数据可能在迁移前已经泄露或被篡改。迁移不能追溯修复旧副本，也不为旧内容补充历史来源证明。验证新资产、附件、导出和两盘恢复后，再由所有者决定旧数据的保留和销毁策略。
 

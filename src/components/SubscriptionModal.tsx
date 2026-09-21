@@ -1,3 +1,4 @@
+import { m } from "../services/messages";
 import { useEffect, useRef, useState } from "react";
 import { Crown, X, CheckCircle2, Sparkles } from "lucide-react";
 import type { Preferences } from "../services/vaultClient";
@@ -48,8 +49,8 @@ export function SubscriptionModal({
   async function change(next: Mode) {
     setMessage("");
     if (await onChange(next))
-      setMessage("测试状态已保存，没有支付、扣费或生成正式授权。");
-    else setMessage("状态未保存，请关闭此窗口查看错误后重试。");
+      setMessage(m("测试状态已保存，没有支付、扣费或生成正式授权。"));
+    else setMessage(m("状态未保存，请关闭此窗口查看错误后重试。"));
   }
   return (
     <dialog
@@ -66,7 +67,7 @@ export function SubscriptionModal({
           className="sub-modal-close-btn"
           onClick={onClose}
           disabled={busy}
-          aria-label="关闭订阅测试"
+          aria-label={m("关闭订阅测试")}
         >
           <X size={18} />
         </button>
@@ -76,10 +77,10 @@ export function SubscriptionModal({
           </div>
           <div>
             <h2 id="subscription-title" className="sub-header-title">
-              LegacyLock 尊享订阅
+              {m("LegacyLock 尊享订阅")}
             </h2>
             <p className="sub-header-subtitle">
-              月度、季度与年度服务 · 测试体验
+              {m("月度、季度与年度服务 · 测试体验")}
             </p>
           </div>
         </div>
@@ -87,26 +88,31 @@ export function SubscriptionModal({
           <div className="sub-status-box">
             <CheckCircle2 size={18} />
             <span>
-              模拟状态：
+              {m("模拟状态：")}
               {mode === "trial"
-                ? "90 天试用（演示）"
+                ? m("90 天试用（演示）")
                 : mode === "expired"
-                  ? "试用到期 · 资产只读"
-                  : `${plans.find((p) => p.id === mode)?.name}已开通（演示）`}
+                  ? m("试用到期 · 资产只读")
+                  : m(
+                      "{0}已开通（演示）",
+                      m(plans.find((p) => p.id === mode)?.name || ""),
+                    )}
             </span>
           </div>
         </div>
       </div>
       <div className="sub-modal-body">
         <p className="sub-feedback-box">
-          测试演示，不会扣费。以下为原设计的示例价格，尚未接入支付平台和正式授权验证。订阅状态不能授予继承人管理权限。
+          {m(
+            "测试演示，不会扣费。以下为原设计的示例价格，尚未接入支付平台和正式授权验证。订阅状态不能授予继承人管理权限。",
+          )}
         </p>
         {message && (
           <p role="status" className="sub-feedback-box">
             {message}
           </p>
         )}
-        <div className="sub-tiers-grid" role="group" aria-label="订阅套餐">
+        <div className="sub-tiers-grid" role="group" aria-label={m("订阅套餐")}>
           {plans.map((plan) => (
             <button
               type="button"
@@ -117,27 +123,27 @@ export function SubscriptionModal({
               onClick={() => setTier(plan.id)}
             >
               <div className="sub-tier-header">
-                <span className="sub-tier-name">{plan.name}</span>
+                <span className="sub-tier-name">{m(plan.name)}</span>
               </div>
               <div className="sub-tier-price-row">
                 <span className="sub-tier-currency">¥</span>
                 <span className="sub-tier-amount">{plan.price}</span>
-                <span className="sub-tier-unit">/{plan.period}</span>
+                <span className="sub-tier-unit">/{m(plan.period)}</span>
               </div>
-              <p className="sub-tier-desc">{plan.desc}</p>
+              <p className="sub-tier-desc">{m(plan.desc)}</p>
             </button>
           ))}
         </div>
         <div className="sub-benefits-card">
           <h3 className="sub-benefits-title">
-            <Sparkles size={18} /> 功能体验
+            <Sparkles size={18} /> {m("功能体验")}
           </h3>
           <div className="sub-benefits-list">
             {[
-              "24 类资产与自定义字段",
-              "本机加密存储与单个 2 MB 附件",
-              "双 U 盘继承只读恢复",
-              "背景主题、锁屏与备份设置",
+              m("24 类资产与自定义字段"),
+              m("本机加密存储与单个 2 MB 附件"),
+              m("双 U 盘继承只读恢复"),
+              m("背景主题、锁屏与备份设置"),
             ].map((t) => (
               <div className="sub-benefit-item" key={t}>
                 <CheckCircle2 size={16} />
@@ -151,28 +157,30 @@ export function SubscriptionModal({
           disabled={busy}
           onClick={() => void change(tier)}
         >
-          <Crown size={20} /> 模拟开通所选套餐（不扣费）
+          <Crown size={20} /> {m("模拟开通所选套餐（不扣费）")}
         </button>
         <div className="subscription-test-actions">
           <button disabled={busy} onClick={() => void change("expired")}>
-            模拟试用到期
+            {m("模拟试用到期")}
           </button>
           <button disabled={busy} onClick={() => void change("trial")}>
-            恢复试用体验
+            {m("恢复试用体验")}
           </button>
         </div>
         <p className="sub-tier-desc">
-          模拟到期时暂停新增、修改与删除资产；所有者仍可查看、导出、管理设置和恢复试用。此状态仅属于当前安装，不随双盘备份迁移。
+          {m(
+            "模拟到期时暂停新增、修改与删除资产；所有者仍可查看、导出、管理设置和恢复试用。此状态仅属于当前安装，不随双盘备份迁移。",
+          )}
         </p>
       </div>
       <div className="sub-modal-footer">
-        <span>本次体验无需银行卡或激活码。</span>
+        <span>{m("本次体验无需银行卡或激活码。")}</span>
         <button
           className="sub-footer-close-btn"
           disabled={busy}
           onClick={onClose}
         >
-          关闭
+          {m("关闭")}
         </button>
       </div>
     </dialog>

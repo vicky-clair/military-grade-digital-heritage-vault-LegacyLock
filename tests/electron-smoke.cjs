@@ -1,14 +1,46 @@
 "use strict";
 const { app, BrowserWindow, dialog, ipcMain, clipboard } = require("electron");
 // Never touch the user's real clipboard in desktop regression.
-let fakeClipboard = '', clipboardUnavailable = false;
-clipboard.writeText = value => { fakeClipboard = value; };
-clipboard.readText = () => { if (clipboardUnavailable) throw new Error('Synthetic clipboard unavailable'); return fakeClipboard; };
-clipboard.clear = () => { fakeClipboard = ''; };
+let fakeClipboard = "",
+  clipboardUnavailable = false;
+clipboard.writeText = (value) => {
+  fakeClipboard = value;
+};
+clipboard.readText = () => {
+  if (clipboardUnavailable) throw new Error("Synthetic clipboard unavailable");
+  return fakeClipboard;
+};
+clipboard.clear = () => {
+  fakeClipboard = "";
+};
 const fs = require("node:fs/promises"),
   path = require("node:path"),
   assert = require("node:assert/strict");
 const dir = path.resolve(process.argv[2]);
+const trayModule = require("../electron/vault-tray.cjs");
+const RealTray = trayModule.VaultTray;
+let trayController, trayMenu;
+class FakeNativeTray {
+  setToolTip() {}
+  on() {}
+  isDestroyed() {
+    return false;
+  }
+  destroy() {}
+  setContextMenu(menu) {
+    trayMenu = menu;
+  }
+}
+trayModule.VaultTray = class extends RealTray {
+  constructor(options) {
+    super({
+      ...options,
+      Tray: FakeNativeTray,
+      Menu: { buildFromTemplate: (v) => v },
+    });
+    trayController = this;
+  }
+};
 app.disableHardwareAcceleration();
 app.setPath("userData", dir);
 app.setPath("sessionData", dir);
@@ -130,6 +162,22 @@ app.on("browser-window-created", (_event, win) => {
       );
       await tick();
       await screenshot("05-settings.png");
+      for (const [lang, expected, name] of [
+        ["en", "Delete local vault", "11-settings-en.png"],
+        ["ja", "この端末の保管庫を削除", "12-settings-ja.png"],
+        ["zh", "删除本机密库", "13-settings-zh.png"],
+      ]) {
+        await js(
+          `(()=>{const el=document.querySelector('.appearance-panel select');Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set.call(el,'${lang}');el.dispatchEvent(new Event('change',{bubbles:true}));})()`,
+        );
+        await tick();
+        assert.ok((await js("document.body.innerText")).includes(expected));
+        assert.equal(
+          (await js("window.vaultAPI.preferences()")).value.language,
+          lang,
+        );
+        await screenshot(name);
+      }
       assert.equal(
         await js(
           "(()=>{const panel=document.querySelector('.restored-settings').getBoundingClientRect();const side=document.querySelector('.app-sidebar').getBoundingClientRect();const bar=document.querySelector('.main-topbar').getBoundingClientRect();return panel.left>=side.right && panel.top>=bar.bottom;})()",
@@ -137,7 +185,7 @@ app.on("browser-window-created", (_event, win) => {
         true,
       );
       await js(
-        `Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='更换密码和安全密钥').click()`,
+        `Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='密码与密钥').click()`,
       );
       await tick();
       assert.equal(
@@ -160,7 +208,12 @@ app.on("browser-window-created", (_event, win) => {
       await js("document.querySelector('.cat-rich-card').click()");
       await tick();
       await screenshot("02-item-editor.png");
-      assert.equal(await js("(()=>{const r=document.querySelector('dialog.modal-backdrop').getBoundingClientRect();return r.left===0 && r.top===0 && r.width===window.innerWidth;})()"),true);
+      assert.equal(
+        await js(
+          "(()=>{const r=document.querySelector('dialog.modal-backdrop').getBoundingClientRect();return r.left===0 && r.top===0 && r.width===window.innerWidth;})()",
+        ),
+        true,
+      );
       await js(
         `(()=>{const f=document.querySelector('.modal-window-dialog input');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(f,'界面新增资产');f.dispatchEvent(new Event('input',{bubbles:true}));})()`,
       );
@@ -272,7 +325,7 @@ app.on("browser-window-created", (_event, win) => {
       assert.equal(result.ok, true);
       result = await js("window.vaultAPI.copy('Synthetic clipboard value')");
       assert.equal(result.ok, true);
-      assert.equal(fakeClipboard, 'Synthetic clipboard value');
+      assert.equal(fakeClipboard, "Synthetic clipboard value");
       clipboardUnavailable = true;
       await js("window.vaultAPI.lock()");
       clipboardUnavailable = false;
@@ -297,7 +350,7 @@ app.on("browser-window-created", (_event, win) => {
       );
       await tick();
       await js(
-        `Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='用双盘打开本机密库').click()`,
+        `Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='选择信息备份并只读访问').click()`,
       );
       await tick();
       assert.match(await js("document.body.innerText"), /继承人 · 只读/);
@@ -321,7 +374,12 @@ app.on("browser-window-created", (_event, win) => {
       await screenshot("03-heir-readonly.png");
       await js("document.querySelector('.btn-card-action').click()");
       await tick();
-      assert.equal(await js("Array.from(document.querySelectorAll('dialog button')).some(b=>b.textContent.includes('升级'))"),false);
+      assert.equal(
+        await js(
+          "Array.from(document.querySelectorAll('dialog button')).some(b=>b.textContent.includes('升级'))",
+        ),
+        false,
+      );
       await js("document.querySelector('.modal-window-close').click()");
       await js("window.vaultAPI.lock()");
       await tick();
@@ -339,6 +397,65 @@ app.on("browser-window-created", (_event, win) => {
         "utf8",
       );
       assert.ok(!bytes.includes("Synthetic only"));
+      // Tray preference remains owner-only, and native close locks instead of quitting.
+      await js(
+        `(()=>{const fields=document.querySelectorAll('form input[type="password"]');const setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;['Test password for desktop!',window.testSecret].forEach((v,i)=>{setter.call(fields[i],v);fields[i].dispatchEvent(new Event('input',{bubbles:true}));});})()`,
+      );
+      await tick();
+      await js("document.querySelector('form').requestSubmit()");
+      await new Promise((r) => setTimeout(r, 350));
+      assert.match(await js("document.body.innerText"), /所有者 · 可管理/);
+      assert.equal(
+        (
+          await js(
+            `(async()=>{const p=(await window.vaultAPI.preferences()).value;return window.vaultAPI.setPreferences({...p,closeToTray:true});})()`,
+          )
+        ).ok,
+        true,
+      );
+      win.setSize(1180, 800);
+      await js(
+        `Array.from(document.querySelectorAll('button')).find(b=>b.textContent.includes('加密导入导出')).click()`,
+      );
+      await tick();
+      await screenshot("15-information-backup.png");
+      await js(`document.querySelector('.sidebar-settings-btn').click()`);
+      await tick();
+      await js(
+        `Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='删除本机密库（需两次确认）').click()`,
+      );
+      await tick();
+      await js(
+        `(()=>{const fields=document.querySelectorAll('dialog input[type="password"]');const setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;['Test password for desktop!',window.testSecret].forEach((v,i)=>{setter.call(fields[i],v);fields[i].dispatchEvent(new Event('input',{bubbles:true}));});})()`,
+      );
+      await tick();
+      await js(`document.querySelector('dialog form').requestSubmit()`);
+      await new Promise((r) => setTimeout(r, 350));
+      await fs.access(path.join(dir, "vault-v3.llvault"));
+      assert.match(
+        await js('document.querySelector("dialog").innerText'),
+        /第二次确认/,
+      );
+      await screenshot("14-delete-confirmation.png");
+      await js(
+        `(()=>{const f=document.querySelector('dialog input');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(f,'DELETE');f.dispatchEvent(new Event('input',{bubbles:true}));})()`,
+      );
+      await tick();
+      await js(`document.querySelector('dialog form').requestSubmit()`);
+      await tick();
+      assert.equal((await js("window.vaultAPI.status()")).value.exists, false);
+      await assert.rejects(
+        fs.access(path.join(dir, "vault-v3.llvault.previous")),
+        { code: "ENOENT" },
+      );
+      await fs.access(path.join(dir, "export.llvault"));
+      win.close();
+      await tick();
+      assert.equal(win.isDestroyed(), false);
+      assert.equal((await js("window.vaultAPI.status()")).value.role, "LOCKED");
+      assert.ok(trayMenu.some((entry) => entry.label === "退出应用"));
+      trayController.restore();
+      assert.ok(!win.isDestroyed());
       process.stdout.write(
         "Desktop smoke passed: sandbox, real form create, disk save, USB fixture provisioning, owner export, theme persistence, subscription demo, lock despite clipboard failure, heir UI, IPC denial, settings bounds and 800x500 layout.\n",
       );

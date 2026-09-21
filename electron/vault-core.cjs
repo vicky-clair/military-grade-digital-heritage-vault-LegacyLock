@@ -585,6 +585,7 @@ module.exports = {
   newSecret,
   validateItems,
   validateSettings,
+  verifyShare,
   validateEnvelope,
   create,
   unlockOwner,

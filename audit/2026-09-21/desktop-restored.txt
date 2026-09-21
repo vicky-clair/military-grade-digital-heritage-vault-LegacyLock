@@ -8,12 +8,12 @@
 
 vite v6.4.3 building for production...
 transforming...
-✓ 1606 modules transformed.
+✓ 1609 modules transformed.
 rendering chunks...
 computing gzip size...
 dist/index.html                   1.22 kB │ gzip:   0.77 kB
-dist/assets/index-D_jTco1Q.css   69.52 kB │ gzip:  13.20 kB
-dist/assets/index-DFf-oAxK.js   415.13 kB │ gzip: 127.91 kB
-✓ built in 3.19s
+dist/assets/index-CXokjzWu.css   70.08 kB │ gzip:  13.33 kB
+dist/assets/index-4k1t2yGW.js   454.16 kB │ gzip: 142.18 kB
+✓ built in 3.50s
 
 Desktop smoke passed: sandbox, real form create, disk save, USB fixture provisioning, owner export, theme persistence, subscription demo, lock despite clipboard failure, heir UI, IPC denial, settings bounds and 800x500 layout.

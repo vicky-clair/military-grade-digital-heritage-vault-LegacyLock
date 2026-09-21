@@ -1,12 +1,13 @@
+import { setMessageLanguage } from "../messages";
 /**
  * ============================================================================
  * LegacyLock 国际化 (i18n) 响应式引擎与 React Provider
  * ============================================================================
  * 
  * 核心规范：
- * 1. 默认语言严格遵循用户要求：默认显示英文 (English)；
+ * 1. 启动时由主进程偏好加载语言；没有配置时默认中文；
  * 2. 仅支持三种语言：'en' (English) | 'zh' (简体中文) | 'ja' (日本語)；
- * 3. 极简零外部依赖，100% 响应式更新与跨会话持久化。
+ * 3. 此 Provider 只处理显示；持久化设置由主进程校验所有者权限。
  */
 
 import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
@@ -21,23 +22,8 @@ const DICTIONARIES: Record<SupportedLanguage, TranslationDictionary> = {
   ja,
 };
 
-const STORAGE_KEY = 'legacylock_language';
-
-/**
- * 获取初始语言：优先读取持久化配置，若无则严格默认为英文 ('en')
- */
-export function getInitialLanguage(): SupportedLanguage {
-  try {
-    if (typeof window !== 'undefined' && window.localStorage) {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved === 'en' || saved === 'zh' || saved === 'ja') {
-        return saved;
-      }
-    }
-  } catch (_) {}
-  // 用户明确要求：默认为英文界面
-  return 'en';
-}
+// Persistent preferences are owned by the main process; locked/heir language changes are temporary.
+export function getInitialLanguage(): SupportedLanguage { return 'zh'; }
 
 interface I18nContextType {
   /** 当前启用的语言代码 */
@@ -79,9 +65,10 @@ export const I18nProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const setLanguage = (lang: SupportedLanguage) => {
     if (lang !== 'en' && lang !== 'zh' && lang !== 'ja') return;
+    setMessageLanguage(lang);
     setLanguageState(lang);
     try {
-      localStorage.setItem(STORAGE_KEY, lang);
+
       if (typeof document !== 'undefined') {
         document.documentElement.lang = lang === 'zh' ? 'zh-CN' : lang === 'ja' ? 'ja' : 'en';
       }

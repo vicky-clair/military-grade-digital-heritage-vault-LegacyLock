@@ -17,10 +17,13 @@ const methods = [
   "export",
   "credentials",
   "health",
-  "migrate",
+  "importData",
+  "prepareDestroy",
+  "destroy",
   "preferences",
   "setPreferences",
   "windowControl",
+  "viewLanguage",
   "copy",
 ];
 const api = {};

@@ -1,3 +1,4 @@
+import { m } from "../services/messages";
 /**
  * ============================================================================
  * LegacyLock 军规遗产密钥库 — 主工作区与顶部平衡工具栏组件 (RightContentArea)
@@ -176,7 +177,7 @@ export const RightContentArea: React.FC<RightContentAreaProps> = ({
       setCopyError("");
       setCopiedId(id);
     } catch (e) {
-      setCopyError(e instanceof Error ? e.message : "复制失败");
+      setCopyError(e instanceof Error ? e.message : m("复制失败"));
     }
   };
   const toggleReveal = (id: string) => {
@@ -198,15 +199,15 @@ export const RightContentArea: React.FC<RightContentAreaProps> = ({
       case "settings":
         return {
           title: t("nav.settings"),
-          subtitle: "背景与锁屏、继承说明、密码和安全密钥",
+          subtitle: m("背景、锁屏与托盘、继承说明和本机数据删除"),
         };
       case "import_export":
         return {
           title: t("nav.importExport"),
-          subtitle: "加密备份、双盘配置与同步",
+          subtitle: m("加密备份、双盘配置与同步"),
         };
       case "all":
-        return { title: t("nav.all"), subtitle: `${items.length} 项资产` };
+        return { title: t("nav.all"), subtitle: m("{0} 项资产", items.length) };
       default:
         return {
           title: t(`nav.${selectedNav}`),
@@ -266,10 +267,10 @@ export const RightContentArea: React.FC<RightContentAreaProps> = ({
             title={
               effectiveReadOnly
                 ? !canModify
-                  ? "当前处于继承人只读模式，需接管控制权后方可录入新资产"
-                  : "当前处于试用到期只读模式，点击升级订阅以录入新资产"
+                  ? m("当前处于继承人只读模式，需接管控制权后方可录入新资产")
+                  : m("当前处于试用到期只读模式，点击升级订阅以录入新资产")
                 : selectedNav === "all"
-                  ? "点击打开资产分类选择面板，添加新资产或密钥"
+                  ? m("点击打开资产分类选择面板，添加新资产或密钥")
                   : `添加新「${categoryActionTitle}」`
             }
           >
@@ -364,7 +365,7 @@ export const RightContentArea: React.FC<RightContentAreaProps> = ({
                           boxShadow: "0 1px 4px rgba(0,0,0,0.5)",
                         }}
                       />
-                      <span>{th.name}</span>
+                      <span>{m(th.name)}</span>
                     </div>
                     {th.id === currentTheme.id && (
                       <Check
@@ -382,10 +383,10 @@ export const RightContentArea: React.FC<RightContentAreaProps> = ({
             onClick={onOpenUsbPassword}
             className="topbar-tool-pill cyan-highlight"
             disabled={!canModify || busy}
-            title="密码与安全密钥"
+            title={m("密码与安全密钥")}
           >
             <KeyRound style={{ width: 15, height: 15, color: "#00D4FF" }} />
-            <span className="tool-pill-label cyan-text">密码与密钥</span>
+            <span className="tool-pill-label cyan-text">{m("密码与密钥")}</span>
           </button>
 
           {/* 密库健康自检快捷入口 */}
@@ -424,16 +425,16 @@ export const RightContentArea: React.FC<RightContentAreaProps> = ({
               className="topbar-tool-pill"
               onClick={onOpenSubscription}
               disabled={busy}
-              title="订阅测试，不会扣费"
+              title={m("订阅测试，不会扣费")}
             >
               <Crown size={15} color="#F59E0B" />
               <span>
-                订阅测试 ·{" "}
+                {m("订阅测试 ·")}{" "}
                 {demo === "trial"
-                  ? "试用中"
+                  ? m("试用中")
                   : demo === "expired"
-                    ? "已到期"
-                    : "已开通"}
+                    ? m("已到期")
+                    : m("已开通")}
               </span>
             </button>
           )}
@@ -442,21 +443,21 @@ export const RightContentArea: React.FC<RightContentAreaProps> = ({
           <div className="window-controls">
             <button
               className="win-btn"
-              title="最大化或还原"
+              title={m("最大化或还原")}
               onClick={() => void call("windowControl", "maximize")}
             >
               <Maximize2 size={14} />
             </button>
             <button
               className="win-btn"
-              title="最小化窗口"
+              title={m("最小化窗口")}
               onClick={() => void call("windowControl", "minimize")}
             >
               <Minus size={14} />
             </button>
             <button
               className="win-btn close"
-              title="关闭应用"
+              title={m("关闭应用")}
               onClick={() => void call("windowControl", "close")}
             >
               <X size={14} />
@@ -495,7 +496,7 @@ export const RightContentArea: React.FC<RightContentAreaProps> = ({
                     border: "1px solid rgba(0, 212, 255, 0.3)",
                   }}
                 >
-                  AES-256-GCM 认证加密
+                  {m("AES-256-GCM 认证加密")}
                 </span>
               )}
               {selectedNav === "settings" && (
@@ -681,7 +682,7 @@ export const RightContentArea: React.FC<RightContentAreaProps> = ({
                           <button
                             onClick={() => toggleReveal(item.id)}
                             className="btn-mini-copy"
-                            title={isRevealed ? "隐藏密码" : "显示密码"}
+                            title={isRevealed ? m("隐藏密码") : m("显示密码")}
                           >
                             {isRevealed ? (
                               <EyeOff style={{ width: 12, height: 12 }} />
@@ -694,7 +695,7 @@ export const RightContentArea: React.FC<RightContentAreaProps> = ({
                               handleCopy(item.password!, `p-${item.id}`)
                             }
                             className="btn-mini-copy"
-                            title="复制密码"
+                            title={m("复制密码")}
                           >
                             {copiedId === `p-${item.id}` ? (
                               <Check
@@ -714,7 +715,7 @@ export const RightContentArea: React.FC<RightContentAreaProps> = ({
 
                     {item.url && (
                       <div className="card-field-row">
-                        <span className="card-field-label">网址:</span>
+                        <span className="card-field-label">{m("网址:")}</span>
                         <div className="card-field-value-group">
                           <span className="card-field-value font-mono">
                             {item.url}
@@ -724,7 +725,7 @@ export const RightContentArea: React.FC<RightContentAreaProps> = ({
                               handleCopy(item.url!, `url-${item.id}`)
                             }
                             className="btn-mini-copy"
-                            title="复制网址"
+                            title={m("复制网址")}
                           >
                             {copiedId === `url-${item.id}` ? (
                               <Check
@@ -764,7 +765,7 @@ export const RightContentArea: React.FC<RightContentAreaProps> = ({
                                 <span
                                   className={`card-field-value ${cf.type === "url" || isSecret ? "font-mono" : ""}`}
                                 >
-                                  {displayVal || "(空)"}
+                                  {displayVal || m("(空)")}
                                 </span>
                                 {isSecret && (
                                   <button
@@ -773,7 +774,9 @@ export const RightContentArea: React.FC<RightContentAreaProps> = ({
                                     }
                                     className="btn-mini-copy"
                                     title={
-                                      isFieldRevealed ? "隐藏明文" : "显示明文"
+                                      isFieldRevealed
+                                        ? m("隐藏明文")
+                                        : m("显示明文")
                                     }
                                   >
                                     {isFieldRevealed ? (
@@ -790,7 +793,7 @@ export const RightContentArea: React.FC<RightContentAreaProps> = ({
                                     handleCopy(cf.value, `cf-${fieldKey}`)
                                   }
                                   className="btn-mini-copy"
-                                  title={`复制 ${cf.name}`}
+                                  title={m("复制 {0}", cf.name)}
                                 >
                                   {copiedId === `cf-${fieldKey}` ? (
                                     <Check
@@ -818,7 +821,10 @@ export const RightContentArea: React.FC<RightContentAreaProps> = ({
                           <Paperclip
                             style={{ width: 12, height: 12, color: "#00D4FF" }}
                           />
-                          <span>加密附件 ({item.attachments.length})</span>
+                          <span>
+                            {m("加密附件 (")}
+                            {item.attachments.length})
+                          </span>
                         </div>
                         {item.attachments.map((att) => (
                           <div key={att.id} className="card-attachment-pill">
@@ -845,7 +851,7 @@ export const RightContentArea: React.FC<RightContentAreaProps> = ({
                               type="button"
                               onClick={() => handleDownloadAttachment(att)}
                               className="btn-mini-copy"
-                              title={`下载/导出附件: ${att.name}`}
+                              title={m("下载/导出附件: {0}", att.name)}
                             >
                               <Download
                                 style={{
@@ -873,7 +879,8 @@ export const RightContentArea: React.FC<RightContentAreaProps> = ({
                           whiteSpace: "nowrap",
                         }}
                       >
-                        接管指引: {item.inheritanceInstructions}
+                        {m("接管指引:")}
+                        {item.inheritanceInstructions}
                       </span>
                     </div>
                   )}

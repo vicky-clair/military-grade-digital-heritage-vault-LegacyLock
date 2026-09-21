@@ -7,6 +7,8 @@ const {
   powerMonitor,
   session,
   clipboard,
+  Tray,
+  Menu,
 } = require("electron");
 const path = require("node:path");
 const { pathToFileURL } = require("node:url");
@@ -15,13 +17,24 @@ const core = require("./vault-core.cjs");
 const { VaultStore } = require("./vault-store.cjs");
 const { VaultController } = require("./vault-controller.cjs");
 const { Preferences } = require("./vault-preferences.cjs");
+const { VaultTray } = require("./vault-tray.cjs");
+const messages = require("./ui-messages.json");
+let displayLanguage = "zh",
+  tray;
+const text = (source) =>
+  messages[source]?.[displayLanguage === "ja" ? 1 : 0] &&
+  displayLanguage !== "zh"
+    ? messages[source][displayLanguage === "ja" ? 1 : 0]
+    : source;
 let preferences, clipboardTimer, copiedText;
 function clearCopiedText() {
   clearTimeout(clipboardTimer);
   try {
     if (copiedText !== undefined && clipboard.readText() === copiedText)
       clipboard.clear();
-  } catch { /* Clipboard availability must not prevent locking the vault. */ }
+  } catch {
+    /* Clipboard availability must not prevent locking the vault. */
+  }
   copiedText = undefined;
 }
 let win,
@@ -71,6 +84,7 @@ function register(name, fn) {
 if (!app.requestSingleInstanceLock()) app.quit();
 else {
   app.on("second-instance", () => {
+    if (win?.isMinimized()) win.restore();
     win?.show();
     win?.focus();
   });
@@ -93,11 +107,12 @@ else {
         store,
       );
       await preferences.load();
+      displayLanguage = preferences.value.language;
       store.beforeAssetWrite = () => preferences.assertWritable();
       controller = new VaultController(store, {
         open: async (title) => {
           const r = await dialog.showOpenDialog(win, {
-            title,
+            title: text(title),
             properties: ["openFile"],
             filters: [
               {
@@ -110,7 +125,7 @@ else {
         },
         save: async (title, defaultPath) => {
           const r = await dialog.showSaveDialog(win, {
-            title,
+            title: text(title),
             defaultPath,
             filters: [{ name: "LegacyLock", extensions: ["llvault"] }],
           });
@@ -134,9 +149,7 @@ else {
       register(
         "unlock",
         authenticate(async (p, s) => {
-          const view = await store.unlock(p, s);
-          controller.recoveryPair = null;
-          return { view };
+          return controller.unlock(p, s);
         }),
       );
       register("lock", () => lock());
@@ -149,13 +162,28 @@ else {
         return store.deleteItem(id);
       });
       register("preferences", () => preferences.value);
-      register("setPreferences", (v) => preferences.set(v));
+      register("setPreferences", async (v) => {
+        const saved = await preferences.set(v);
+        displayLanguage = saved.language;
+        tray?.refresh();
+        if (saved.closeToTray) tray?.ensure();
+        return saved;
+      });
+      register("viewLanguage", (language) => {
+        if (!["zh", "en", "ja"].includes(language))
+          core.fail("INVALID_SETTINGS");
+        displayLanguage = language;
+        tray?.refresh();
+      });
       register("windowControl", (action) => {
         if (action === "minimize") win.minimize();
         else if (action === "maximize")
           win.isMaximized() ? win.unmaximize() : win.maximize();
         else if (action === "close") win.close();
-        else core.fail("INVALID_SETTINGS");
+        else if (action === "quit") app.quit();
+        else if (action === "tray") {
+          if (!tray.hide()) core.fail("OPERATION_FAILED");
+        } else core.fail("INVALID_SETTINGS");
       });
       register("copy", (text) => {
         if (!store.session) core.fail("LOCKED");
@@ -176,11 +204,17 @@ else {
         "export",
         "credentials",
         "health",
+        "importData",
+        "prepareDestroy",
       ])
         register(method, (...args) => controller[method](...args));
-      register("migrate", (...args) =>
-        require("./vault-migrate.cjs").migrate(controller, ...args),
-      );
+      register("destroy", async (...args) => {
+        try {
+          return await controller.destroy(...args);
+        } finally {
+          if (!store.session) lock();
+        }
+      });
       const ses = session.defaultSession;
       ses.setPermissionRequestHandler((_wc, _permission, callback) =>
         callback(false),
@@ -238,12 +272,24 @@ else {
       win.on("close", (event) => {
         if (closing) return;
         event.preventDefault();
+        if (preferences.value.closeToTray && tray.hide()) return;
         lock();
         store.queue.finally(() => {
           closing = true;
           app.quit();
         });
       });
+      tray = new VaultTray({
+        Tray,
+        Menu,
+        icon: path.join(__dirname, "tray-icon.png"),
+        window: () => win,
+        lock,
+        quit: () => app.quit(),
+        text,
+      });
+      if (preferences.value.closeToTray) tray.ensure();
+      app.on("activate", () => tray.restore());
       powerMonitor.on("suspend", lock);
       powerMonitor.on("lock-screen", lock);
       timer = setInterval(async () => {
@@ -283,6 +329,7 @@ else {
     }
   });
   app.on("will-quit", () => {
+    tray?.destroy();
     clearInterval(timer);
     lock();
   });

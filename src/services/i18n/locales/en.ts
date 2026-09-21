@@ -3,7 +3,7 @@ import { TranslationDictionary } from '../types';
 export const en: TranslationDictionary = {
   brand: {
     title: 'LegacyLock Heritage Vault',
-    sub: 'Military-Grade Dual-USB Digital Vault',
+    sub: 'Encrypted vault · LVCF 3',
     coldStorage: 'Cold Offline Storage',
   },
   nav: {

@@ -1,5 +1,8 @@
+import { m } from "./messages";
 import type { VaultItem } from "../types";
 export interface Preferences {
+  language: "zh" | "en" | "ja";
+  closeToTray: boolean;
   theme: string;
   zoom: number;
   subscriptionDemo: "trial" | "expired" | "monthly" | "quarterly" | "yearly";
@@ -46,10 +49,13 @@ type Method =
   | "export"
   | "credentials"
   | "health"
-  | "migrate"
+  | "importData"
+  | "prepareDestroy"
+  | "destroy"
   | "preferences"
   | "setPreferences"
   | "windowControl"
+  | "viewLanguage"
   | "copy";
 type Reply = { ok: true; value: unknown } | { ok: false; error: string };
 declare global {
@@ -61,6 +67,7 @@ declare global {
   }
 }
 const errors: Record<string, string> = {
+  CONFIRMATION_REQUIRED: "销毁确认已失效，请重新验证密码和安全密钥。",
   DEMO_READ_ONLY:
     "当前模拟试用到期；可在订阅测试页面恢复试用或模拟开通。不会扣费。",
   AUTHENTICATION_FAILED: "密码或安全密钥错误，或密库内容已损坏。",
@@ -83,7 +90,7 @@ const errors: Record<string, string> = {
   INVALID_ITEMS: "资产格式不正确或超出容量限制；单个附件最多 2 MB。",
   INVALID_SETTINGS: "设置值无效。",
   UNSUPPORTED_FORMAT:
-    "文件不是受支持的 LVCF 3 密库；旧版导出包请使用迁移入口。",
+    "文件不是受支持的 LVCF 3 信息备份，请保留原文件并查阅恢复文档。",
   INVALID_FORMAT: "文件结构无效或已损坏。",
   UNSUPPORTED_LEGACY_FORMAT:
     "此旧文件格式不受迁移器支持。请保留原文件，参阅迁移文档。",
@@ -100,53 +107,12 @@ const errors: Record<string, string> = {
 };
 export async function call<T>(method: Method, ...args: unknown[]): Promise<T> {
   if (!window.vaultAPI)
-    throw new Error("请使用桌面应用。浏览器预览不提供真实密库或模拟 U 盘。");
+    throw new Error(m("请使用桌面应用。浏览器预览不提供真实密库或模拟 U 盘。"));
   const r = await window.vaultAPI[method](...args);
-  if (!r.ok) throw new Error(errors[r.error] || `操作失败（${r.error}）`);
+  if (!r.ok)
+    throw new Error(
+      m(errors[r.error] || "操作失败") +
+        (errors[r.error] ? "" : ` (${r.error})`),
+    );
   return r.value as T;
-}
-// Explicit migration only: never decrypt or mutate old storage at startup.
-export async function legacySnapshot() {
-  const plan = JSON.parse(localStorage.getItem("legacylock_plan") || "null");
-  const encrypted = await new Promise<unknown>((resolve, reject) => {
-    const req = indexedDB.open("LegacyLockVaultDB");
-    req.onupgradeneeded = () => {
-      req.transaction?.abort();
-      resolve(null);
-    };
-    req.onerror = () =>
-      reject(new Error("无法读取旧版数据库，请保留数据并重试。"));
-    req.onsuccess = () => {
-      const db = req.result;
-      if (!db.objectStoreNames.contains("secure_vault")) {
-        db.close();
-        resolve(null);
-        return;
-      }
-      const tx = db.transaction("secure_vault", "readonly"),
-        q = tx.objectStore("secure_vault").get("vault_items_payload");
-      let value: unknown;
-      q.onsuccess = () => {
-        value = q.result;
-      };
-      tx.oncomplete = () => {
-        db.close();
-        resolve(value);
-      };
-      tx.onerror = () => {
-        db.close();
-        reject(tx.error);
-      };
-    };
-  });
-  const effectiveEncrypted =
-    encrypted ||
-    JSON.parse(localStorage.getItem("legacylock_items_enc") || "null");
-  return {
-    plan,
-    encrypted: effectiveEncrypted,
-    plain: effectiveEncrypted
-      ? null
-      : JSON.parse(localStorage.getItem("legacylock_items") || "null"),
-  };
 }

@@ -1,3 +1,4 @@
+import { m } from "../services/messages";
 /**
  * ============================================================================
  * LegacyLock 军规遗产密钥库 — 资产录入与编辑模态弹窗组件 (ItemModal)
@@ -275,26 +276,26 @@ export const ItemModal: React.FC<ItemModalProps> = ({
     if (!defaultTitle) {
       if (language === 'zh') {
         switch (type) {
-          case 'url': defaultTitle = '网站'; break;
-          case 'email': defaultTitle = '电子邮件'; break;
-          case 'phone': defaultTitle = '电话'; break;
-          case 'address': defaultTitle = '地址'; break;
-          case 'date': defaultTitle = '日期'; break;
-          case 'totp': defaultTitle = '一次性密码'; break;
-          case 'password': defaultTitle = '密码'; break;
-          case 'note': defaultTitle = '安全便签'; break;
-          default: defaultTitle = '文本'; break;
+          case 'url': defaultTitle = m("网站"); break;
+          case 'email': defaultTitle = m("电子邮件"); break;
+          case 'phone': defaultTitle = m("电话"); break;
+          case 'address': defaultTitle = m("地址"); break;
+          case 'date': defaultTitle = m("日期"); break;
+          case 'totp': defaultTitle = m("一次性密码"); break;
+          case 'password': defaultTitle = m("密码"); break;
+          case 'note': defaultTitle = m("安全便签"); break;
+          default: defaultTitle = m("文本"); break;
         }
       } else if (language === 'ja') {
         switch (type) {
           case 'url': defaultTitle = 'ウェブサイト'; break;
           case 'email': defaultTitle = 'メール'; break;
-          case 'phone': defaultTitle = '電話番号'; break;
-          case 'address': defaultTitle = '住所'; break;
-          case 'date': defaultTitle = '日付'; break;
+          case 'phone': defaultTitle = m("電話番号"); break;
+          case 'address': defaultTitle = m("住所"); break;
+          case 'date': defaultTitle = m("日付"); break;
           case 'totp': defaultTitle = 'ワンタイムパスワード (TOTP)'; break;
           case 'password': defaultTitle = 'パスワード'; break;
-          case 'note': defaultTitle = '安全なメモ'; break;
+          case 'note': defaultTitle = m("安全なメモ"); break;
           default: defaultTitle = 'テキスト'; break;
         }
       } else {
@@ -400,9 +401,9 @@ export const ItemModal: React.FC<ItemModalProps> = ({
     if (!title.trim()) {
       alert(
         language === 'zh'
-          ? '请输入资产项目的标题名称'
+          ? m("请输入资产项目的标题名称")
           : language === 'ja'
-          ? '資産のタイトルを入力してください'
+          ? m("資産のタイトルを入力してください")
           : 'Please enter an asset title'
       );
       return;
@@ -431,12 +432,12 @@ export const ItemModal: React.FC<ItemModalProps> = ({
 
     setSaving(true);setSaveError('');
     try { await onSave(item); onClose(); }
-    catch(e) { setSaveError(e instanceof Error ? e.message : '保存失败，请重试。'); }
+    catch(e) { setSaveError(e instanceof Error ? e.message : m("保存失败，请重试。")); }
     finally { setSaving(false); }
   };
 
   return (
-    <dialog ref={modalRef} className="modal-backdrop" aria-label={isReadOnly ? '查看资产' : '编辑资产'} onCancel={e=>{e.preventDefault();if(!saving)onClose();}} onClick={() => { if (!saving) onClose(); }}>
+    <dialog ref={modalRef} className="modal-backdrop" aria-label={isReadOnly ? m("查看资产") : m("编辑资产")} onCancel={e=>{e.preventDefault();if(!saving)onClose();}} onClick={() => { if (!saving) onClose(); }}>
       <div
         className="modal-window-dialog"
         onClick={(e) => e.stopPropagation()}
@@ -484,7 +485,7 @@ export const ItemModal: React.FC<ItemModalProps> = ({
                 )}
               </div>
               <p style={{ fontSize: 11, color: '#8EA4D4', marginTop: 2 }}>
-                {isReadOnly ? (isHeirReadOnly ? '只读访问；修改需要所有者密码和安全密钥。' : '订阅测试：模拟试用到期，可在订阅测试中恢复试用。') : getCategoryDescription(category)}
+                {isReadOnly ? (isHeirReadOnly ? m("只读访问；修改需要所有者密码和安全密钥。") : m("订阅测试：模拟试用到期，可在订阅测试中恢复试用。")) : getCategoryDescription(category)}
               </p>
             </div>
           </div>
@@ -512,7 +513,7 @@ export const ItemModal: React.FC<ItemModalProps> = ({
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <AlertTriangle style={{ width: 18, height: 18, color: '#F59E0B', flexShrink: 0 }} />
               <span style={{ fontSize: 12.5, color: '#FDE68A', lineHeight: 1.4 }}>
-                <strong>只读保护中</strong>：{isHeirReadOnly ? '您可以查看和下载附件，修改资产需要验证所有者凭据。' : '当前模拟试用到期。可在订阅测试中恢复试用或模拟开通，不会扣费。'}
+                <strong>{m("只读保护中")}</strong>：{isHeirReadOnly ? m("您可以查看和下载附件，修改资产需要验证所有者凭据。") : m("当前模拟试用到期。可在订阅测试中恢复试用或模拟开通，不会扣费。")}
               </span>
             </div>
             {onUpgrade && (
@@ -542,8 +543,8 @@ export const ItemModal: React.FC<ItemModalProps> = ({
           {/* 卡片 1: 基本标识 (项目标题与所属分类) */}
           <div className="form-card">
             <div className="form-card-title">
-              <span>{language === 'zh' ? '基本信息 (Basic Info)' : language === 'ja' ? '基本情報 (Basic Info)' : 'Basic Info'}</span>
-              <span style={{ fontSize: 10, color: '#00D4FF', textTransform: 'none' }}>* {language === 'zh' ? '必填项' : language === 'ja' ? '必須' : 'Required'}</span>
+              <span>{language === 'zh' ? m("基本信息 (Basic Info)") : language === 'ja' ? m("基本情報 (Basic Info)") : 'Basic Info'}</span>
+              <span style={{ fontSize: 10, color: '#00D4FF', textTransform: 'none' }}>* {language === 'zh' ? m("必填项") : language === 'ja' ? m("必須") : 'Required'}</span>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 12 }}>
@@ -593,7 +594,7 @@ export const ItemModal: React.FC<ItemModalProps> = ({
           {/* 卡片 2: 核心凭证 (Credentials) */}
           <div className="form-card">
             <div className="form-card-title">
-              <span>{language === 'zh' ? '核心凭证 (Credentials)' : language === 'ja' ? '主要認証情報 (Credentials)' : 'Core Credentials'}</span>
+              <span>{language === 'zh' ? m("核心凭证 (Credentials)") : language === 'ja' ? m("主要認証情報 (Credentials)") : 'Core Credentials'}</span>
             </div>
 
             {/* 用户名 / 账号 */}
@@ -635,7 +636,7 @@ export const ItemModal: React.FC<ItemModalProps> = ({
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   className="btn-framed-icon"
-                  title={showPassword ? (language === 'zh' ? '隐藏明文' : language === 'ja' ? '非表示' : 'Hide') : (language === 'zh' ? '显示明文' : language === 'ja' ? '表示' : 'Show')}
+                  title={showPassword ? (language === 'zh' ? m("隐藏明文") : language === 'ja' ? m("非表示") : 'Hide') : (language === 'zh' ? m("显示明文") : language === 'ja' ? m("表示") : 'Show')}
                 >
                   {showPassword ? <EyeOff style={{ width: 15, height: 15 }} /> : <Eye style={{ width: 15, height: 15 }} />}
                 </button>
@@ -666,7 +667,7 @@ export const ItemModal: React.FC<ItemModalProps> = ({
                       className="btn-framed-cyan"
                     >
                       <RefreshCw style={{ width: 12, height: 12 }} />
-                      <span>{language === 'zh' ? '重新生成' : language === 'ja' ? '再生成' : 'Regenerate'}</span>
+                      <span>{language === 'zh' ? m("重新生成") : language === 'ja' ? m("再生成") : 'Regenerate'}</span>
                     </button>
                   </div>
 
@@ -695,7 +696,7 @@ export const ItemModal: React.FC<ItemModalProps> = ({
                       style={{ accentColor: '#0572EC', cursor: 'pointer' }}
                     />
                     <label htmlFor="gen-symbols" style={{ cursor: 'pointer' }}>
-                      {language === 'zh' ? '包含特殊符号 (!@#$%^&*)' : language === 'ja' ? '記号を含む (!@#$%^&*)' : 'Include Symbols (!@#$%^&*)'}
+                      {language === 'zh' ? m("包含特殊符号 (!@#$%^&*)") : language === 'ja' ? m("記号を含む (!@#$%^&*)") : 'Include Symbols (!@#$%^&*)'}
                     </label>
                   </div>
                 </div>
@@ -720,7 +721,7 @@ export const ItemModal: React.FC<ItemModalProps> = ({
             <div className="form-card-title">
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <span>{t('itemModal.customFieldsTitle')} ({customFields.length})</span>
-                <span style={{ fontSize: 10, color: '#00D4FF', textTransform: 'none' }}>· {language === 'zh' ? '用户可自由自定义标题与内容' : language === 'ja' ? '項目名と内容をカスタマイズ可能' : 'Customizable label & content'}</span>
+                <span style={{ fontSize: 10, color: '#00D4FF', textTransform: 'none' }}>· {language === 'zh' ? m("用户可自由自定义标题与内容") : language === 'ja' ? m("項目名と内容をカスタマイズ可能") : 'Customizable label & content'}</span>
               </div>
             </div>
 
@@ -742,9 +743,9 @@ export const ItemModal: React.FC<ItemModalProps> = ({
                             type="text"
                             value={field.name}
                             onChange={(e) => handleFieldChange(field.id, 'name', e.target.value)}
-                            placeholder={language === 'zh' ? '自定义标题 (例如: 网站 / 备用邮箱 / 密保)' : language === 'ja' ? '項目名 (例: ウェブサイト / 予備メール)' : 'Custom Field Label (e.g. Website / Backup Email)'}
+                            placeholder={language === 'zh' ? m("自定义标题 (例如: 网站 / 备用邮箱 / 密保)") : language === 'ja' ? m("項目名 (例: ウェブサイト / 予備メール)") : 'Custom Field Label (e.g. Website / Backup Email)'}
                             className="custom-option-title-input"
-                            title={language === 'zh' ? '点击可修改此选项的自定义标题' : language === 'ja' ? 'クリックして項目名を変更' : 'Click to edit field label'}
+                            title={language === 'zh' ? m("点击可修改此选项的自定义标题") : language === 'ja' ? m("クリックして項目名を変更") : 'Click to edit field label'}
                           />
                         </div>
 
@@ -754,7 +755,7 @@ export const ItemModal: React.FC<ItemModalProps> = ({
                             type="button"
                             onClick={() => handleFieldChange(field.id, 'isSecret', !field.isSecret)}
                             className={`btn-custom-toggle-secret ${field.isSecret ? 'active' : ''}`}
-                            title={field.isSecret ? (language === 'zh' ? '当前已掩码隐藏，点击设为普通明文' : language === 'ja' ? '現在マスク中、クリックで平文表示' : 'Currently masked, click to show plaintext') : (language === 'zh' ? '当前为明文，点击设为保密掩码' : language === 'ja' ? '現在平文、クリックでマスク' : 'Currently plaintext, click to mask')}
+                            title={field.isSecret ? (language === 'zh' ? m("当前已掩码隐藏，点击设为普通明文") : language === 'ja' ? m("現在マスク中、クリックで平文表示") : 'Currently masked, click to show plaintext') : (language === 'zh' ? m("当前为明文，点击设为保密掩码") : language === 'ja' ? m("現在平文、クリックでマスク") : 'Currently plaintext, click to mask')}
                           >
                             {field.isSecret ? (
                               <EyeOff style={{ width: 13, height: 13, color: '#F59E0B' }} />
@@ -768,7 +769,7 @@ export const ItemModal: React.FC<ItemModalProps> = ({
                             type="button"
                             onClick={() => handleRemoveField(field.id)}
                             className="btn-custom-delete-minus"
-                            title={language === 'zh' ? '删除此自定义选项' : language === 'ja' ? 'この項目を削除' : 'Delete this field'}
+                            title={language === 'zh' ? m("删除此自定义选项") : language === 'ja' ? m("この項目を削除") : 'Delete this field'}
                           >
                             <MinusCircle style={{ width: 18, height: 18 }} />
                           </button>
@@ -782,7 +783,7 @@ export const ItemModal: React.FC<ItemModalProps> = ({
                             rows={2}
                             value={field.value}
                             onChange={(e) => handleFieldChange(field.id, 'value', e.target.value)}
-                            placeholder={language === 'zh' ? '输入自定义内容 / 便签备忘...' : language === 'ja' ? 'カスタム内容やメモを入力...' : 'Enter custom content or notes...'}
+                            placeholder={language === 'zh' ? m("输入自定义内容 / 便签备忘...") : language === 'ja' ? m("カスタム内容やメモを入力...") : 'Enter custom content or notes...'}
                             className="framed-textarea font-mono"
                             style={{ fontSize: 12.5, background: 'rgba(9, 13, 36, 0.85)' }}
                           />
@@ -806,10 +807,10 @@ export const ItemModal: React.FC<ItemModalProps> = ({
                                   : field.type === 'phone'
                                   ? '+1 (555) 000-0000'
                                   : field.type === 'totp'
-                                  ? (language === 'zh' ? '输入 2FA 密钥或六位动态码' : language === 'ja' ? '2FAシークレットまたは6桁コード' : 'Enter 2FA secret or 6-digit code')
+                                  ? (language === 'zh' ? m("输入 2FA 密钥或六位动态码") : language === 'ja' ? m("2FAシークレットまたは6桁コード") : 'Enter 2FA secret or 6-digit code')
                                   : field.type === 'password'
-                                  ? (language === 'zh' ? '输入敏感保密密码口令' : language === 'ja' ? '機密パスワードを入力' : 'Enter sensitive password')
-                                  : (language === 'zh' ? '输入自定义内容...' : language === 'ja' ? '内容を入力...' : 'Enter custom content...')
+                                  ? (language === 'zh' ? m("输入敏感保密密码口令") : language === 'ja' ? m("機密パスワードを入力") : 'Enter sensitive password')
+                                  : (language === 'zh' ? m("输入自定义内容...") : language === 'ja' ? m("内容を入力...") : 'Enter custom content...')
                               }
                               className={`framed-input ${field.isSecret || field.type === 'url' ? 'font-mono' : ''}`}
                               style={{ flex: 1, height: 36, fontSize: 13, background: 'rgba(9, 13, 36, 0.85)' }}
@@ -822,7 +823,7 @@ export const ItemModal: React.FC<ItemModalProps> = ({
                                 }
                                 className="btn-framed-icon"
                                 style={{ width: 36, height: 36 }}
-                                title={isFieldRevealed ? (language === 'zh' ? '隐藏明文' : language === 'ja' ? '非表示' : 'Hide') : (language === 'zh' ? '查看明文' : language === 'ja' ? '平文を表示' : 'Show plaintext')}
+                                title={isFieldRevealed ? (language === 'zh' ? m("隐藏明文") : language === 'ja' ? m("非表示") : 'Hide') : (language === 'zh' ? m("查看明文") : language === 'ja' ? m("平文を表示") : 'Show plaintext')}
                               >
                                 {isFieldRevealed ? (
                                   <EyeOff style={{ width: 14, height: 14 }} />
@@ -850,9 +851,9 @@ export const ItemModal: React.FC<ItemModalProps> = ({
                 }}
               >
                 {language === 'zh'
-                  ? '暂无自定义选项，可点击下方「添加更多」自定标题与内容'
+                  ? m("暂无自定义选项，可点击下方「添加更多」自定标题与内容")
                   : language === 'ja'
-                  ? 'カスタム項目はありません。「さらに追加」をクリックしてください'
+                  ? m("カスタム項目はありません。「さらに追加」をクリックしてください")
                   : 'No custom fields. Click "Add More" below to add custom fields.'}
               </div>
             )}
@@ -864,13 +865,13 @@ export const ItemModal: React.FC<ItemModalProps> = ({
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
-                  handleAddCustomField('url', language === 'zh' ? '网站' : language === 'ja' ? 'ウェブサイト' : 'Website');
+                  handleAddCustomField('url', language === 'zh' ? m("网站") : language === 'ja' ? 'ウェブサイト' : 'Website');
                 }}
                 className="btn-quick-add-link"
-                title={language === 'zh' ? '快速增加一个网站字段' : language === 'ja' ? 'ウェブサイト項目を素早く追加' : 'Quickly add a website field'}
+                title={language === 'zh' ? m("快速增加一个网站字段") : language === 'ja' ? m("ウェブサイト項目を素早く追加") : 'Quickly add a website field'}
               >
                 <Plus style={{ width: 13, height: 13 }} />
-                <span>{language === 'zh' ? '添加网站' : language === 'ja' ? 'ウェブサイトを追加' : 'Add Website'}</span>
+                <span>{language === 'zh' ? m("添加网站") : language === 'ja' ? m("ウェブサイトを追加") : 'Add Website'}</span>
               </button>
 
               {/* 核心按钮: + 添加更多 */}
@@ -882,11 +883,11 @@ export const ItemModal: React.FC<ItemModalProps> = ({
                     setIsAddMoreOpen(!isAddMoreOpen);
                   }}
                   className="btn-add-more-pill"
-                  title={language === 'zh' ? '点击展开自定义选项类型列表' : language === 'ja' ? 'カスタム項目一覧を展開' : 'Expand field types'}
+                  title={language === 'zh' ? m("点击展开自定义选项类型列表") : language === 'ja' ? m("カスタム項目一覧を展開") : 'Expand field types'}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <Plus style={{ width: 14, height: 14 }} />
-                    <span>{language === 'zh' ? '添加更多' : language === 'ja' ? 'さらに追加' : 'Add More'}</span>
+                    <span>{language === 'zh' ? m("添加更多") : language === 'ja' ? m("さらに追加") : 'Add More'}</span>
                   </div>
                   <ChevronDown
                     style={{
@@ -906,15 +907,15 @@ export const ItemModal: React.FC<ItemModalProps> = ({
                   >
                     <button
                       type="button"
-                      onClick={() => handleAddCustomField('text', language === 'zh' ? '文本' : language === 'ja' ? 'テキスト' : 'Text')}
+                      onClick={() => handleAddCustomField('text', language === 'zh' ? m("文本") : language === 'ja' ? 'テキスト' : 'Text')}
                       className="dropdown-menu-item"
                     >
                       <Type style={{ width: 15, height: 15, color: '#93C5FD' }} />
-                      <span>{language === 'zh' ? '文本' : language === 'ja' ? 'テキスト' : 'Text'}</span>
+                      <span>{language === 'zh' ? m("文本") : language === 'ja' ? 'テキスト' : 'Text'}</span>
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleAddCustomField('url', language === 'zh' ? '网站' : language === 'ja' ? 'ウェブサイト' : 'Website')}
+                      onClick={() => handleAddCustomField('url', language === 'zh' ? m("网站") : language === 'ja' ? 'ウェブサイト' : 'Website')}
                       className="dropdown-menu-item"
                     >
                       <Globe style={{ width: 15, height: 15, color: '#67E8F9' }} />
@@ -922,60 +923,60 @@ export const ItemModal: React.FC<ItemModalProps> = ({
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleAddCustomField('email', language === 'zh' ? '电子邮件' : language === 'ja' ? 'メール' : 'Email')}
+                      onClick={() => handleAddCustomField('email', language === 'zh' ? m("电子邮件") : language === 'ja' ? 'メール' : 'Email')}
                       className="dropdown-menu-item"
                     >
                       <Mail style={{ width: 15, height: 15, color: '#FCD34D' }} />
-                      <span>{language === 'zh' ? '电子邮件' : language === 'ja' ? 'メール' : 'Email'}</span>
+                      <span>{language === 'zh' ? m("电子邮件") : language === 'ja' ? 'メール' : 'Email'}</span>
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleAddCustomField('address', language === 'zh' ? '地址' : language === 'ja' ? '住所' : 'Address')}
+                      onClick={() => handleAddCustomField('address', language === 'zh' ? m("地址") : language === 'ja' ? m("住所") : 'Address')}
                       className="dropdown-menu-item"
                     >
                       <MapPin style={{ width: 15, height: 15, color: '#F87171' }} />
-                      <span>{language === 'zh' ? '地址' : language === 'ja' ? '住所' : 'Address'}</span>
+                      <span>{language === 'zh' ? m("地址") : language === 'ja' ? m("住所") : 'Address'}</span>
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleAddCustomField('date', language === 'zh' ? '日期' : language === 'ja' ? '日付' : 'Date')}
+                      onClick={() => handleAddCustomField('date', language === 'zh' ? m("日期") : language === 'ja' ? m("日付") : 'Date')}
                       className="dropdown-menu-item"
                     >
                       <Calendar style={{ width: 15, height: 15, color: '#C084FC' }} />
-                      <span>{language === 'zh' ? '日期' : language === 'ja' ? '日付' : 'Date'}</span>
+                      <span>{language === 'zh' ? m("日期") : language === 'ja' ? m("日付") : 'Date'}</span>
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleAddCustomField('totp', language === 'zh' ? '一次性密码' : language === 'ja' ? 'ワンタイムパスワード' : 'One-Time Password')}
+                      onClick={() => handleAddCustomField('totp', language === 'zh' ? m("一次性密码") : language === 'ja' ? 'ワンタイムパスワード' : 'One-Time Password')}
                       className="dropdown-menu-item"
                     >
                       <Clock style={{ width: 15, height: 15, color: '#34D399' }} />
-                      <span>{language === 'zh' ? '一次性密码' : language === 'ja' ? 'ワンタイムパスワード' : 'TOTP (2FA)'}</span>
+                      <span>{language === 'zh' ? m("一次性密码") : language === 'ja' ? 'ワンタイムパスワード' : 'TOTP (2FA)'}</span>
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleAddCustomField('password', language === 'zh' ? '密码' : language === 'ja' ? 'パスワード' : 'Password')}
+                      onClick={() => handleAddCustomField('password', language === 'zh' ? m("密码") : language === 'ja' ? 'パスワード' : 'Password')}
                       className="dropdown-menu-item"
                     >
                       <Lock style={{ width: 15, height: 15, color: '#FB923C' }} />
-                      <span>{language === 'zh' ? '密码' : language === 'ja' ? 'パスワード' : 'Password'}</span>
+                      <span>{language === 'zh' ? m("密码") : language === 'ja' ? 'パスワード' : 'Password'}</span>
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleAddCustomField('phone', language === 'zh' ? '电话' : language === 'ja' ? '電話番号' : 'Phone')}
+                      onClick={() => handleAddCustomField('phone', language === 'zh' ? m("电话") : language === 'ja' ? m("電話番号") : 'Phone')}
                       className="dropdown-menu-item"
                     >
                       <Phone style={{ width: 15, height: 15, color: '#60A5FA' }} />
-                      <span>{language === 'zh' ? '电话' : language === 'ja' ? '電話番号' : 'Phone'}</span>
+                      <span>{language === 'zh' ? m("电话") : language === 'ja' ? m("電話番号") : 'Phone'}</span>
                     </button>
                     <div className="dropdown-menu-divider" />
                     <button
                       type="button"
-                      onClick={() => handleAddCustomField('note', language === 'zh' ? '安全便签' : language === 'ja' ? '安全なメモ' : 'Secure Note')}
+                      onClick={() => handleAddCustomField('note', language === 'zh' ? m("安全便签") : language === 'ja' ? m("安全なメモ") : 'Secure Note')}
                       className="dropdown-menu-item"
                     >
                       <FileText style={{ width: 15, height: 15, color: '#A7F3D0' }} />
-                      <span>{language === 'zh' ? '安全便签' : language === 'ja' ? '安全なメモ' : 'Secure Note'}</span>
+                      <span>{language === 'zh' ? m("安全便签") : language === 'ja' ? m("安全なメモ") : 'Secure Note'}</span>
                     </button>
                     <div className="dropdown-menu-divider" />
                     <button
@@ -987,7 +988,7 @@ export const ItemModal: React.FC<ItemModalProps> = ({
                       className="dropdown-menu-item"
                     >
                       <Paperclip style={{ width: 15, height: 15, color: '#38BDF8' }} />
-                      <span>{language === 'zh' ? '附上文件 (≤ 2MB)' : language === 'ja' ? 'ファイルを添付 (≤ 2MB)' : 'Attach File (≤ 2MB)'}</span>
+                      <span>{language === 'zh' ? m("附上文件 (≤ 2MB)") : language === 'ja' ? m("ファイルを添付 (≤ 2MB)") : 'Attach File (≤ 2MB)'}</span>
                     </button>
                   </div>
                 )}
@@ -1017,7 +1018,7 @@ export const ItemModal: React.FC<ItemModalProps> = ({
                 )}
               </div>
               <span className="attachment-limit-badge">
-                {language === 'zh' ? '单文件限制 ≤ 2MB' : language === 'ja' ? 'ファイル上限 ≤ 2MB' : 'Max file size ≤ 2MB'}
+                {language === 'zh' ? m("单文件限制 ≤ 2MB") : language === 'ja' ? m("ファイル上限 ≤ 2MB") : 'Max file size ≤ 2MB'}
               </span>
             </div>
 
@@ -1079,7 +1080,7 @@ export const ItemModal: React.FC<ItemModalProps> = ({
                           type="button"
                           onClick={() => handleDownloadAttachment(att)}
                           className="btn-attachment-download"
-                          title={language === 'zh' ? '解密并下载此附件' : language === 'ja' ? '復号してダウンロード' : 'Decrypt and download attachment'}
+                          title={language === 'zh' ? m("解密并下载此附件") : language === 'ja' ? m("復号してダウンロード") : 'Decrypt and download attachment'}
                         >
                           <Download style={{ width: 14, height: 14 }} />
                         </button>
@@ -1087,7 +1088,7 @@ export const ItemModal: React.FC<ItemModalProps> = ({
                           type="button"
                           onClick={() => handleRemoveAttachment(att.id)}
                           className="btn-custom-delete-minus"
-                          title={language === 'zh' ? '移除此附件' : language === 'ja' ? '添付ファイルを削除' : 'Remove attachment'}
+                          title={language === 'zh' ? m("移除此附件") : language === 'ja' ? m("添付ファイルを削除") : 'Remove attachment'}
                         >
                           <MinusCircle style={{ width: 18, height: 18 }} />
                         </button>
@@ -1116,7 +1117,7 @@ export const ItemModal: React.FC<ItemModalProps> = ({
               }}
             >
               <FileUp style={{ width: 16, height: 16, color: '#00D4FF' }} />
-              <span>{language === 'zh' ? '点击或拖拽文件至此处添加附件 (支持所有文件类型，单文件 ≤ 2MB)' : language === 'ja' ? 'クリックまたはドラッグしてファイルを追加 (すべての形式に対応、最大 2MB)' : 'Click or drop files here to attach (All formats supported, ≤ 2MB each)'}</span>
+              <span>{language === 'zh' ? m("点击或拖拽文件至此处添加附件 (支持所有文件类型，单文件 ≤ 2MB)") : language === 'ja' ? m("クリックまたはドラッグしてファイルを追加 (すべての形式に対応、最大 2MB)") : 'Click or drop files here to attach (All formats supported, ≤ 2MB each)'}</span>
             </div>
           </div>
 
@@ -1159,15 +1160,11 @@ export const ItemModal: React.FC<ItemModalProps> = ({
                   textTransform: 'none',
                 }}
               >
-                {language === 'zh' ? '继承人专用' : language === 'ja' ? '継承者専用' : 'Heir Exclusive'}
+                {language === 'zh' ? m("继承人专用") : language === 'ja' ? m("継承者専用") : 'Heir Exclusive'}
               </span>
             </div>
             <p style={{ fontSize: 11.5, color: '#A4B8E4', lineHeight: 1.5 }}>
-              {language === 'zh'
-                ? '当继承人在副介质（副卡/副U盘）上解锁此资产时，该指引将以最高优先级展示于「接管向导」中。'
-                : language === 'ja'
-                ? '継承者がサブメディア（サブUSB）でこの資産を解除した際、この案内が最優先で「引き継ぎガイド」に表示されます。'
-                : 'Displayed with highest priority in the Takeover Guide when heirs unlock this asset using the secondary hardware key.'}
+              {m("使用双 U 盘只读打开信息备份后，继承人可在该资产中查看此说明。")}
             </p>
             <textarea
               rows={3}
@@ -1197,7 +1194,7 @@ export const ItemModal: React.FC<ItemModalProps> = ({
                   if (window.confirm(confirmMsg)) {
                     setSaving(true);setSaveError('');
                     try { await onDelete(initialItem.id); onClose(); }
-                    catch(e) { setSaveError(e instanceof Error ? e.message : '删除失败，请重试。'); }
+                    catch(e) { setSaveError(e instanceof Error ? e.message : m("删除失败，请重试。")); }
                     finally { setSaving(false); }
                   }
                 }}
@@ -1219,7 +1216,7 @@ export const ItemModal: React.FC<ItemModalProps> = ({
             )}
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#8EA4D4' }}>
               <ShieldCheck style={{ width: 16, height: 16, color: '#34D399' }} />
-              <span>本机加密保存 · AES-256-GCM</span>
+              <span>{m("本机加密保存 · AES-256-GCM")}</span>
             </div>
           </div>
 
@@ -1253,7 +1250,7 @@ export const ItemModal: React.FC<ItemModalProps> = ({
                     border: 'none',
                     cursor: 'pointer',
                   }}
-                  title={language === 'zh' ? '当前处于继承人只读模式，点击输入所有者主密码与紧急安全密钥以接管修改权限' : language === 'ja' ? '現在継承者読み取り専用モードです。マスターPINと緊急キーを入力して権限を引き継ぎます' : 'Currently in Heir Read-Only mode. Click to verify master credentials and takeover write permissions'}
+                  title={language === 'zh' ? m("当前处于继承人只读模式，点击输入所有者主密码与紧急安全密钥以接管修改权限") : language === 'ja' ? m("現在継承者読み取り専用モードです。マスターPINと緊急キーを入力して権限を引き継ぎます") : 'Currently in Heir Read-Only mode. Click to verify master credentials and takeover write permissions'}
                 >
                   {t('itemModal.heirReadOnlyTakeover')}
                 </button>
