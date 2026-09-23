@@ -1,0 +1,77 @@
+MATCH electron\main.cjs
+MATCH electron\preload.cjs
+MATCH electron\tray-icon.png
+MATCH electron\ui-messages.json
+MATCH electron\vault-controller.cjs
+MATCH electron\vault-core.cjs
+MATCH electron\vault-local-key.cjs
+MATCH electron\vault-media.cjs
+MATCH electron\vault-preferences.cjs
+MATCH electron\vault-store.cjs
+MATCH electron\vault-tray.cjs
+MATCH dist\assets\categories-DckiX-1S.js
+MATCH dist\assets\CategoryPickerModal-D1-txcus.js
+MATCH dist\assets\crown-BYUQfl1z.js
+MATCH dist\assets\index-BhV7ny65.css
+MATCH dist\assets\index-DwCr6IW3.js
+MATCH dist\assets\ItemModal-CYcpZV91.js
+MATCH dist\assets\RightContentArea-BHqg04Zm.js
+MATCH dist\assets\search-1DshR1-7.js
+MATCH dist\assets\sparkles-gXlQ6eX5.js
+MATCH dist\assets\SubscriptionModal-Dx5K66w_.js
+MATCH dist\assets\trash-2-BPpbJrvB.js
+MATCH dist\assets\x-x56rB4gj.js
+MATCH dist\index.html
+MATCH reader/scripts/recovery-reader.cjs
+MATCH reader/electron/vault-core.cjs
+MATCH reader/electron/vault-store.cjs
+MATCH reader/HEIR_MANUAL.md
+MATCH reader/LVCF3_PROTOCOL.md
+
+7-Zip 25.01 (x64) : Copyright (c) 1999-2025 Igor Pavlov : 2025-08-03
+
+Scanning the drive for archives:
+1 file, 92865285 bytes (89 MiB)
+
+Testing archive: release\1.0.6-remembered-key\LegacyLock Setup 1.0.6.exe
+--
+Path = release\1.0.6-remembered-key\LegacyLock Setup 1.0.6.exe
+Type = Nsis
+Physical Size = 92865285
+Method = Deflate
+Solid = -
+Headers Size = 213992
+Embedded Stub Size = 59904
+SubType = NSIS-3 Unicode
+
+Everything is Ok
+
+Files: 10
+Size:       92296719
+Compressed: 92865285
+
+
+7-Zip 25.01 (x64) : Copyright (c) 1999-2025 Igor Pavlov : 2025-08-03
+
+Scanning the drive for archives:
+1 file, 92635206 bytes (89 MiB)
+
+Testing archive: release\1.0.6-remembered-key\LegacyLock-v1.0.6-Windows-Portable.exe
+--
+Path = release\1.0.6-remembered-key\LegacyLock-v1.0.6-Windows-Portable.exe
+Type = Nsis
+Physical Size = 92635206
+Method = Deflate
+Solid = -
+Headers Size = 39790
+Embedded Stub Size = 38400
+SubType = NSIS-3 Unicode
+
+Everything is Ok
+
+Files: 4
+Size:       92296719
+Compressed: 92635206
+
+d9d469f6960f97f0cd14514c3450fef678d9fb5ac646384e80ef9aa13d332d12  LegacyLock Setup 1.0.6.exe
+5af4a472d653e8f5af822f46c573ad83613c3edf03d13e0adc88e126e69e69d0  LegacyLock-v1.0.6-Windows-Portable.exe

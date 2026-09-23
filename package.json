@@ -1,6 +1,6 @@
 {
   "name": "legacylock",
-  "version": "1.0.3",
+  "version": "1.0.6",
   "private": true,
   "description": "LegacyLock - Local encrypted heritage vault with dual-USB read-only recovery",
   "author": "LegacyLock Core Architecture <support@legacylock.vault>",

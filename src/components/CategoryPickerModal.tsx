@@ -13,6 +13,7 @@
  */
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
+import { m } from "../services/messages";
 import {
   X,
   Search,
@@ -55,7 +56,7 @@ export const CategoryPickerModal: React.FC<CategoryPickerModalProps> = ({
 }) => {
   const { t } = useI18n();
   const [search, setSearch] = useState("");
-  const [activeTab, setActiveTab] = useState<string>("all");
+  const [activeTab, setActiveTab] = useState<string>("popular");
   const searchInputRef = useRef<HTMLInputElement>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
   useEffect(() => {
@@ -134,7 +135,7 @@ export const CategoryPickerModal: React.FC<CategoryPickerModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       setSearch("");
-      setActiveTab("all");
+      setActiveTab("popular");
       setTimeout(() => {
         searchInputRef.current?.focus();
       }, 80);
@@ -387,7 +388,7 @@ export const CategoryPickerModal: React.FC<CategoryPickerModalProps> = ({
           <div className="cat-footer-info">
             <ShieldCheck className="w-4 h-4 text-[#00D4FF] flex-shrink-0" />
             <span className="cat-footer-tip">
-              AES-256-GCM Zero-Knowledge Protection
+              {m("先选择类型，再填写内容；只有标题必填。")}
             </span>
           </div>
           <button

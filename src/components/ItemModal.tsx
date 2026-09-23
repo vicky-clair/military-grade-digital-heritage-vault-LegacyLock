@@ -37,7 +37,6 @@ import {
   FileText,
   MinusCircle,
   Paperclip,
-  FileUp,
   Download,
   File,
   FileArchive,
@@ -202,7 +201,6 @@ export const ItemModal: React.FC<ItemModalProps> = ({
   // 附件管理状态 (单文件限制 <= 2MB)
   const [attachments, setAttachments] = useState<VaultAttachment[]>([]);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
-  const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -760,16 +758,23 @@ export const ItemModal: React.FC<ItemModalProps> = ({
           </div>
 
           {/* 卡片 2: 核心凭证 (Credentials) */}
-          <div className="form-card">
-            <div className="form-card-title">
-              <span>
-                {language === "zh"
-                  ? m("核心凭证 (Credentials)")
-                  : language === "ja"
-                    ? m("主要認証情報 (Credentials)")
-                    : "Core Credentials"}
-              </span>
-            </div>
+          <details
+            className="form-card optional-fields"
+            key={`credentials-${category}`}
+            open={
+              !!(username || password || url) ||
+              [
+                "login",
+                "email",
+                "password",
+                "server",
+                "database",
+                "router",
+                "game",
+              ].includes(category)
+            }
+          >
+            <summary>{m("账号、密码与网址（按需填写）")}</summary>
 
             {/* 用户名 / 账号 */}
             <div className="framed-input-container">
@@ -947,7 +952,7 @@ export const ItemModal: React.FC<ItemModalProps> = ({
                 className="framed-input font-mono"
               />
             </div>
-          </div>
+          </details>
 
           {/* 卡片 3: 自定义选项与扩展属性 (Custom Options - Military Style) */}
           <div className="form-card" onClick={() => setIsAddMoreOpen(false)}>
@@ -1540,171 +1545,140 @@ export const ItemModal: React.FC<ItemModalProps> = ({
             </div>
           </div>
 
-          {/* 卡片 4: 军规加密附件与证明文件 (Attachments, ≤ 2MB) */}
-          <div className="form-card">
-            <div
-              className="form-card-title"
-              style={{ justifyContent: "space-between" }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <Paperclip
-                  style={{ width: 14, height: 14, color: "#00D4FF" }}
-                />
-                <span>{t("itemModal.attachmentsTitle")}</span>
-                {attachments.length > 0 && (
-                  <span
+          {/* 添加入口统一保留在“添加更多”，文件输入始终挂载。 */}
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileChange}
+            hidden
+            multiple
+          />
+          {(attachments.length > 0 || attachmentError) && (
+            <div className="form-card">
+              <div
+                className="form-card-title"
+                style={{ justifyContent: "space-between" }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <Paperclip
+                    style={{ width: 14, height: 14, color: "#00D4FF" }}
+                  />
+                  <span>{t("itemModal.attachmentsTitle")}</span>
+                  {attachments.length > 0 && (
+                    <span
+                      style={{
+                        fontSize: 11,
+                        padding: "1px 6px",
+                        borderRadius: 10,
+                        background: "rgba(0, 212, 255, 0.15)",
+                        color: "#00D4FF",
+                        fontWeight: 600,
+                      }}
+                    >
+                      {attachments.length}
+                    </span>
+                  )}
+                </div>
+                <span className="attachment-limit-badge">
+                  {language === "zh"
+                    ? m("单文件限制 ≤ 2MB")
+                    : language === "ja"
+                      ? m("ファイル上限 ≤ 2MB")
+                      : "Max file size ≤ 2MB"}
+                </span>
+              </div>
+
+              {/* 超限错误提示条 */}
+              {attachmentError && (
+                <div
+                  className="attachment-error-banner"
+                  style={{ marginBottom: 10 }}
+                >
+                  <AlertTriangle
+                    style={{ width: 15, height: 15, flexShrink: 0 }}
+                  />
+                  <span style={{ flex: 1 }}>{attachmentError}</span>
+                  <button
+                    type="button"
+                    onClick={() => setAttachmentError(null)}
                     style={{
-                      fontSize: 11,
-                      padding: "1px 6px",
-                      borderRadius: 10,
-                      background: "rgba(0, 212, 255, 0.15)",
-                      color: "#00D4FF",
-                      fontWeight: 600,
+                      background: "transparent",
+                      border: "none",
+                      color: "#FCA5A5",
+                      cursor: "pointer",
+                      padding: 0,
                     }}
                   >
-                    {attachments.length}
-                  </span>
-                )}
-              </div>
-              <span className="attachment-limit-badge">
-                {language === "zh"
-                  ? m("单文件限制 ≤ 2MB")
-                  : language === "ja"
-                    ? m("ファイル上限 ≤ 2MB")
-                    : "Max file size ≤ 2MB"}
-              </span>
-            </div>
+                    <X style={{ width: 14, height: 14 }} />
+                  </button>
+                </div>
+              )}
 
-            {/* 隐藏的原生文件输入组件 */}
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleFileChange}
-              style={{ display: "none" }}
-              multiple
-            />
-
-            {/* 超限错误提示条 */}
-            {attachmentError && (
-              <div
-                className="attachment-error-banner"
-                style={{ marginBottom: 10 }}
-              >
-                <AlertTriangle
-                  style={{ width: 15, height: 15, flexShrink: 0 }}
-                />
-                <span style={{ flex: 1 }}>{attachmentError}</span>
-                <button
-                  type="button"
-                  onClick={() => setAttachmentError(null)}
-                  style={{
-                    background: "transparent",
-                    border: "none",
-                    color: "#FCA5A5",
-                    cursor: "pointer",
-                    padding: 0,
-                  }}
+              {/* 附件列表 */}
+              {attachments.length > 0 && (
+                <div
+                  className="attachment-container"
+                  style={{ marginBottom: 10 }}
                 >
-                  <X style={{ width: 14, height: 14 }} />
-                </button>
-              </div>
-            )}
-
-            {/* 附件列表 */}
-            {attachments.length > 0 && (
-              <div
-                className="attachment-container"
-                style={{ marginBottom: 10 }}
-              >
-                {attachments.map((att) => {
-                  const AttIcon = getAttachmentIcon(att.type, att.name);
-                  return (
-                    <div key={att.id} className="attachment-card">
-                      <div className="attachment-left">
-                        <div className="attachment-file-icon">
-                          <AttIcon style={{ width: 16, height: 16 }} />
-                        </div>
-                        <div className="attachment-info">
-                          <span className="attachment-name" title={att.name}>
-                            {att.name}
-                          </span>
-                          <span className="attachment-meta">
-                            <span>{formatFileSize(att.size)}</span>
-                            <span>•</span>
-                            <span>
-                              {new Date(att.uploadedAt).toLocaleDateString()}
+                  {attachments.map((att) => {
+                    const AttIcon = getAttachmentIcon(att.type, att.name);
+                    return (
+                      <div key={att.id} className="attachment-card">
+                        <div className="attachment-left">
+                          <div className="attachment-file-icon">
+                            <AttIcon style={{ width: 16, height: 16 }} />
+                          </div>
+                          <div className="attachment-info">
+                            <span className="attachment-name" title={att.name}>
+                              {att.name}
                             </span>
-                          </span>
+                            <span className="attachment-meta">
+                              <span>{formatFileSize(att.size)}</span>
+                              <span>•</span>
+                              <span>
+                                {new Date(att.uploadedAt).toLocaleDateString()}
+                              </span>
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="attachment-actions">
+                          <button
+                            type="button"
+                            onClick={() => handleDownloadAttachment(att)}
+                            className="btn-attachment-download"
+                            title={
+                              language === "zh"
+                                ? m("解密并下载此附件")
+                                : language === "ja"
+                                  ? m("復号してダウンロード")
+                                  : "Decrypt and download attachment"
+                            }
+                          >
+                            <Download style={{ width: 14, height: 14 }} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveAttachment(att.id)}
+                            className="btn-custom-delete-minus"
+                            title={
+                              language === "zh"
+                                ? m("移除此附件")
+                                : language === "ja"
+                                  ? m("添付ファイルを削除")
+                                  : "Remove attachment"
+                            }
+                          >
+                            <MinusCircle style={{ width: 18, height: 18 }} />
+                          </button>
                         </div>
                       </div>
-
-                      <div className="attachment-actions">
-                        <button
-                          type="button"
-                          onClick={() => handleDownloadAttachment(att)}
-                          className="btn-attachment-download"
-                          title={
-                            language === "zh"
-                              ? m("解密并下载此附件")
-                              : language === "ja"
-                                ? m("復号してダウンロード")
-                                : "Decrypt and download attachment"
-                          }
-                        >
-                          <Download style={{ width: 14, height: 14 }} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveAttachment(att.id)}
-                          className="btn-custom-delete-minus"
-                          title={
-                            language === "zh"
-                              ? m("移除此附件")
-                              : language === "ja"
-                                ? m("添付ファイルを削除")
-                                : "Remove attachment"
-                          }
-                        >
-                          <MinusCircle style={{ width: 18, height: 18 }} />
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* 拖拽与点击上传区域 */}
-            <div
-              className={`attachment-dropzone ${dragActive ? "drag-active" : ""}`}
-              onClick={() => fileInputRef.current?.click()}
-              onDragOver={(e) => {
-                e.preventDefault();
-                setDragActive(true);
-              }}
-              onDragLeave={() => setDragActive(false)}
-              onDrop={(e) => {
-                e.preventDefault();
-                setDragActive(false);
-                if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-                  handleProcessFiles(e.dataTransfer.files);
-                }
-              }}
-            >
-              <FileUp style={{ width: 16, height: 16, color: "#00D4FF" }} />
-              <span>
-                {language === "zh"
-                  ? m(
-                      "点击或拖拽文件至此处添加附件 (支持所有文件类型，单文件 ≤ 2MB)",
-                    )
-                  : language === "ja"
-                    ? m(
-                        "クリックまたはドラッグしてファイルを追加 (すべての形式に対応、最大 2MB)",
-                      )
-                    : "Click or drop files here to attach (All formats supported, ≤ 2MB each)"}
-              </span>
+                    );
+                  })}
+                </div>
+              )}
             </div>
-          </div>
+          )}
 
           {/* 卡片 5: 常规安全备注 (General Notes) */}
           <div className="form-card">
@@ -1721,14 +1695,16 @@ export const ItemModal: React.FC<ItemModalProps> = ({
           </div>
 
           {/* 卡片 6: 副卡接管向导指示 (Takeover Guide) */}
-          <div
-            className="form-card"
+          <details
+            className="form-card optional-fields"
+            open={!!inheritanceInstructions}
             style={{
               borderColor: "rgba(0, 212, 255, 0.35)",
               background:
                 "linear-gradient(180deg, rgba(14, 25, 65, 0.8) 0%, rgba(18, 18, 55, 0.8) 100%)",
             }}
           >
+            <summary>{m("这项资产如何交接（选填）")}</summary>
             <div className="form-card-title">
               <div
                 style={{
@@ -1773,7 +1749,7 @@ export const ItemModal: React.FC<ItemModalProps> = ({
               className="framed-textarea font-mono"
               style={{ fontSize: 12 }}
             />
-          </div>
+          </details>
         </form>
 
         {/* 底部独立按钮栏 (加框美化与操作区) */}

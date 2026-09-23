@@ -282,6 +282,8 @@ class VaultController {
           /^[a-f0-9]{24}$/.test(name.slice((base + ".tmp-").length)),
       );
       // Only exact application-owned files, never external exports or USB contents.
+      await this.beforeDestroy?.();
+      this.guard(epoch);
       files.push(base + ".previous", base);
       try {
         for (const name of files) {

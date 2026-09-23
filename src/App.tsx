@@ -37,15 +37,20 @@ import type { NavCategoryType, VaultCategory, VaultItem } from "./types";
 import "./secure-app.css";
 import "./restored-app.css";
 
-type Action = "unlock" | "export" | "provision" | "credentials" | "destroy";
+type Action =
+  "unlock" | "export" | "provision" | "credentials" | "destroy" | "remember";
+type LocalUnlock = { available: boolean; remembered: boolean };
 type Result = {
+  localUnlock?: LocalUnlock;
   view?: View;
   canceled?: boolean;
   path?: string;
   paths?: string[];
   revision?: number;
 };
-export default function App() { return <VaultApp />; }
+export default function App() {
+  return <VaultApp />;
+}
 function VaultApp() {
   const { language, setLanguage } = useI18n();
   const [status, setStatus] = useState<Status | null>(null),
@@ -53,6 +58,25 @@ function VaultApp() {
   const [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [notice, setNotice] = useState("");
+  const [localUnlock, setLocalUnlock] = useState<LocalUnlock>({
+    available: false,
+    remembered: false,
+  });
+  const [manualKey, setManualKey] = useState(false);
+  const canUseLocalKey = localUnlock.remembered && localUnlock.available;
+  useEffect(() => {
+    let active = true;
+    void call<LocalUnlock>("localUnlockStatus")
+      .then((value) => {
+        if (active) setLocalUnlock(value);
+      })
+      .catch(() => {
+        if (active) setLocalUnlock({ available: false, remembered: false });
+      });
+    return () => {
+      active = false;
+    };
+  }, [view?.id, view?.revision]);
   const [nav, setNav] = useState<NavCategoryType>("all");
   const [category, setCategory] = useState<VaultCategory>("login");
   const [picker, setPicker] = useState(false),
@@ -111,6 +135,7 @@ function VaultApp() {
     setDestroyText("");
   };
   const clear = () => {
+    setManualKey(false);
     epoch.current++;
     setView(null);
     setEditor(undefined);
@@ -170,6 +195,7 @@ function VaultApp() {
       const value = await fn();
       if (started !== epoch.current) return false;
       const r = value as Result & Partial<View>;
+      if (r?.localUnlock) setLocalUnlock(r.localUnlock);
       if (r?.canceled) return false;
       const next = r?.view || (r?.role && r?.items ? (r as View) : null);
       if (next) {
@@ -352,6 +378,11 @@ function VaultApp() {
   );
   async function submitAction() {
     let success = false;
+    if (action === "remember")
+      success = await perform(
+        () => call("setRememberedSecret", true, password, secret),
+        m("已在本机记住安全密钥；请继续保留独立密钥备份。"),
+      );
     if (action === "unlock")
       success = await perform(
         () => call("unlock", password, secret),
@@ -505,6 +536,43 @@ function VaultApp() {
       {appearancePanel}
       <section className="secure-card">
         <h2>{m("应用与继承设置")}</h2>
+        <h3>{m("本机解锁方式")}</h3>
+        <p>
+          {localUnlock.remembered
+            ? m("已记住安全密钥：本机解锁只需密码。")
+            : m("每次解锁必须输入密码和安全密钥。")}
+        </p>
+        <p className="secure-hint">
+          {m(
+            "记住密钥会降低本机保护强度；备份导入、导出及更换凭据仍需要密码和安全密钥。",
+          )}
+        </p>
+        <button
+          disabled={busy || (!localUnlock.available && !localUnlock.remembered)}
+          onClick={() =>
+            localUnlock.remembered
+              ? void perform(
+                  () => call("setRememberedSecret", false),
+                  m("已取消记住密钥，下次解锁需要两项凭据。"),
+                )
+              : openAction("remember")
+          }
+        >
+          {localUnlock.remembered
+            ? m("改为每次输入安全密钥")
+            : m("在本机记住安全密钥")}
+        </button>
+        {!localUnlock.available && (
+          <p className="secure-hint">
+            {m("系统安全存储不可用，无法启用记住密钥。")}
+          </p>
+        )}
+        <hr />
+        <p className="secure-hint">
+          {m(
+            "交接信息仅用于说明，不验证身份、不通知对方，也不授予权限；只读访问仍需要双 U 盘。",
+          )}
+        </p>
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -533,7 +601,7 @@ function VaultApp() {
             </select>
           </label>
           <label>
-            {m("继承人姓名")}
+            {m("交接对象姓名（选填）")}
             <input
               maxLength={200}
               value={settings.heirName}
@@ -546,7 +614,7 @@ function VaultApp() {
             />
           </label>
           <label>
-            {m("继承说明")}
+            {m("整体交接说明（选填）")}
             <textarea
               maxLength={10000}
               rows={4}
@@ -635,27 +703,29 @@ function VaultApp() {
               "副盘可提前交给继承人；之后保存资产、更换密码或安全密钥、更新主盘，都不需要重新写入副盘。",
             )}
           </p>
-          <button
-            disabled={busy || !ready}
-            onClick={() => openAction("provision")}
-          >
-            {view.recovery
-              ? m("重新配置两盘（副盘需在场）")
-              : m("首次配置主、副 U 盘")}
-          </button>
-          <button
-            className="primary"
-            disabled={busy || !primary || !view.recovery}
-            onClick={() =>
-              void perform(async () => {
-                const r = await call<Result>("sync", primary);
-                setBackupRevision(r.revision || null);
-                return r;
-              }, m("当前信息备份已更新到主盘，副盘保持不变。"))
-            }
-          >
-            {m("更新主盘信息备份（无需副盘）")}
-          </button>
+          <div className="secure-actions">
+            <button
+              disabled={busy || !ready}
+              onClick={() => openAction("provision")}
+            >
+              {view.recovery
+                ? m("重新配置两盘（副盘需在场）")
+                : m("首次配置主、副 U 盘")}
+            </button>
+            <button
+              className="primary"
+              disabled={busy || !primary || !view.recovery}
+              onClick={() =>
+                void perform(async () => {
+                  const r = await call<Result>("sync", primary);
+                  setBackupRevision(r.revision || null);
+                  return r;
+                }, m("当前信息备份已更新到主盘，副盘保持不变。"))
+              }
+            >
+              {m("更新主盘信息备份（无需副盘）")}
+            </button>
+          </div>
           <p className="secure-hint">
             {m("本机版本")}
             {view.revision}；
@@ -777,9 +847,11 @@ function VaultApp() {
                 </p>
               )}
               <p>
-                {m(
-                  "所有者解锁需要同时提供密码和安全密钥。继承人可通过双 U 盘入口只读访问。",
-                )}
+                {canUseLocalKey && status.exists
+                  ? m("已记住安全密钥：本机解锁只需密码。")
+                  : m(
+                      "所有者解锁需要同时提供密码和安全密钥。继承人可通过双 U 盘入口只读访问。",
+                    )}
               </p>
               <form
                 onSubmit={(e) => {
@@ -796,7 +868,11 @@ function VaultApp() {
                   void perform(
                     () =>
                       call(
-                        status.exists ? "unlock" : "initialize",
+                        status.exists
+                          ? canUseLocalKey && !manualKey
+                            ? "unlockLocal"
+                            : "unlock"
+                          : "initialize",
                         password,
                         secret,
                       ),
@@ -850,8 +926,21 @@ function VaultApp() {
                       {m("已在独立安全位置备份此密钥")}
                     </label>
                   </>
-                ) : (
+                ) : !canUseLocalKey || manualKey ? (
                   secretInput(secret, setSecret)
+                ) : null}
+                {status.exists && canUseLocalKey && (
+                  <label className="secure-check">
+                    <input
+                      type="checkbox"
+                      checked={manualKey}
+                      onChange={(e) => {
+                        setManualKey(e.target.checked);
+                        setSecret("");
+                      }}
+                    />
+                    {m("改用密码和安全密钥解锁")}
+                  </label>
                 )}
                 <button
                   className="primary"
@@ -866,82 +955,99 @@ function VaultApp() {
             {informationImport}
           </div>
         ) : (
-          <Suspense fallback={<div className="panel-loading" role="status">{m("正在加载界面…")}</div>}><RightContentArea
-            selectedNav={nav}
-            items={view.items}
-            currentTheme={currentTheme}
-            busy={busy}
-            canModify={owner}
-            isReadOnly={preferences.subscriptionDemo === "expired"}
-            demo={preferences.subscriptionDemo}
-            onAddNew={add}
-            onEditItem={(item) => {
-              if (!busy) setEditor(item);
-            }}
-            onDeleteItem={(id) => {
-              if (
-                !busy &&
-                owner &&
-                window.confirm(
-                  m(
-                    "删除“{0}”？删除后请更新主盘备份。",
-                    view.items.find((i) => i.id === id)?.title || m("此资产"),
-                  ),
-                )
-              ) {
-                void perform(
-                  () => call("deleteItem", id),
-                  m("资产已删除，请更新主盘备份。"),
-                );
-              }
-            }}
-            onSelectTheme={(theme) =>
-              void updatePreferences({ ...preferences, theme })
-            }
-            onOpenUsbPassword={() => openAction("credentials")}
-            onOpenHealthCheck={() =>
-              void perform(
-                () => call("health"),
-                m(
-                  "当前磁盘签名及会话完整性校验通过。此结果不代表离线 U 盘已更新。",
-                ),
-              )
-            }
-            onOpenSubscription={owner ? () => setSubscription(true) : undefined}
-            onRequestTakeover={() => openAction("unlock")}
-            onLock={lock}
-            settingsContent={settingsPanel}
-            backupContent={backupPanel}
-            banner={
-              <div className="workspace-status">
-                <span className="secure-badge">
-                  {owner ? m("所有者 · 可管理") : m("继承人 · 只读")}
-                </span>
-                <span>
-                  {m("资产")}
-                  {view.items.length} {m("· 版本")}
-                  {view.revision} {m("· 本机保存后请更新主盘")}
-                </span>
-                {!owner && (
-                  <>
-                    <button onClick={() => openAction("unlock")}>
-                      {m("输入密码和密钥，接管管理权限")}
-                    </button>
-                    <p>
-                      {view.settings.heirName} {view.settings.heirNotes}
-                    </p>
-                  </>
-                )}
-                {owner && preferences.subscriptionDemo === "expired" && (
-                  <p>
-                    {m(
-                      "订阅测试：模拟试用到期，资产只读。可在订阅测试中恢复试用，不会扣费。",
-                    )}
-                  </p>
-                )}
+          <Suspense
+            fallback={
+              <div className="panel-loading" role="status">
+                {m("正在加载界面…")}
               </div>
             }
-          /></Suspense>
+          >
+            <RightContentArea
+              selectedNav={nav}
+              items={view.items}
+              currentTheme={currentTheme}
+              busy={busy}
+              canModify={owner}
+              isReadOnly={preferences.subscriptionDemo === "expired"}
+              demo={preferences.subscriptionDemo}
+              onAddNew={add}
+              onEditItem={(item) => {
+                if (!busy) setEditor(item);
+              }}
+              onDeleteItem={(id) => {
+                if (
+                  !busy &&
+                  owner &&
+                  window.confirm(
+                    m(
+                      "删除“{0}”？删除后请更新主盘备份。",
+                      view.items.find((i) => i.id === id)?.title || m("此资产"),
+                    ),
+                  )
+                ) {
+                  void perform(
+                    () => call("deleteItem", id),
+                    m("资产已删除，请更新主盘备份。"),
+                  );
+                }
+              }}
+              onSelectTheme={(theme) =>
+                void updatePreferences({ ...preferences, theme })
+              }
+              onOpenUsbPassword={() => openAction("credentials")}
+              onOpenHealthCheck={() =>
+                void perform(
+                  () => call("health"),
+                  m(
+                    "当前磁盘签名及会话完整性校验通过。此结果不代表离线 U 盘已更新。",
+                  ),
+                )
+              }
+              onOpenSubscription={
+                owner ? () => setSubscription(true) : undefined
+              }
+              onRequestTakeover={() => openAction("unlock")}
+              onLock={lock}
+              settingsContent={settingsPanel}
+              backupContent={backupPanel}
+              banner={
+                <div className="workspace-status">
+                  <span className="secure-badge">
+                    {owner ? m("所有者 · 可管理") : m("继承人 · 只读")}
+                  </span>
+                  <span>
+                    {m("资产")}
+                    {view.items.length} {m("· 版本")}
+                    {view.revision} {m("· 本机保存后请更新主盘")}
+                  </span>
+                  {!owner && (
+                    <>
+                      <button onClick={() => openAction("unlock")}>
+                        {m("输入密码和密钥，接管管理权限")}
+                      </button>
+                      {view.settings.heirName && (
+                        <p>
+                          {m("交接对象姓名（选填）")}: {view.settings.heirName}
+                        </p>
+                      )}
+                      {view.settings.heirNotes && (
+                        <p>
+                          {m("整体交接说明（选填）")}: {view.settings.heirNotes}
+                        </p>
+                      )}
+                    </>
+                  )}
+                  {owner && preferences.subscriptionDemo === "expired" && (
+                    <p>
+                      {m(
+                        "订阅测试：模拟试用到期，资产只读。可在订阅测试中恢复试用，不会扣费。",
+                      )}
+                    </p>
+                  )}
+                </div>
+              }
+            />
+          </Suspense>
         )}
       </div>
       {!owner && (
@@ -963,67 +1069,91 @@ function VaultApp() {
         </label>
       )}
       {owner && subscription && (
-        <Suspense fallback={<div className="panel-loading" role="status">{m("正在加载界面…")}</div>}><SubscriptionModal
-          mode={preferences.subscriptionDemo}
-          busy={busy}
-          onClose={() => {
-            if (!busy) setSubscription(false);
-          }}
-          onChange={(subscriptionDemo) =>
-            updatePreferences({ ...preferences, subscriptionDemo })
+        <Suspense
+          fallback={
+            <div className="panel-loading" role="status">
+              {m("正在加载界面…")}
+            </div>
           }
-        /></Suspense>
+        >
+          <SubscriptionModal
+            mode={preferences.subscriptionDemo}
+            busy={busy}
+            onClose={() => {
+              if (!busy) setSubscription(false);
+            }}
+            onChange={(subscriptionDemo) =>
+              updatePreferences({ ...preferences, subscriptionDemo })
+            }
+          />
+        </Suspense>
       )}
       {owner && picker && (
-        <Suspense fallback={<div className="panel-loading" role="status">{m("正在加载界面…")}</div>}><CategoryPickerModal
-          isOpen
-          onClose={() => setPicker(false)}
-          onSelectCategory={(c) => {
-            setCategory(c);
-            setEditor(null);
-          }}
-        /></Suspense>
+        <Suspense
+          fallback={
+            <div className="panel-loading" role="status">
+              {m("正在加载界面…")}
+            </div>
+          }
+        >
+          <CategoryPickerModal
+            isOpen
+            onClose={() => setPicker(false)}
+            onSelectCategory={(c) => {
+              setCategory(c);
+              setEditor(null);
+            }}
+          />
+        </Suspense>
       )}
       {view && editor !== undefined && (
-        <Suspense fallback={<div className="panel-loading" role="status">{m("正在加载界面…")}</div>}><ItemModal
-          isOpen
-          initialItem={editor}
-          defaultCategory={category || "login"}
-          isReadOnly={!owner || preferences.subscriptionDemo === "expired"}
-          isHeirReadOnly={!owner}
-          onUpgrade={
-            owner
-              ? () => {
-                  setEditor(undefined);
-                  setSubscription(true);
-                }
-              : undefined
+        <Suspense
+          fallback={
+            <div className="panel-loading" role="status">
+              {m("正在加载界面…")}
+            </div>
           }
-          onClose={() => {
-            if (!busy) setEditor(undefined);
-          }}
-          onRequestTakeover={() =>
-            owner ? setSubscription(true) : openAction("unlock")
-          }
-          onSave={async (item) => {
-            if (
-              !(await perform(
-                () => call("saveItem", item),
-                m("资产已加密保存，请更新主盘备份。"),
-              ))
-            )
-              throw new Error(lastError.current || m("保存未完成，请重试。"));
-          }}
-          onDelete={async (id) => {
-            if (
-              !(await perform(
-                () => call("deleteItem", id),
-                m("资产已删除，请更新主盘备份。"),
-              ))
-            )
-              throw new Error(lastError.current || m("删除未完成。"));
-          }}
-        /></Suspense>
+        >
+          <ItemModal
+            isOpen
+            initialItem={editor}
+            defaultCategory={category || "login"}
+            isReadOnly={!owner || preferences.subscriptionDemo === "expired"}
+            isHeirReadOnly={!owner}
+            onUpgrade={
+              owner
+                ? () => {
+                    setEditor(undefined);
+                    setSubscription(true);
+                  }
+                : undefined
+            }
+            onClose={() => {
+              if (!busy) setEditor(undefined);
+            }}
+            onRequestTakeover={() =>
+              owner ? setSubscription(true) : openAction("unlock")
+            }
+            onSave={async (item) => {
+              if (
+                !(await perform(
+                  () => call("saveItem", item),
+                  m("资产已加密保存，请更新主盘备份。"),
+                ))
+              )
+                throw new Error(lastError.current || m("保存未完成，请重试。"));
+            }}
+            onDelete={async (id) => {
+              if (
+                !(await perform(
+                  () => call("deleteItem", id),
+                  m("资产已删除，请更新主盘备份。"),
+                ))
+              )
+                throw new Error(lastError.current || m("删除未完成。"));
+            }}
+          />
+        </Suspense>
       )}
       {action && (
         <dialog
@@ -1051,6 +1181,7 @@ function VaultApp() {
                   provision: m("验证并配置两盘"),
                   credentials: m("更换所有者凭据"),
                   destroy: m("删除本机密库"),
+                  remember: m("在本机记住安全密钥"),
                 }[action]
               }
             </h2>

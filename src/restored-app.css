@@ -7,6 +7,20 @@
     "Microsoft YaHei",
     sans-serif;
 }
+.optional-fields > summary {
+  cursor: pointer;
+  color: #c4d4ee;
+  font-weight: 600;
+  padding: 4px 0;
+}
+.optional-fields[open] > summary {
+  margin-bottom: 16px;
+}
+.optional-fields > summary:focus-visible {
+  outline: 2px solid #67e8f9;
+  outline-offset: 4px;
+  border-radius: 4px;
+}
 .restored-workspace {
   min-width: 0;
   flex: 1;
@@ -346,15 +360,12 @@
 .restored-app .card-fields-box:empty {
   display: none;
 }
-.secure-controls .secure-card > button + button {
-  margin-inline-start: 10px;
-}
 .secure-controls .secure-row {
   gap: 12px;
   flex-wrap: wrap;
 }
 .secure-controls .secure-card > button {
-  margin-block: 6px;
+  margin: 6px 0;
 }
 .secure-controls button:focus-visible,
 .restored-app button:focus-visible {
@@ -365,10 +376,55 @@
   gap: 12px;
   flex-wrap: wrap;
 }
-@media (max-width: 850px) {
-  .secure-controls .secure-card > button + button {
-    margin-inline-start: 0;
-  }
+.secure-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
+  gap: 12px;
+  margin: 18px 0;
+}
+.secure-controls .secure-actions > button {
+  margin: 0;
+  width: 100%;
+}
+.secure-controls button:not(.modal-window-dialog button) {
+  min-height: 44px;
+  border-radius: 10px;
+  border-color: #607a9b80;
+  background: linear-gradient(180deg, #2a3d59, #1e2d45);
+  box-shadow:
+    inset 0 1px #ffffff0c,
+    0 2px 5px #0002;
+  line-height: 1.5;
+  transition:
+    background 120ms,
+    border-color 120ms,
+    box-shadow 120ms;
+}
+.secure-controls button:not(.modal-window-dialog button):not(:disabled):hover {
+  border-color: #83c7ef;
+  background: #2c4664;
+}
+.secure-controls button:not(.modal-window-dialog button).primary {
+  background: linear-gradient(135deg, #2563eb, #3459cf);
+  border-color: #709bff;
+}
+.secure-controls button:not(.modal-window-dialog button).danger:not(:disabled) {
+  color: #fecaca;
+  background: #542936;
+  border-color: #e8797977;
+}
+.secure-controls button:not(.modal-window-dialog button):disabled {
+  opacity: 1;
+  color: #8e9bb0;
+  background: #1a2940;
+  border-color: #3d4d6480;
+  box-shadow: none;
+}
+.secure-controls .secure-row > button {
+  margin: 0;
+}
+.restored-app .modal-window-dialog .form-card {
+  border-radius: 12px;
 }
 
 /* Category navigation, compact item list and independently scrolling details. */

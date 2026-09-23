@@ -103,6 +103,10 @@ export const RightContentArea: React.FC<RightContentAreaProps> = ({
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const detailRef = useRef<HTMLElement>(null);
+  const workspaceRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    workspaceRef.current?.scrollTo(0, 0);
+  }, [selectedNav]);
   const [isThemeMenuOpen, setIsThemeMenuOpen] = useState(false);
 
   const [copyError, setCopyError] = useState("");
@@ -459,6 +463,7 @@ export const RightContentArea: React.FC<RightContentAreaProps> = ({
 
       {/* 主工作滚动区域 */}
       <div
+        ref={workspaceRef}
         className={`main-scroll-content ${selectedNav !== "settings" && selectedNav !== "import_export" ? "master-detail-content" : ""}`}
       >
         {banner}

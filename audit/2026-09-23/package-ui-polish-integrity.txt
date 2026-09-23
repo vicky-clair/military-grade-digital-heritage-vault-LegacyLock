@@ -1,0 +1,76 @@
+MATCH electron\main.cjs
+MATCH electron\preload.cjs
+MATCH electron\tray-icon.png
+MATCH electron\ui-messages.json
+MATCH electron\vault-controller.cjs
+MATCH electron\vault-core.cjs
+MATCH electron\vault-media.cjs
+MATCH electron\vault-preferences.cjs
+MATCH electron\vault-store.cjs
+MATCH electron\vault-tray.cjs
+MATCH dist\assets\categories-Bud0rnvs.js
+MATCH dist\assets\CategoryPickerModal-CZu7XtTr.js
+MATCH dist\assets\crown-BTchiFEA.js
+MATCH dist\assets\index-BRdOLtFv.js
+MATCH dist\assets\index-D9Ud6y3m.css
+MATCH dist\assets\ItemModal-DV7ZXhI3.js
+MATCH dist\assets\RightContentArea-cpDpRk1Z.js
+MATCH dist\assets\search-BDTSlZPM.js
+MATCH dist\assets\sparkles-BH5__ipi.js
+MATCH dist\assets\SubscriptionModal-uLyoWJfD.js
+MATCH dist\assets\trash-2-BnZTygV-.js
+MATCH dist\assets\x-DjEGljAc.js
+MATCH dist\index.html
+MATCH reader/scripts/recovery-reader.cjs
+MATCH reader/electron/vault-core.cjs
+MATCH reader/electron/vault-store.cjs
+MATCH reader/HEIR_MANUAL.md
+MATCH reader/LVCF3_PROTOCOL.md
+
+7-Zip 25.01 (x64) : Copyright (c) 1999-2025 Igor Pavlov : 2025-08-03
+
+Scanning the drive for archives:
+1 file, 92864427 bytes (89 MiB)
+
+Testing archive: release\1.0.4-ui-polish\LegacyLock Setup 1.0.4.exe
+--
+Path = release\1.0.4-ui-polish\LegacyLock Setup 1.0.4.exe
+Type = Nsis
+Physical Size = 92864427
+Method = Deflate
+Solid = -
+Headers Size = 214006
+Embedded Stub Size = 59904
+SubType = NSIS-3 Unicode
+
+Everything is Ok
+
+Files: 10
+Size:       92295867
+Compressed: 92864427
+
+
+7-Zip 25.01 (x64) : Copyright (c) 1999-2025 Igor Pavlov : 2025-08-03
+
+Scanning the drive for archives:
+1 file, 92634356 bytes (89 MiB)
+
+Testing archive: release\1.0.4-ui-polish\LegacyLock-v1.0.4-Windows-Portable.exe
+--
+Path = release\1.0.4-ui-polish\LegacyLock-v1.0.4-Windows-Portable.exe
+Type = Nsis
+Physical Size = 92634356
+Method = Deflate
+Solid = -
+Headers Size = 39790
+Embedded Stub Size = 38400
+SubType = NSIS-3 Unicode
+
+Everything is Ok
+
+Files: 4
+Size:       92295867
+Compressed: 92634356
+
+0362f9248da7e87e9b1b7789f0faa394f7a020ed3126e6f4dcd90e6c9d69b7a4  LegacyLock Setup 1.0.4.exe
+43ee0aa1cc44acbd01030949cd35d2fce16ff39cd941d935ea3b704c9ab4a5ac  LegacyLock-v1.0.4-Windows-Portable.exe

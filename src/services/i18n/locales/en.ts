@@ -95,16 +95,16 @@ export const en: TranslationDictionary = {
     readOnlyBadge: "Read-Only Mode",
     readOnlyBanner:
       "Current mode is Read-Only: You can view credentials, copy passwords, and download attachments.",
-    titleLabel: "Asset Name / Title",
+    titleLabel: "Name",
     titlePlaceholder:
       "e.g. GitHub Production Admin, Primary Bank Account, AWS Root Key...",
     categoryLabel: "Category",
-    usernameLabel: "Username / Account / Identifier",
+    usernameLabel: "Account",
     usernamePlaceholder: "e.g. admin@organization.com or account ID",
-    passwordLabel: "Password / Secret Credential",
-    passwordPlaceholder: "Enter high-strength password or secret token",
+    passwordLabel: "Password",
+    passwordPlaceholder: "This account's password, not your vault password",
     generatePassBtn: "Generate Strong Password",
-    urlLabel: "Website / Login URL / Node",
+    urlLabel: "URL",
     urlPlaceholder: "https://...",
     notesLabel: "Encrypted Notes (Markdown Supported)",
     notesPlaceholder:

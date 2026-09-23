@@ -112,7 +112,7 @@ app.on("browser-window-created", (_event, win) => {
         "..",
         "audit",
         "2026-09-21",
-        "master-detail-ui",
+        "remembered-key-ui",
       );
       await fs.mkdir(folder, { recursive: true });
       // Hidden windows can return an older compositor frame. Request frames before retaining one.
@@ -202,6 +202,14 @@ app.on("browser-window-created", (_event, win) => {
       assert.equal(await js(`localStorage.getItem('legacylock_items')`), null);
       assert.equal(await js(`localStorage.getItem('legacylock_plan')`), null);
       await js(
+        `Array.from(document.querySelectorAll('button')).find(b=>b.textContent.includes('加密导入导出')).click()`,
+      );
+      await tick();
+      await js(
+        "document.querySelector('.secure-actions').scrollIntoView({block:'center'})",
+      );
+      await screenshot("15-backup-buttons.png");
+      await js(
         `Array.from(document.querySelectorAll('button')).find(b=>b.textContent.includes('系统设置与安全')).click()`,
       );
       await tick();
@@ -254,6 +262,40 @@ app.on("browser-window-created", (_event, win) => {
       await tick();
       await visible(".modal-window-dialog");
       await screenshot("02-item-editor.png");
+      await js(
+        `(()=>{const f=document.querySelector('.modal-window-dialog select');Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set.call(f,'note');f.dispatchEvent(new Event('change',{bubbles:true}));})()`,
+      );
+      await tick();
+      assert.equal(
+        await js("document.querySelector('details.optional-fields').open"),
+        false,
+      );
+      await js(
+        `(()=>{const f=document.querySelector('.modal-window-dialog select');Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set.call(f,'login');f.dispatchEvent(new Event('change',{bubbles:true}));})()`,
+      );
+      await tick();
+      assert.equal(
+        await js("document.querySelector('details.optional-fields').open"),
+        true,
+      );
+      assert.equal(
+        await js("document.querySelector('.attachment-dropzone')===null"),
+        true,
+      );
+      await js("document.querySelector('.btn-add-more-pill').click()");
+      await tick();
+      await js(
+        `(()=>{const input=document.querySelector('input[type=file]');const original=input.click;input.click=()=>{window.attachmentPickerOpened=true};Array.from(document.querySelectorAll('.dropdown-menu-item')).find(b=>b.textContent.includes('附上文件')).click();input.click=original;})()`,
+      );
+      assert.equal(await js("window.attachmentPickerOpened"), true);
+      await js(
+        `(()=>{const input=document.querySelector('input[type=file]');const data=new DataTransfer();data.items.add(new File(['Synthetic attachment'],'test-attachment.txt',{type:'text/plain'}));input.files=data.files;input.dispatchEvent(new Event('change',{bubbles:true}));})()`,
+      );
+      await tick();
+      assert.match(
+        await js("document.querySelector('.attachment-container').innerText"),
+        /test-attachment.txt/,
+      );
       assert.equal(
         await js("document.querySelector('.btn-quick-add-link')===null"),
         true,
@@ -571,6 +613,43 @@ app.on("browser-window-created", (_event, win) => {
       await js(`document.querySelector('.sidebar-settings-btn').click()`);
       await tick();
       await js(
+        `Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='在本机记住安全密钥').click()`,
+      );
+      await tick();
+      await js(
+        `(()=>{const fields=document.querySelectorAll('dialog input[type="password"]');const setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;['Test password for desktop!',window.testSecret].forEach((v,i)=>{setter.call(fields[i],v);fields[i].dispatchEvent(new Event('input',{bubbles:true}));});})()`,
+      );
+      await tick();
+      await js("document.querySelector('dialog form').requestSubmit()");
+      await new Promise((r) => setTimeout(r, 350));
+      assert.equal(
+        (await js("window.vaultAPI.localUnlockStatus()")).value.remembered,
+        true,
+      );
+      assert.ok(
+        !(
+          await fs.readFile(path.join(dir, "local-key-v1.json"), "utf8")
+        ).includes(await js("window.testSecret")),
+      );
+      await js("window.vaultAPI.lock()");
+      await tick();
+      assert.equal(
+        await js(
+          "document.querySelectorAll('form input[type=password]').length",
+        ),
+        1,
+      );
+      await screenshot("16-password-only.png");
+      await js(
+        `(()=>{const f=document.querySelector('form input[type=password]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(f,'Test password for desktop!');f.dispatchEvent(new Event('input',{bubbles:true}));})()`,
+      );
+      await new Promise((r) => setTimeout(r, 1600));
+      await js("document.querySelector('form').requestSubmit()");
+      await new Promise((r) => setTimeout(r, 350));
+      assert.match(await js("document.body.innerText"), /所有者 · 可管理/);
+      await js(`document.querySelector('.sidebar-settings-btn').click()`);
+      await tick();
+      await js(
         `Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='删除本机密库（需两次确认）').click()`,
       );
       await tick();
@@ -593,6 +672,9 @@ app.on("browser-window-created", (_event, win) => {
       await js(`document.querySelector('dialog form').requestSubmit()`);
       await tick();
       assert.equal((await js("window.vaultAPI.status()")).value.exists, false);
+      await assert.rejects(fs.access(path.join(dir, "local-key-v1.json")), {
+        code: "ENOENT",
+      });
       await assert.rejects(
         fs.access(path.join(dir, "vault-v3.llvault.previous")),
         { code: "ENOENT" },

@@ -147,6 +147,8 @@ class VaultStore {
   async commit(next) {
     const epoch = this.epoch;
     try {
+      await this.beforeCommit?.(next.envelope);
+      if (epoch !== this.epoch) core.fail("LOCKED");
       await atomicWrite(this.file, next.envelope);
       if (epoch !== this.epoch) {
         core.destroySession(next);

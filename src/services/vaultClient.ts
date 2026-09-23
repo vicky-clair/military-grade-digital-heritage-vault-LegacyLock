@@ -37,6 +37,9 @@ type Method =
   | "newSecret"
   | "initialize"
   | "unlock"
+  | "unlockLocal"
+  | "localUnlockStatus"
+  | "setRememberedSecret"
   | "lock"
   | "saveItem"
   | "deleteItem"
@@ -67,6 +70,7 @@ declare global {
   }
 }
 const errors: Record<string, string> = {
+  LOCAL_KEY_UNAVAILABLE: "本机记住的密钥不可用，请改用密码和安全密钥解锁。",
   CONFIRMATION_REQUIRED: "销毁确认已失效，请重新验证密码和安全密钥。",
   DEMO_READ_ONLY:
     "当前模拟试用到期；可在订阅测试页面恢复试用或模拟开通。不会扣费。",

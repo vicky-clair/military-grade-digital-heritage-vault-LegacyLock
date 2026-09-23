@@ -1,4 +1,69 @@
 {
+  "本机解锁方式": ["Unlock on this device", "この端末のロック解除"],
+  "已记住安全密钥：本机解锁只需密码。": [
+    "Security key remembered: enter your password to unlock this device.",
+    "安全キーを保存済みです。この端末はパスワードで解除できます。"
+  ],
+  "每次解锁必须输入密码和安全密钥。": [
+    "Password and security key are required for every unlock.",
+    "解除のたびにパスワードと安全キーが必要です。"
+  ],
+  "记住密钥会降低本机保护强度；备份导入、导出及更换凭据仍需要密码和安全密钥。": [
+    "Remembering the key reduces local protection. Backup import, export and credential changes still require both credentials.",
+    "キーの保存は端末の保護を弱めます。バックアップの入出力や認証情報の変更には両方が必要です。"
+  ],
+  "改为每次输入安全密钥": [
+    "Require the security key every time",
+    "毎回安全キーを入力する"
+  ],
+  "在本机记住安全密钥": [
+    "Remember security key on this device",
+    "この端末に安全キーを保存"
+  ],
+  "系统安全存储不可用，无法启用记住密钥。": [
+    "Secure OS storage is unavailable. The key cannot be remembered.",
+    "OSの安全なストレージが利用できないため、キーを保存できません。"
+  ],
+  "改用密码和安全密钥解锁": [
+    "Use password and security key instead",
+    "パスワードと安全キーで解除する"
+  ],
+  "已取消记住密钥，下次解锁需要两项凭据。": [
+    "Remembered key removed. Both credentials are required next time.",
+    "保存したキーを削除しました。次回は両方の認証情報が必要です。"
+  ],
+  "已在本机记住安全密钥；请继续保留独立密钥备份。": [
+    "Security key remembered locally. Keep your separate key backup.",
+    "この端末に安全キーを保存しました。別途キーのバックアップを保管してください。"
+  ],
+  "本机记住的密钥不可用，请改用密码和安全密钥解锁。": [
+    "Remembered key unavailable. Unlock with your password and security key.",
+    "保存したキーを利用できません。パスワードと安全キーで解除してください。"
+  ],
+  "先选择类型，再填写内容；只有标题必填。": [
+    "Choose a type, then add details. Only the title is required.",
+    "種類を選んで内容を入力します。必須項目はタイトルのみです。"
+  ],
+  "交接对象姓名（选填）": [
+    "Recipient name (optional)",
+    "引き継ぐ相手の名前（任意）"
+  ],
+  "整体交接说明（选填）": [
+    "General handover notes (optional)",
+    "全体の引き継ぎメモ（任意）"
+  ],
+  "交接信息仅用于说明，不验证身份、不通知对方，也不授予权限；只读访问仍需要双 U 盘。": [
+    "These notes do not verify identity, notify anyone or grant access. Read-only recovery still requires both USB drives.",
+    "この情報は説明用です。本人確認、通知、権限付与は行いません。読み取り専用アクセスには引き続き2本のUSBが必要です。"
+  ],
+  "账号、密码与网址（按需填写）": [
+    "Account, password and URL (optional)",
+    "アカウント・パスワード・URL（必要に応じて入力）"
+  ],
+  "这项资产如何交接（选填）": [
+    "How to hand over this item (optional)",
+    "この項目の引き継ぎ方法（任意）"
+  ],
   "操作失败": ["Operation failed", "操作に失敗しました"],
   "界面设置已保存。": ["Display settings saved.", "表示設定を保存しました。"],
   "已扫描实际 USB 设备。": [

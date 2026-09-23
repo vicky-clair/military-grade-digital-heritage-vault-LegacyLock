@@ -10,6 +10,7 @@ const {
   Tray,
   Menu,
   nativeImage,
+  safeStorage,
 } = require("electron");
 const path = require("node:path");
 const { pathToFileURL } = require("node:url");
@@ -19,6 +20,7 @@ const { VaultStore } = require("./vault-store.cjs");
 const { VaultController } = require("./vault-controller.cjs");
 const { Preferences } = require("./vault-preferences.cjs");
 const { VaultTray } = require("./vault-tray.cjs");
+const { LocalKey } = require("./vault-local-key.cjs");
 const messages = require("./ui-messages.json");
 let displayLanguage = "zh",
   tray;
@@ -139,6 +141,14 @@ else {
         preferencesWarning: !!preferences.loadWarning,
       }));
       register("newSecret", () => core.newSecret());
+      const localKey = new LocalKey(
+        store,
+        path.join(app.getPath("userData"), "local-key-v1.json"),
+        safeStorage,
+      );
+      store.beforeCommit = (envelope) => localKey.invalidateFor(envelope);
+      controller.beforeDestroy = () => localKey.clear();
+      register("localUnlockStatus", () => localKey.status());
       let nextAttempt = 0;
       const authenticate =
         (fn) =>
@@ -148,6 +158,17 @@ else {
           return fn(...args);
         };
       register("initialize", (p, s) => store.initialize(p, s));
+      register(
+        "unlockLocal",
+        authenticate((p) => localKey.unlock(p)),
+      );
+      register(
+        "setRememberedSecret",
+        authenticate(async (enabled, p, s) => {
+          await localKey.set(enabled, p, s);
+          return { localUnlock: await localKey.status() };
+        }),
+      );
       register(
         "unlock",
         authenticate(async (p, s) => {
