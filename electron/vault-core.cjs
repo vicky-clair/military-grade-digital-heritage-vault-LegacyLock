@@ -1,9 +1,23 @@
 "use strict";
-// LVCF 3: a single, versioned implementation shared by desktop and offline reader.
+/**
+ * LVCF 3 (LegacyLock Vault Container Format v3) 密码学与安全核心实现
+ * 
+ * 核心安全设计哲学：
+ * 1. 唯一协议权威：桌面主进程与独立离线阅读器共享此单一、带版本号的协议实现；
+ * 2. 强口令 KDF 派生：采用 scrypt (N=32768, r=8, p=1) 计算口令与安全密钥派生密钥；
+ * 3. 军工级对称加密：主数据采用 AES-256-GCM 认证加密 (AEAD)，附加认证数据 (AAD) 强绑定信封上下文；
+ * 4. 非对称抗篡改签名：采用 Ed25519 签名体系，信封任何字节被修改即触发验签失败 (Fail-Closed)；
+ * 5. 双物理 U 盘只读恢复：采用 HKDF-SHA256 派生双份独立恢复秘密 (2-of-2)，无单点破解后门；
+ * 6. 内存即时零化擦除 (Zeroization)：密钥材料使用完毕后立即调用 .fill(0) 清除。
+ */
 const c = require("node:crypto");
 const { promisify } = require("node:util");
 const scrypt = promisify(c.scrypt);
+
+// 单个密库容器与解析的最大容量上限 (32MB)，防范内存耗尽 DoS 攻击
 const MAX_BYTES = 32 * 1024 * 1024;
+
+// 资产允许的合法类别白名单集合
 const CATEGORIES = new Set([
   "login",
   "note",
@@ -30,15 +44,30 @@ const CATEGORIES = new Set([
   "game",
   "license",
 ]);
+
+/**
+ * 密库核心安全异常类
+ */
 class VaultError extends Error {
   constructor(code) {
     super(code);
     this.code = code;
   }
 }
+
+/**
+ * 快速抛出密库异常工具函数
+ * @param {string} code 错误代码标识
+ */
 function fail(code) {
   throw new VaultError(code);
 }
+
+/**
+ * 规范化 JSON 序列化 (Canonical JSON)
+ * 递归对对象的键名按字母升序排序，保证相同的对象结构始终生成严格一致的字节流，
+ * 彻底消除因空白字符或字段乱序导致的数字签名验签不一致问题。
+ */
 function canonical(v) {
   if (v === null || typeof v !== "object") return JSON.stringify(v);
   if (Array.isArray(v)) return "[" + v.map(canonical).join(",") + "]";
@@ -52,6 +81,10 @@ function canonical(v) {
     "}"
   );
 }
+
+/**
+ * 安全解析 JSON 文本，包含最大字节数限制检测与异常封装
+ */
 function json(text) {
   if (typeof text !== "string" || Buffer.byteLength(text) > MAX_BYTES)
     fail("INVALID_SIZE");
@@ -81,12 +114,21 @@ function secretText(v) {
   if (!/^[0-9a-f]{64}$/.test(clean)) fail("INVALID_CREDENTIALS");
   return clean;
 }
+/**
+ * 生成符合 LL3- 格式规范的随机 256 位安全密钥文本 (64 字符十六进制，带连字符分组)
+ */
 function newSecret() {
   return (
     "LL3-" +
     c.randomBytes(32).toString("hex").match(/.{8}/g).join("-").toUpperCase()
   );
 }
+
+/**
+ * 基于用户口令 + 安全密钥派生高强度对称密钥
+ * 采用 scrypt 密码散列函数 (N=32768 CPU/内存开销，r=8 分块大小，p=1 并行度)，
+ * 并在计算完成后立即执行内存清空零化 (fill(0))。
+ */
 async function credentialKey(password, secret, salt) {
   if (!str(password, 1024) || password.length < 12) fail("INVALID_CREDENTIALS");
   const material = Buffer.from(JSON.stringify([password, secretText(secret)]));
@@ -101,6 +143,14 @@ async function credentialKey(password, secret, salt) {
     material.fill(0);
   }
 }
+
+/**
+ * AES-256-GCM 认证加密
+ * @param {Buffer} key 256 位对称密钥
+ * @param {Buffer|object} data 明文数据（自动规范化转为 Buffer）
+ * @param {string} aad 附加认证数据 (Associated Authenticated Data)，用于绑定上下文防篡改与重放
+ * @returns {{iv: string, tag: string, data: string}} Base64 编码的密文盒
+ */
 function encrypt(key, data, aad) {
   const iv = c.randomBytes(12),
     cipher = c.createCipheriv("aes-256-gcm", key, iv);
@@ -117,6 +167,7 @@ function encrypt(key, data, aad) {
     if (!Buffer.isBuffer(data)) bytes.fill(0);
   }
 }
+
 function boxCheck(box) {
   if (!object(box) || Object.keys(box).sort().join(",") !== "data,iv,tag")
     fail("INVALID_FORMAT");
@@ -124,6 +175,11 @@ function boxCheck(box) {
   b64(box.tag, 16);
   b64(box.data);
 }
+
+/**
+ * AES-256-GCM 认证解密
+ * 严格验证 IV (12字节)、Tag (16字节) 与 AAD，任何不匹配均触发 AUTHENTICATION_FAILED
+ */
 function decrypt(key, box, aad) {
   boxCheck(box);
   try {
@@ -135,6 +191,10 @@ function decrypt(key, box, aad) {
     fail("AUTHENTICATION_FAILED");
   }
 }
+
+/**
+ * 解密密文盒并解析还原为 JSON 数据对象，解析后立即清零明文临时缓冲区
+ */
 function unpack(key, box, aad) {
   const buf = decrypt(key, box, aad);
   try {
@@ -143,6 +203,9 @@ function unpack(key, box, aad) {
     buf.fill(0);
   }
 }
+/**
+ * 解析并生成 Ed25519 签名根公钥对象
+ */
 function rootKey(v) {
   try {
     const k = c.createPublicKey({ key: b64(v), format: "der", type: "spki" });
@@ -152,10 +215,19 @@ function rootKey(v) {
     fail("INVALID_FORMAT");
   }
 }
+
+/**
+ * 剥离信封对象的 signature 字段，获取待签名原始载荷
+ */
 function unsigned(v) {
   const { signature, ...rest } = v;
   return rest;
 }
+
+/**
+ * 使用 Ed25519 私钥对信封规范化 JSON 进行数字签名
+ * @returns {object} 附加 Base64 格式 signature 字段的完整信封
+ */
 function sign(v, key) {
   const body = unsigned(v);
   return {
@@ -165,6 +237,11 @@ function sign(v, key) {
       .toString("base64"),
   };
 }
+
+/**
+ * 严格校验密库信封 (LVCF 3) 的结构、字段类型、KDF 参数及 Ed25519 数字签名
+ * 任何结构偏差或签名篡改均会直接抛出异常拒绝加载 (Fail-Closed)
+ */
 function validateEnvelope(v, pin) {
   if (
     !object(v) ||
@@ -350,6 +427,14 @@ async function wrapOwner(v, vmk, signingKey, password, secret) {
     privateBytes.fill(0);
   }
 }
+/**
+ * 创建新密库 (初始化)
+ * 1. 自动生成专属 Ed25519 签名密钥对；
+ * 2. 随机生成 256 位 Vault Master Key (VMK) 主数据密钥；
+ * 3. 使用用户输入的口令与安全密钥通过 scrypt 派生包装密钥，封装 VMK 和 Ed25519 私钥；
+ * 4. 使用 VMK 加密初始资产数据；
+ * 5. 使用私钥对整个信封生成数字签名。
+ */
 async function create(password, secret, initial = []) {
   validateItems(initial);
   const keys = c.generateKeyPairSync("ed25519"),
@@ -385,6 +470,11 @@ async function create(password, secret, initial = []) {
     throw e;
   }
 }
+
+/**
+ * 所有者解锁会话
+ * 校验数字签名 -> scrypt 派生口令密钥 -> 解密 VMK 与 Ed25519 签名私钥 -> 校验公私钥匹配 -> 解密资产数据
+ */
 async function unlockOwner(envelope, password, secret, pin) {
   const v = validateEnvelope(envelope, pin),
     key = await credentialKey(password, secret, b64(v.owner.salt, 16));
@@ -424,6 +514,11 @@ async function unlockOwner(envelope, password, secret, pin) {
     key.fill(0);
   }
 }
+
+/**
+ * 更新密库数据 (保存资产/设置变更)
+ * 版本号递增 (revision + 1)，用 VMK 重新加密载荷，并用 Ed25519 私钥重新签名
+ */
 function update(session, data) {
   owner(session);
   validateData(data);
@@ -434,6 +529,10 @@ function update(session, data) {
   };
   return { ...session, envelope: sign(v, session.signingKey), data };
 }
+
+/**
+ * 基于 HKDF-SHA256 算法，将双物理 U 盘的随机秘密 a 与 b 合并派生出恢复密钥
+ */
 function recoveryKey(a, b, id, generation) {
   const seed = Buffer.concat([a, b]);
   try {
@@ -450,6 +549,11 @@ function recoveryKey(a, b, id, generation) {
     seed.fill(0);
   }
 }
+
+/**
+ * 为双 USB 设备配置/签发恢复秘密份额 (2-of-2 独立签名凭证)
+ * 生成新的 recovery generation 代次，使用 Ed25519 签名主盘和副盘的独立 llkey 文件
+ */
 function provision(session) {
   owner(session);
   const a = c.randomBytes(32),
@@ -486,6 +590,10 @@ function provision(session) {
     key.fill(0);
   }
 }
+
+/**
+ * 核验单个恢复份额 (llkey) 的结构、角色、代次及所有者 Ed25519 数字签名
+ */
 function verifyShare(s, v, role) {
   if (
     !object(s) ||
@@ -510,6 +618,12 @@ function verifyShare(s, v, role) {
     fail("INVALID_SIGNATURE");
   return b64(s.secret, 32);
 }
+
+/**
+ * 继承人双盘只读恢复会话
+ * 必须同时提供主盘和副盘秘密文件，核验两份签名有效且代次匹配后，恢复解密 VMK，生成只读会话 (role: HEIR)
+ * 注意：继承人会话不包含 signingKey，根本无法伪造或签署任何写入修改！
+ */
 function unlockRecovery(envelope, primary, secondary) {
   const v = validateEnvelope(envelope);
   if (!v.recovery) fail("NO_RECOVERY");
@@ -540,6 +654,10 @@ function unlockRecovery(envelope, primary, secondary) {
     key?.fill(0);
   }
 }
+
+/**
+ * 修改所有者密码与安全密钥 (重包装 owner 结构)
+ */
 async function rewrap(session, password, secret) {
   owner(session);
   const v = { ...session.envelope, revision: session.envelope.revision + 1 };
@@ -552,7 +670,11 @@ async function rewrap(session, password, secret) {
   );
   return { ...session, envelope: sign(v, session.signingKey) };
 }
-// Rotate the data key as well as the shares: old recovery material must not open future payloads.
+
+/**
+ * 轮换恢复代次并重置主数据密钥 (VMK)
+ * 重新生成全新 VMK，并强制使之前的历史恢复秘密失效
+ */
 async function rotateRecovery(session, password, secret) {
   owner(session);
   const checked = await unlockOwner(session.envelope, password, secret);
@@ -568,6 +690,10 @@ async function rotateRecovery(session, password, secret) {
     throw e;
   }
 }
+
+/**
+ * 彻底销毁并擦除会话内存（主动调用 fill(0) 清除 VMK 主密钥，清空数据引用）
+ */
 function destroySession(s) {
   if (s) {
     s.vmk?.fill(0);

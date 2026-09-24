@@ -19,7 +19,12 @@ async function fixture(t) {
       !path.basename(dir).startsWith("legacylock-local-key-")
     )
       throw Error("Unsafe cleanup");
-    await fs.rm(dir, { recursive: true, force: true });
+    await fs.rm(dir, {
+      recursive: true,
+      force: true,
+      maxRetries: 10,
+      retryDelay: 100,
+    });
   });
   const key = crypto.randomBytes(32);
   const safe = {

@@ -1,8 +1,23 @@
 "use strict";
+/**
+ * 密库持久化存储与原子 I/O 模块
+ * 
+ * 核心安全机制：
+ * 1. 同文件系统临时文件写入 + 独占排他创建标志 (wx, 0o600)；
+ * 2. 强制物理落盘 (fsync)，杜绝断电导致的文件损坏；
+ * 3. 写入读回校验：每次写入后立即从磁盘重新读取，校验 canonical 字节与数字签名；
+ * 4. 自动保留上一快照 (.previous)，防止灾难事故；
+ * 5. 原子替换 (rename)，规避中间半截入库状态；
+ * 6. 串行操作锁 (serial queue) 与 代次代数 (epoch)，防范并发竞争与旧会话越权。
+ */
 const fs = require("node:fs/promises"),
   path = require("node:path"),
   crypto = require("node:crypto");
 const core = require("./vault-core.cjs");
+
+/**
+ * 安全读取密库文件，校验文件大小及读取完整性
+ */
 async function read(file) {
   const h = await fs.open(file, "r");
   try {
@@ -21,7 +36,17 @@ async function read(file) {
     await h.close();
   }
 }
-// Temp file in the same filesystem. Never silently changes the destination.
+
+/**
+ * 工业级原子写入 (Atomic Write with Fsync & Verify)
+ * 写入流程：
+ * 1. 检查软链接符号攻击 (Anti-Symlink Attack)；
+ * 2. 写入随机同级临时文件 (.tmp-xxx) 并执行 fsync() 强制刷盘；
+ * 3. 立即读回临时文件，校验 canonical JSON 字节与信封结构；
+ * 4. 将原有效文件备份至 .previous；
+ * 5. 通过系统原子 rename 替换目标文件；
+ * 6. 再次读回目标文件核实，若出现异常则标记 commitUncertain = true 触发会话锁定。
+ */
 async function atomicWrite(
   file,
   value,
@@ -89,14 +114,23 @@ async function atomicWrite(
     });
   }
 }
+/**
+ * 密库持久化存储管理类
+ * 维护内存中解密的会话对象 (session)、磁盘文件路径、串行写队列与活动状态
+ */
 class VaultStore {
   constructor(file) {
     this.file = file;
     this.session = null;
     this.queue = Promise.resolve();
-    this.epoch = 0;
+    this.epoch = 0; // 会话代次：锁定后立即自增，使排队中的过期写入立即作废 (fail-closed)
     this.lastActivity = Date.now();
   }
+
+  /**
+   * 串行化执行高危 I/O 操作，杜绝多线程/多事件并发导致的数据交错
+   * 同时比对执行时刻与排队时刻的 epoch，如果期间发生过锁屏或退出，则拒绝执行并报错 LOCKED
+   */
   serial(fn) {
     const epoch = this.epoch;
     const next = this.queue.then(() => {
@@ -106,6 +140,10 @@ class VaultStore {
     this.queue = next.catch(() => {});
     return next;
   }
+
+  /**
+   * 安全锁定会话：代次自增使等待任务失效，内存擦除零化 session，并置空引用
+   */
   lock() {
     this.epoch++;
     core.destroySession(this.session);

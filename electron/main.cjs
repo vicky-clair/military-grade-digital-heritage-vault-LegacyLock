@@ -1,4 +1,15 @@
 "use strict";
+/**
+ * Electron 主进程与系统生命周期管理器 (Main Process)
+ * 
+ * 核心安全防御体系：
+ * 1. 单实例互斥锁 (Single Instance Lock)：防止多个实例同时访问和争用密库；
+ * 2. 剪贴板安全销毁：复制密码等敏感信息后自动启动定时销毁，锁定密库时立即清空剪贴板；
+ * 3. 来源严苛校验 (Sender Verification)：核验 IPC 消息必须来自主窗口顶层本地 HTML，防范恶意脚本跨帧投毒；
+ * 4. 强制网络断网隔离 (Air-Gap Simulation)：拦截渲染进程所有发往外部的外联网络请求；
+ * 5. OS 系统级感知联动：监听系统锁屏、睡眠挂起事件，第一时间触发密库零化锁定；
+ * 6. 不确定性提交防御 (Fail-Closed)：发生写入异常或未决状态时，立即阻断后续执行并强制锁定。
+ */
 const {
   app,
   BrowserWindow,
@@ -22,6 +33,7 @@ const { Preferences } = require("./vault-preferences.cjs");
 const { VaultTray } = require("./vault-tray.cjs");
 const { LocalKey } = require("./vault-local-key.cjs");
 const messages = require("./ui-messages.json");
+
 let displayLanguage = "zh",
   tray;
 const text = (source) =>
@@ -30,16 +42,21 @@ const text = (source) =>
     ? messages[source][displayLanguage === "ja" ? 1 : 0]
     : source;
 let preferences, clipboardTimer, copiedText;
+
+/**
+ * 清空复制到剪贴板的敏感密码，避免密码常驻系统剪贴板被其他应用读取
+ */
 function clearCopiedText() {
   clearTimeout(clipboardTimer);
   try {
     if (copiedText !== undefined && clipboard.readText() === copiedText)
       clipboard.clear();
   } catch {
-    /* Clipboard availability must not prevent locking the vault. */
+    /* 剪贴板异常不得阻断密库锁定流程 */
   }
   copiedText = undefined;
 }
+
 let win,
   store,
   controller,
@@ -49,6 +66,10 @@ let win,
 let closePrompt = false;
 const entry = path.join(__dirname, "..", "dist", "index.html"),
   entryUrl = pathToFileURL(entry).href;
+
+/**
+ * 触发全局安全锁定
+ */
 function lock() {
   clearCopiedText();
   controller?.lock();
@@ -56,10 +77,14 @@ function lock() {
     try {
       win.webContents.send("secure:locked");
     } catch {
-      /* Renderer may already be gone. */
+      /* 渲染进程若已销毁则忽略 */
     }
   }
 }
+
+/**
+ * 严格校验 IPC 发送源是否为合法的主窗口本地 Frame
+ */
 function sender(event) {
   if (
     !win ||
@@ -69,6 +94,10 @@ function sender(event) {
   )
     core.fail("UNTRUSTED_SENDER");
 }
+
+/**
+ * 注册受保护的 IPC 处理函数，包含大小边界校验和错误锁定保护
+ */
 function register(name, fn) {
   ipcMain.handle("secure:" + name, async (event, ...args) => {
     try {

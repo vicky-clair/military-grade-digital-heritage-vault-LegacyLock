@@ -1,8 +1,22 @@
 "use strict";
+/**
+ * 本机记住安全密钥模块 (Local Remembered Key with OS SafeStorage)
+ * 
+ * 安全架构与设计原则：
+ * 1. 操作系统级安全存储：利用 OS 底层密钥库 (Windows DPAPI, macOS Keychain, Linux libsecret/kwallet) 加密存储安全密钥；
+ * 2. 密码学绑定 (Cryptographic Binding)：记录中包含信封标识、签名公钥及 owner 包装头的 SHA-256 绑定哈希；
+ * 3. 凭据变更自动失效：一旦修改主口令或安全密钥，绑定哈希改变，旧记录立即作废并自动物理删除；
+ * 4. 隔离原则：此文件仅存在于本机当前 OS 用户目录，绝不会被打包或同步进 U 盘与外部信息导出包；
+ * 5. 解锁双因子约束：即使开启本机记住密钥，解锁仍必须验证用户的主口令，严禁“免密直登”。
+ */
 const fs = require("node:fs/promises");
 const crypto = require("node:crypto");
 const core = require("./vault-core.cjs");
 const { read, atomicWrite } = require("./vault-store.cjs");
+
+/**
+ * 计算信封的特征绑定哈希 (SHA-256)，用于校验本地安全存储与当前密库是否完全吻合
+ */
 const binding = (envelope) =>
   crypto
     .createHash("sha256")
@@ -10,11 +24,15 @@ const binding = (envelope) =>
       core.canonical([envelope.id, envelope.signingPublicKey, envelope.owner]),
     )
     .digest("hex");
-// This file is local to the OS account and is never part of an information backup.
+
 class LocalKey {
   constructor(store, file, safeStorage, platform = process.platform) {
     Object.assign(this, { store, file, safeStorage, platform });
   }
+
+  /**
+   * 检测当前操作系统安全存储服务是否真正可用且支持硬件/系统级加密
+   */
   available() {
     try {
       return (
@@ -28,6 +46,10 @@ class LocalKey {
       return false;
     }
   }
+
+  /**
+   * 读取并校验本地存储的安全密钥记录，核验版本、绑定哈希及长度
+   */
   async record(envelope) {
     try {
       const record = await read(this.file);
